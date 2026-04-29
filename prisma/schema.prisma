@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  COMERCIANTE
+}
+
+enum PlanType {
+  FREE
+  PREMIUM
+}
+
+enum ComercioStatus {
+  PENDENTE
+  ATIVO
+  INATIVO
+  REJEITADO
+}
+
+enum Categoria {
+  RESTAURANTE
+  HOSPEDAGEM
+  TURISMO
+  SERVICO
+  COMERCIO
+  ENTRETENIMENTO
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(COMERCIANTE)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comercio Comercio?
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Comercio {
+  id        String         @id @default(cuid())
+  nome      String
+  descricao String?        @db.Text
+  categoria Categoria
+  status    ComercioStatus @default(PENDENTE)
+  plano     PlanType       @default(FREE)
+  cep       String?
+  endereco  String?
+  numero    String?
+  bairro    String?
+  cidade    String?
+  estado    String?
+  lat       Float?
+  lng       Float?
+  telefone  String?
+  whatsapp  String?
+  email     String?
+  website   String?
+  instagram String?
+  horarios  String?
+  logo      String?
+  ownerId   String         @unique
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tags    Tag[]
+  fotos   Foto[]
+  eventos Evento[]
+
+  @@map("comercios")
+}
+
+model Tag {
+  id         String   @id @default(cuid())
+  nome       String
+  comercioId String
+  createdAt  DateTime @default(now())
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@unique([nome, comercioId])
+  @@map("tags")
+}
+
+model Foto {
+  id         String   @id @default(cuid())
+  url        String
+  alt        String?
+  ordem      Int      @default(0)
+  comercioId String
+  createdAt  DateTime @default(now())
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@map("fotos")
+}
+
+model Evento {
+  id         String    @id @default(cuid())
+  titulo     String
+  descricao  String?   @db.Text
+  dataInicio DateTime
+  dataFim    DateTime?
+  comercioId String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@map("eventos")
+}
