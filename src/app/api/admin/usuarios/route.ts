@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
   }
 
+  const isPrivilegedRole = parsed.data.role === "ADMIN" || parsed.data.role === "SUPER_ADMIN"
+  if (isPrivilegedRole && session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Apenas Super Admins podem criar administradores." }, { status: 403 })
+  }
+
   const exists = await prisma.user.findUnique({ where: { email: parsed.data.email } })
   if (exists) {
     return NextResponse.json({ error: "E-mail já cadastrado." }, { status: 409 })

@@ -36,6 +36,10 @@ export async function POST(req: NextRequest) {
   const path =
     tipo === "logo"
       ? `${userId}/logo.${ext}`
+      : tipo === "produto"
+      ? `${userId}/produtos/${Date.now()}.${ext}`
+      : tipo === "evento"
+      ? `${userId}/eventos/${Date.now()}.${ext}`
       : `${userId}/fotos/${Date.now()}.${ext}`
 
   const url = await uploadFile(path, file)

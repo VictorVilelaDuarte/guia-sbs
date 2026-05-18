@@ -11,14 +11,16 @@ import {
   LayoutDashboard,
   Users,
   Store,
+  CalendarDays,
   LogOut,
   MapPin,
 } from "lucide-react"
 
 const navItems = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/usuarios", label: "Usuários", icon: Users },
-  { href: "/admin/comercios", label: "Comércios", icon: Store },
+  { href: "/admin/dashboard",  label: "Dashboard",  icon: LayoutDashboard },
+  { href: "/admin/usuarios",   label: "Usuários",   icon: Users },
+  { href: "/admin/comercios",  label: "Comércios",  icon: Store },
+  { href: "/admin/eventos",    label: "Eventos",    icon: CalendarDays },
 ]
 
 interface AdminSidebarProps {

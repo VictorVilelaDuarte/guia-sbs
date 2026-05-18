@@ -89,10 +89,11 @@ model Comercio {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  tags    Tag[]
-  fotos   Foto[]
-  eventos Evento[]
+  owner    User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  tags     Tag[]
+  fotos    Foto[]
+  eventos  Evento[]
+  produtos Produto[]
 
   @@map("comercios")
 }
@@ -122,15 +123,36 @@ model Foto {
   @@map("fotos")
 }
 
-model Evento {
-  id         String    @id @default(cuid())
+model Produto {
+  id         String   @id @default(cuid())
   titulo     String
-  descricao  String?   @db.Text
-  dataInicio DateTime
-  dataFim    DateTime?
+  descricao  String?  @db.Text
+  preco      Float?
+  imagem     String?
+  disponivel Boolean  @default(true)
+  ordem      Int      @default(0)
   comercioId String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@map("produtos")
+}
+
+model Evento {
+  id          String    @id @default(cuid())
+  titulo      String
+  descricao   String?   @db.Text
+  dataInicio  DateTime
+  dataFim     DateTime?
+  imagem      String?
+  local       String?
+  preco       Float?
+  linkExterno String?
+  comercioId  String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
 

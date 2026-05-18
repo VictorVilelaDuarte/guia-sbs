@@ -3,10 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { redirect } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { EditarComercioForm } from "@/components/comerciante/editar-comercio-form"
-import { LogoUploader } from "@/components/comerciante/logo-uploader"
-import { FotosUploader } from "@/components/comerciante/fotos-uploader"
+import { Card, CardContent } from "@/components/ui/card"
+import { DashboardTabs } from "@/components/comerciante/dashboard-tabs"
 import { LogOut, MapPin, Store } from "lucide-react"
 
 const statusVariants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -29,7 +27,12 @@ export default async function ComercinateDashboard() {
 
   const comercio = await prisma.comercio.findUnique({
     where: { ownerId: session.user.id },
-    include: { fotos: { orderBy: { ordem: "asc" } } },
+    include: {
+      fotos:    { orderBy: { ordem: "asc" } },
+      tags:     { orderBy: { createdAt: "asc" }, select: { id: true, nome: true } },
+      produtos: { orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] },
+      eventos:  { orderBy: { dataInicio: "asc" } },
+    },
   })
 
   return (
@@ -59,7 +62,7 @@ export default async function ComercinateDashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-8 space-y-6">
+      <main className="mx-auto max-w-3xl px-6 py-8">
         {!comercio ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-center">
@@ -71,13 +74,15 @@ export default async function ComercinateDashboard() {
             </CardContent>
           </Card>
         ) : (
-          <>
-            <div className="flex items-center justify-between">
+          <div className="space-y-6">
+            <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-2xl font-bold">{comercio.nome}</h1>
-                <p className="text-sm text-muted-foreground mt-0.5">Gerencie as informações do seu comércio</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Gerencie as informações do seu comércio
+                </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <Badge variant={statusVariants[comercio.status]}>
                   {statusLabels[comercio.status] ?? comercio.status}
                 </Badge>
@@ -87,33 +92,8 @@ export default async function ComercinateDashboard() {
               </div>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Logo</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <LogoUploader logoAtual={comercio.logo} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Fotos do comércio</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FotosUploader fotosIniciais={comercio.fotos} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Informações</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <EditarComercioForm comercio={comercio} />
-              </CardContent>
-            </Card>
-          </>
+            <DashboardTabs comercio={comercio} />
+          </div>
         )}
       </main>
     </div>

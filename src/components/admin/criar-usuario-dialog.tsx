@@ -22,15 +22,16 @@ import {
 import { toast } from "sonner"
 import { Loader2, Plus } from "lucide-react"
 
-const roles = [
+const ALL_ROLES = [
   { value: "SUPER_ADMIN", label: "Super Admin" },
   { value: "ADMIN", label: "Admin" },
   { value: "COMERCIANTE", label: "Comerciante" },
 ]
 
-const roleLabels: Record<string, string> = Object.fromEntries(roles.map((r) => [r.value, r.label]))
+const roleLabels: Record<string, string> = Object.fromEntries(ALL_ROLES.map((r) => [r.value, r.label]))
 
-export function CriarUsuarioDialog() {
+export function CriarUsuarioDialog({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const roles = isSuperAdmin ? ALL_ROLES : ALL_ROLES.filter((r) => r.value === "COMERCIANTE")
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)

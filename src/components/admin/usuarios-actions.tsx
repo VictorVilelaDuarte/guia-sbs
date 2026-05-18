@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
-import { MoreHorizontal, Pencil, UserX, UserCheck, Loader2 } from "lucide-react"
+import { MoreHorizontal, Pencil, UserX, UserCheck, Loader2, Trash2 } from "lucide-react"
 
 interface Usuario {
   id: string
@@ -36,13 +36,22 @@ interface Usuario {
   active: boolean
 }
 
-const roles = [
+const ALL_ROLES = [
   { value: "SUPER_ADMIN", label: "Super Admin" },
   { value: "ADMIN", label: "Admin" },
   { value: "COMERCIANTE", label: "Comerciante" },
 ]
 
-export function UsuariosActions({ usuario }: { usuario: Usuario }) {
+export function UsuariosActions({
+  usuario,
+  isSuperAdmin,
+}: {
+  usuario: Usuario
+  isSuperAdmin: boolean
+}) {
+  const targetIsAdmin = usuario.role === "ADMIN" || usuario.role === "SUPER_ADMIN"
+  const canEdit = isSuperAdmin || !targetIsAdmin
+  const roles = isSuperAdmin ? ALL_ROLES : ALL_ROLES.filter((r) => r.value === "COMERCIANTE")
   const router = useRouter()
   const [editOpen, setEditOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -90,6 +99,20 @@ export function UsuariosActions({ usuario }: { usuario: Usuario }) {
     router.refresh()
   }
 
+  async function handleDelete() {
+    if (!confirm(`Excluir "${usuario.name}" permanentemente?`)) return
+
+    const res = await fetch(`/api/admin/usuarios/${usuario.id}`, { method: "DELETE" })
+
+    if (!res.ok) {
+      toast.error("Erro ao excluir usuário.")
+      return
+    }
+
+    toast.success("Usuário excluído.")
+    router.refresh()
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -99,12 +122,12 @@ export function UsuariosActions({ usuario }: { usuario: Usuario }) {
           <MoreHorizontal className="h-4 w-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setEditOpen(true)}>
+          <DropdownMenuItem onClick={() => setEditOpen(true)} disabled={!canEdit}>
             <Pencil className="mr-2 h-4 w-4" />
             Editar
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={toggleActive}>
+          <DropdownMenuItem onClick={toggleActive} disabled={!canEdit}>
             {usuario.active ? (
               <>
                 <UserX className="mr-2 h-4 w-4" />
@@ -117,6 +140,18 @@ export function UsuariosActions({ usuario }: { usuario: Usuario }) {
               </>
             )}
           </DropdownMenuItem>
+          {isSuperAdmin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

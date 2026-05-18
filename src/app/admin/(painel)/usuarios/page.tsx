@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { auth } from "@/lib/auth"
 import { Badge } from "@/components/ui/badge"
 import {
   Table,
@@ -41,7 +42,9 @@ const roleVariants: Record<string, "default" | "secondary" | "outline" | "destru
 }
 
 export default async function UsuariosPage() {
-  const usuarios = await getUsuarios()
+  const [usuarios, session] = await Promise.all([getUsuarios(), auth()])
+  const currentUserRole = session?.user?.role ?? "ADMIN"
+  const isSuperAdmin = currentUserRole === "SUPER_ADMIN"
 
   return (
     <div className="p-6 space-y-6">
@@ -50,7 +53,7 @@ export default async function UsuariosPage() {
           <h1 className="text-2xl font-bold">Usuários</h1>
           <p className="text-muted-foreground text-sm">{usuarios.length} cadastrados</p>
         </div>
-        <CriarUsuarioDialog />
+        <CriarUsuarioDialog isSuperAdmin={isSuperAdmin} />
       </div>
 
       <div className="border rounded-lg overflow-hidden bg-background">
@@ -95,7 +98,7 @@ export default async function UsuariosPage() {
                   {format(u.createdAt, "dd/MM/yyyy", { locale: ptBR })}
                 </TableCell>
                 <TableCell>
-                  <UsuariosActions usuario={u} />
+                  <UsuariosActions usuario={u} isSuperAdmin={isSuperAdmin} />
                 </TableCell>
               </TableRow>
             ))}

@@ -31,6 +31,19 @@ export async function PATCH(
     return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
   }
 
+  // ADMIN não pode promover ninguém a ADMIN/SUPER_ADMIN
+  const isPrivilegedRole = parsed.data.role === "ADMIN" || parsed.data.role === "SUPER_ADMIN"
+  if (isPrivilegedRole && session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Apenas Super Admins podem definir este perfil." }, { status: 403 })
+  }
+
+  // ADMIN não pode editar outros admins
+  const target = await prisma.user.findUnique({ where: { id }, select: { role: true } })
+  const targetIsAdmin = target?.role === "ADMIN" || target?.role === "SUPER_ADMIN"
+  if (targetIsAdmin && session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Sem permissão para editar este usuário." }, { status: 403 })
+  }
+
   const user = await prisma.user.update({
     where: { id },
     data: parsed.data,
@@ -45,6 +58,10 @@ export async function DELETE(
 ) {
   const session = await requireAdmin()
   if (!session) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+
+  if (session.user.role !== "SUPER_ADMIN") {
+    return NextResponse.json({ error: "Apenas Super Admins podem excluir usuários." }, { status: 403 })
+  }
 
   const { id } = await params
 
