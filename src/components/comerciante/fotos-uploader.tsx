@@ -4,7 +4,7 @@ import { useRef, useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { Loader2, Plus, X } from "lucide-react"
+import { Loader2, Plus, X, Lock } from "lucide-react"
 
 interface Foto {
   id: string
@@ -14,18 +14,30 @@ interface Foto {
 
 interface FotosUploaderProps {
   fotosIniciais: Foto[]
+  limite?: number
 }
 
-export function FotosUploader({ fotosIniciais }: FotosUploaderProps) {
+export function FotosUploader({ fotosIniciais, limite }: FotosUploaderProps) {
   const [fotos, setFotos] = useState<Foto[]>(fotosIniciais)
   const [uploading, setUploading] = useState(false)
   const [removendo, setRemovendo] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const atingiuLimite = limite !== undefined && fotos.length >= limite
+
   async function handleFiles(files: FileList) {
+    const disponivel = limite !== undefined ? limite - fotos.length : Infinity
+    const arquivos = Array.from(files).slice(0, disponivel)
+
+    if (arquivos.length < files.length) {
+      toast.warning(`Limite de ${limite} fotos atingido. Faça upgrade para o plano Premium.`)
+    }
+
+    if (arquivos.length === 0) return
+
     setUploading(true)
 
-    for (const file of Array.from(files)) {
+    for (const file of arquivos) {
       const form = new FormData()
       form.append("file", file)
       form.append("tipo", "foto")
@@ -92,23 +104,37 @@ export function FotosUploader({ fotosIniciais }: FotosUploaderProps) {
           </div>
         ))}
 
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="flex aspect-video items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted hover:border-ring transition-colors disabled:opacity-50"
-        >
-          {uploading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          ) : (
-            <Plus className="h-5 w-5 text-muted-foreground" />
-          )}
-        </button>
+        {atingiuLimite ? (
+          <div className="flex aspect-video flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-input bg-muted/50 text-muted-foreground/60">
+            <Lock className="h-4 w-4" />
+            <span className="text-[11px] text-center leading-tight px-2">Premium para mais fotos</span>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="flex aspect-video items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted hover:border-ring transition-colors disabled:opacity-50"
+          >
+            {uploading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            ) : (
+              <Plus className="h-5 w-5 text-muted-foreground" />
+            )}
+          </button>
+        )}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        JPEG, PNG ou WebP · máx. 5MB por foto · pode selecionar várias de uma vez
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          JPEG, PNG ou WebP · máx. 5MB por foto · pode selecionar várias de uma vez
+        </p>
+        {limite !== undefined && (
+          <p className={`text-xs font-medium ${atingiuLimite ? "text-amber-600" : "text-muted-foreground"}`}>
+            {fotos.length}/{limite} fotos
+          </p>
+        )}
+      </div>
 
       <input
         ref={inputRef}

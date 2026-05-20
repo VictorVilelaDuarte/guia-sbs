@@ -98,7 +98,10 @@ export default async function PaginaComercio({
 
   const comercio = await prisma.comercio.findUnique({
     where: { id },
-    include: { fotos: { orderBy: { ordem: "asc" } } },
+    include: {
+      fotos: { orderBy: { ordem: "asc" } },
+      plan: true,
+    },
   });
 
   if (!comercio) notFound();
@@ -194,7 +197,7 @@ export default async function PaginaComercio({
             >
               {categoriaLabels[comercio.categoria] ?? comercio.categoria}
             </span>
-            {comercio.plano === "PREMIUM" && (
+            {comercio.plan.slug === "premium" && (
               <span className="inline-flex items-center gap-1 ml-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                 <Star className="h-3 w-3 fill-current" /> Premium
               </span>

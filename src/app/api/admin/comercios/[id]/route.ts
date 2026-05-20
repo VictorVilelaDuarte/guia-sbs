@@ -5,7 +5,7 @@ import { z } from "zod"
 
 const patchSchema = z.object({
   status: z.enum(["PENDENTE", "ATIVO", "INATIVO", "REJEITADO"]).optional(),
-  plano: z.enum(["FREE", "PREMIUM"]).optional(),
+  planSlug: z.string().optional(),
 })
 
 async function requireAdmin() {
@@ -29,9 +29,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
   }
 
+  const { status, planSlug } = parsed.data
+
+  let planId: string | undefined
+  if (planSlug) {
+    const plan = await prisma.plan.findUnique({ where: { slug: planSlug } })
+    if (!plan) return NextResponse.json({ error: "Plano não encontrado." }, { status: 404 })
+    planId = plan.id
+  }
+
   const comercio = await prisma.comercio.update({
     where: { id },
-    data: parsed.data,
+    data: {
+      ...(status ? { status } : {}),
+      ...(planId ? { planId } : {}),
+    },
   })
 
   return NextResponse.json({ id: comercio.id })

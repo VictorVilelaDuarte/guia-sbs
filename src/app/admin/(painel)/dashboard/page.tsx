@@ -7,7 +7,7 @@ async function getStats() {
     await Promise.all([
       prisma.user.count(),
       prisma.comercio.count(),
-      prisma.comercio.count({ where: { plano: "PREMIUM" } }),
+      prisma.comercio.count({ where: { plan: { slug: "premium" } } }),
       prisma.comercio.count({ where: { status: "PENDENTE" } }),
     ])
 

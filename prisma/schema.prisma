@@ -14,10 +14,7 @@ enum Role {
   COMERCIANTE
 }
 
-enum PlanType {
-  FREE
-  PREMIUM
-}
+// PlanType enum removido — substituído pelo model Plan
 
 enum ComercioStatus {
   PENDENTE
@@ -33,6 +30,23 @@ enum Categoria {
   SERVICO
   COMERCIO
   ENTRETENIMENTO
+}
+
+model Plan {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  nome      String
+  descricao String?
+  preco     Float    @default(0)
+  features  Json     @default("{}")
+  ativo     Boolean  @default(true)
+  ordem     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comercios Comercio[]
+
+  @@map("plans")
 }
 
 model User {
@@ -69,7 +83,7 @@ model Comercio {
   descricao String?        @db.Text
   categoria Categoria
   status    ComercioStatus @default(PENDENTE)
-  plano     PlanType       @default(FREE)
+  planId    String
   cep       String?
   endereco  String?
   numero    String?
@@ -90,6 +104,7 @@ model Comercio {
   updatedAt DateTime       @updatedAt
 
   owner    User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id])
   tags     Tag[]
   fotos    Foto[]
   eventos  Evento[]

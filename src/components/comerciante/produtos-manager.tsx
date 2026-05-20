@@ -285,13 +285,19 @@ function ProdutoDialog({ open, produto, onClose, onSaved }: ProdutoDialogProps) 
 
 // ── Manager principal ────────────────────────────────────────────────────────
 
-export function ProdutosManager({ produtosIniciais }: { produtosIniciais: Produto[] }) {
+export function ProdutosManager({ produtosIniciais, limite }: { produtosIniciais: Produto[]; limite?: number }) {
   const [produtos, setProdutos] = useState<Produto[]>(produtosIniciais)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<Produto | null>(null)
   const [removendoId, setRemovendoId] = useState<string | null>(null)
 
+  const atingiuLimite = limite !== undefined && produtos.length >= limite
+
   function abrirNovo() {
+    if (atingiuLimite) {
+      toast.warning(`Limite de ${limite} produtos atingido. Faça upgrade para o plano Premium.`)
+      return
+    }
     setEditando(null)
     setDialogOpen(true)
   }
@@ -337,12 +343,12 @@ export function ProdutosManager({ produtosIniciais }: { produtosIniciais: Produt
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
+        <p className={`text-sm ${atingiuLimite ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
           {produtos.length === 0
             ? "Nenhum produto cadastrado."
-            : `${produtos.length} ${produtos.length === 1 ? "produto" : "produtos"}`}
+            : `${produtos.length}${limite !== undefined ? `/${limite}` : ""} ${produtos.length === 1 ? "produto" : "produtos"}`}
         </p>
-        <Button size="sm" onClick={abrirNovo}>
+        <Button size="sm" onClick={abrirNovo} disabled={atingiuLimite}>
           <Plus className="h-4 w-4 mr-1.5" />
           Novo produto
         </Button>
@@ -357,7 +363,13 @@ export function ProdutosManager({ produtosIniciais }: { produtosIniciais: Produt
             Adicionar primeiro produto
           </Button>
         </div>
-      ) : (
+      ) : atingiuLimite ? (
+        <p className="text-xs text-amber-600 font-medium">
+          Limite de {limite} produtos atingido. Faça upgrade para o plano Premium para adicionar mais.
+        </p>
+      ) : null}
+
+      {produtos.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
           {produtos.map((p) => (
             <div

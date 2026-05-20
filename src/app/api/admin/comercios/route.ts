@@ -31,12 +31,16 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 })
   if (user.comercio) return NextResponse.json({ error: "Usuário já possui comércio vinculado." }, { status: 409 })
 
+  const planFree = await prisma.plan.findUnique({ where: { slug: "free" } })
+  if (!planFree) return NextResponse.json({ error: "Plano padrão não encontrado. Execute o seed." }, { status: 500 })
+
   const comercio = await prisma.comercio.create({
     data: {
       nome: parsed.data.nome,
       categoria: parsed.data.categoria,
       descricao: parsed.data.descricao,
       ownerId: parsed.data.ownerId,
+      planId: planFree.id,
     },
   })
 

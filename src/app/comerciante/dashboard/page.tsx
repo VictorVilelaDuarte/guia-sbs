@@ -28,6 +28,7 @@ export default async function ComercinateDashboard() {
   const comercio = await prisma.comercio.findUnique({
     where: { ownerId: session.user.id },
     include: {
+      plan:     true,
       fotos:    { orderBy: { ordem: "asc" } },
       tags:     { orderBy: { createdAt: "asc" }, select: { id: true, nome: true } },
       produtos: { orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] },
@@ -86,8 +87,8 @@ export default async function ComercinateDashboard() {
                 <Badge variant={statusVariants[comercio.status]}>
                   {statusLabels[comercio.status] ?? comercio.status}
                 </Badge>
-                <Badge variant={comercio.plano === "PREMIUM" ? "default" : "outline"}>
-                  {comercio.plano}
+                <Badge variant={comercio.plan.slug === "premium" ? "default" : "outline"}>
+                  {comercio.plan.nome}
                 </Badge>
               </div>
             </div>

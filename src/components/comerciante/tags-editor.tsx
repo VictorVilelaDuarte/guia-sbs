@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, KeyboardEvent } from "react"
-import { X, Plus, Loader2 } from "lucide-react"
+import { X, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -12,14 +12,17 @@ interface Tag {
 
 interface TagsEditorProps {
   tagsIniciais: Tag[]
+  limite?: number
 }
 
-export function TagsEditor({ tagsIniciais }: TagsEditorProps) {
+export function TagsEditor({ tagsIniciais, limite }: TagsEditorProps) {
   const [tags, setTags] = useState<Tag[]>(tagsIniciais)
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const atingiuLimite = limite !== undefined && tags.length >= limite
 
   function normalize(value: string) {
     return value.toLowerCase().trim().replace(/\s+/g, " ")
@@ -28,6 +31,13 @@ export function TagsEditor({ tagsIniciais }: TagsEditorProps) {
   async function addTag(raw: string) {
     const nome = normalize(raw)
     if (!nome) return
+
+    if (atingiuLimite) {
+      toast.warning(`Limite de ${limite} palavras-chave atingido. Faça upgrade para o plano Premium.`)
+      setInput("")
+      return
+    }
+
     if (tags.some((t) => t.nome === nome)) {
       setInput("")
       return
@@ -77,13 +87,12 @@ export function TagsEditor({ tagsIniciais }: TagsEditorProps) {
 
   return (
     <div className="space-y-3">
-      {/* Campo de entrada */}
       <div
         className={cn(
           "flex flex-wrap gap-2 min-h-10 px-3 py-2 rounded-md border border-input bg-background",
-          "cursor-text focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+          !atingiuLimite && "cursor-text focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
         )}
-        onClick={() => inputRef.current?.focus()}
+        onClick={() => !atingiuLimite && inputRef.current?.focus()}
       >
         {tags.map((tag) => (
           <span
@@ -106,31 +115,44 @@ export function TagsEditor({ tagsIniciais }: TagsEditorProps) {
           </span>
         ))}
 
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => { if (input.trim()) addTag(input) }}
-          placeholder={tags.length === 0 ? "Digite uma palavra-chave e pressione Enter..." : ""}
-          className="flex-1 min-w-32 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
-          disabled={loading}
-        />
+        {!atingiuLimite && (
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => { if (input.trim()) addTag(input) }}
+            placeholder={tags.length === 0 ? "Digite uma palavra-chave e pressione Enter..." : ""}
+            className="flex-1 min-w-32 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+            disabled={loading}
+          />
+        )}
 
         {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground self-center" />}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Pressione <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">Enter</kbd> ou <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">,</kbd> para adicionar.
-        Backspace remove a última tag. Exemplos: <span className="italic">bolo, encomenda, delivery, almoço</span>.
-      </p>
-
-      {tags.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          {tags.length} {tags.length === 1 ? "palavra-chave cadastrada" : "palavras-chave cadastradas"}
+      {atingiuLimite && (
+        <p className="text-xs text-amber-600 font-medium">
+          Limite de {limite} palavras-chave atingido. Faça upgrade para o plano Premium para adicionar mais.
         </p>
       )}
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          {!atingiuLimite && (
+            <>
+              Pressione <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">Enter</kbd> ou <kbd className="px-1 py-0.5 rounded bg-muted border border-border text-[10px] font-mono">,</kbd> para adicionar.
+              {" "}Backspace remove a última.
+            </>
+          )}
+        </p>
+        {limite !== undefined && (
+          <p className={`text-xs font-medium ${atingiuLimite ? "text-amber-600" : "text-muted-foreground"}`}>
+            {tags.length}/{limite} palavras-chave
+          </p>
+        )}
+      </div>
     </div>
   )
 }

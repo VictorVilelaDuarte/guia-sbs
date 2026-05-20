@@ -14,6 +14,7 @@ import {
   CalendarDays,
   LogOut,
   MapPin,
+  CreditCard,
 } from "lucide-react"
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/admin/usuarios",   label: "Usuários",   icon: Users },
   { href: "/admin/comercios",  label: "Comércios",  icon: Store },
   { href: "/admin/eventos",    label: "Eventos",    icon: CalendarDays },
+  { href: "/admin/planos",     label: "Planos",     icon: CreditCard },
 ]
 
 interface AdminSidebarProps {

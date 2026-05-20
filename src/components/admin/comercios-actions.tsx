@@ -16,7 +16,7 @@ interface Comercio {
   id: string
   nome: string
   status: string
-  plano: string
+  plan: { slug: string; nome: string }
 }
 
 export function ComerciosActions({ comercio }: { comercio: Comercio }) {
@@ -34,6 +34,8 @@ export function ComerciosActions({ comercio }: { comercio: Comercio }) {
     }
     router.refresh()
   }
+
+  const isPremium = comercio.plan.slug === "premium"
 
   return (
     <DropdownMenu>
@@ -66,10 +68,10 @@ export function ComerciosActions({ comercio }: { comercio: Comercio }) {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        {comercio.plano === "FREE" ? (
+        {!isPremium ? (
           <DropdownMenuItem
             onClick={() => {
-              updateComercio({ plano: "PREMIUM" })
+              updateComercio({ planSlug: "premium" })
               toast.success("Plano alterado para Premium.")
             }}
           >
@@ -79,8 +81,8 @@ export function ComerciosActions({ comercio }: { comercio: Comercio }) {
         ) : (
           <DropdownMenuItem
             onClick={() => {
-              updateComercio({ plano: "FREE" })
-              toast.success("Plano rebaixado para Free.")
+              updateComercio({ planSlug: "free" })
+              toast.success("Plano alterado para Gratuito.")
             }}
           >
             <StarOff className="mr-2 h-4 w-4" />
