@@ -33,6 +33,10 @@ export default async function ComercinateDashboard() {
       tags:     { orderBy: { createdAt: "asc" }, select: { id: true, nome: true } },
       produtos: { orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] },
       eventos:  { orderBy: { dataInicio: "asc" } },
+      cardapioCategorias: {
+        orderBy: { ordem: "asc" },
+        include: { itens: { orderBy: { ordem: "asc" } } },
+      },
     },
   })
 

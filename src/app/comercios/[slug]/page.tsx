@@ -18,6 +18,7 @@ import {
   Ticket,
   Camera,
   ShoppingBag,
+  UtensilsCrossed,
 } from "lucide-react";
 import { MapaView } from "@/components/public/mapa-view-dynamic";
 import { ShareButton } from "@/components/public/share-button";
@@ -192,13 +193,20 @@ export default async function PaginaComercio({
       produtos: { where: { disponivel: true }, orderBy: { ordem: "asc" } },
       eventos: { orderBy: { dataInicio: "asc" } },
       plan: true,
+      cardapioCategorias: {
+        orderBy: { ordem: "asc" },
+        include: {
+          itens: { where: { disponivel: true }, orderBy: { ordem: "asc" } },
+        },
+      },
     },
   });
 
   if (!comercio) notFound();
 
   const isPublicado = comercio.status === "ATIVO";
-  const temEventos = temFeature(comercio.plan.features, "eventos");
+  const temEventos = temFeature(comercio.plan.features, "eventos")
+  const temCardapio = temFeature(comercio.plan.features, "cardapio");
 
   const horarios = parseHorarios(comercio.horarios);
   const diaAtual = getDiaAtual();
@@ -396,6 +404,52 @@ export default async function PaginaComercio({
                 Fotos
               </h2>
               <GaleriaFotos fotos={fotosGaleria} nomeComercio={comercio.nome} />
+            </section>
+            <Separator className="mb-6" />
+          </>
+        )}
+
+        {/* Cardápio (apenas planos com a feature) */}
+        {temCardapio && comercio.cardapioCategorias.length > 0 && (
+          <>
+            <section className="mb-6">
+              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-1.5">
+                <UtensilsCrossed className="h-3.5 w-3.5" />
+                Cardápio
+              </h2>
+              <div className="space-y-6">
+                {comercio.cardapioCategorias.map((cat) => (
+                  cat.itens.length > 0 && (
+                    <div key={cat.id}>
+                      <h3 className="text-sm font-semibold mb-3 pb-1 border-b border-border">{cat.nome}</h3>
+                      <div className="space-y-3">
+                        {cat.itens.map((item) => (
+                          <div key={item.id} className="flex items-start gap-3">
+                            {item.imagem && (
+                              <div className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden bg-muted">
+                                <Image src={item.imagem} alt={item.titulo} fill className="object-cover" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium leading-snug">{item.titulo}</p>
+                                {item.preco != null && item.preco > 0 && (
+                                  <span className="text-sm font-semibold text-primary shrink-0">
+                                    {item.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                  </span>
+                                )}
+                              </div>
+                              {item.descricao && (
+                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.descricao}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                ))}
+              </div>
             </section>
             <Separator className="mb-6" />
           </>

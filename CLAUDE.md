@@ -14,7 +14,7 @@ Dois públicos principais:
 - **Comerciante:** gerencia seu próprio perfil (informações, fotos, produtos, eventos, palavras-chave) via dashboard privado.
 - **Visitante/turista:** consulta o guia público sem login — comércios, eventos, mapa.
 
-Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/comercios/[id]`.
+Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/comercios/[slug]` (slug gerado automaticamente a partir do nome na criação do comércio).
 
 **Modelo de negócio:** SaaS B2B local — comerciantes pagam planos (FREE / PREMIUM) para acessar recursos da plataforma. A diferenciação de features entre os planos é estratégica e ainda está sendo definida. Ao implementar novas features, considerar se faz sentido restringi-las ao plano PREMIUM.
 
@@ -38,8 +38,8 @@ npm run db:seed      # cria o super admin padrão (admin@guiasbs.com.br / admin1
 ## Variáveis de Ambiente (`.env`)
 
 ```env
-DATABASE_URL="postgresql://..."   # porta 5432 direta — NÃO use o pooler (causa "Tenant not found")
-DIRECT_URL="postgresql://..."     # igual ao DATABASE_URL neste setup
+DATABASE_URL="postgresql://..."   # dev: porta 5432 direta. produção (Vercel): pooler porta 6543 com ?pgbouncer=true
+DIRECT_URL="postgresql://..."     # sempre porta 5432 direta (usado pelo Prisma para migrations)
 NEXT_PUBLIC_SUPABASE_URL="https://<ref>.supabase.co"
 SUPABASE_SERVICE_ROLE_KEY="..."
 NEXTAUTH_URL="http://localhost:3000"
@@ -94,7 +94,9 @@ if (!session || session.user.role !== "COMERCIANTE") return 401
 
 ### Perfil público
 
-`/comercios/[id]/page.tsx` — Server Component público. Exibe todos os dados do comércio. Comércios com `status !== ATIVO` mostram um banner de pré-visualização mas não bloqueiam o acesso (útil para o comerciante revisar antes da aprovação).
+`/comercios/[slug]/page.tsx` — Server Component público. Exibe todos os dados do comércio: identidade (logo + descrição), status aberto/fechado (timezone `America/Sao_Paulo`), CTAs rápidos, galeria de fotos, eventos, horários, mapa, contatos e produtos. Comércios com `status !== ATIVO` mostram um banner de pré-visualização mas não bloqueiam o acesso (útil para o comerciante revisar antes da aprovação).
+
+Status aberto/fechado usa `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paulo"` — calculado no servidor. Quando fechado, exibe "Volta amanhã às HH:MM" ou "Volta [dia] às HH:MM" com base no próximo dia com abertura cadastrada.
 
 ### Upload de imagens
 
@@ -107,9 +109,33 @@ Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, 
 {userId}/eventos/{timestamp}.{ext}
 ```
 
-### Mapas (Leaflet)
+### Auth config separada (Edge-compatible)
+
+O middleware roda no Edge runtime da Vercel (limite de 1 MB). Para não ultrapassar o limite, a config do NextAuth está dividida em dois arquivos:
+
+- `src/auth.config.ts` — config leve com só os callbacks JWT e sem providers. Importado pelo middleware.
+- `src/lib/auth.ts` — config completa com Credentials provider, Prisma e bcryptjs. Importado pelas API routes e Server Components.
+
+**Nunca importe `@/lib/auth` no middleware** — isso puxa Prisma + bcryptjs e estoura o limite do Edge.
+
+### Slug de comércio
+
+`src/lib/slugify.ts` — utilitário que normaliza NFD, remove diacríticos e converte para kebab-case. Usado na criação do comércio (`/api/admin/comercios`) para gerar slug único com sufixo numérico caso já exista (ex: `chao-bento-2`).
+
+### Galeria de fotos pública
+
+`src/components/public/galeria-fotos.tsx` — carrossel horizontal com lightbox fullscreen.
+
+- Carrossel: `overflow-x-auto -mx-4 px-4` (mesma convenção do CTA strip — sem `snap-*`, pois o snap quebra o alinhamento com o padding). **Não adicione snap classes aqui.**
+- Lightbox: pinch-to-zoom via listener `touchmove` não-passivo (`{ passive: false }` + `e.preventDefault()`). Refs espelham state para evitar stale closures em event listeners DOM.
+- Todas as cores do lightbox são `rgba()` inline — classes Tailwind de opacidade (`text-white/70`, `bg-black/40`) não funcionam em alguns browsers móveis.
+- `key={indice}` no componente `<Lightbox>` reseta zoom/pan ao trocar foto sem useEffect.
+
+### Mapa (Leaflet)
 
 Leaflet exige importação com `next/dynamic` + `ssr: false`. O padrão adotado é ter um wrapper `*-dynamic.tsx` (Client Component) que faz o dynamic import do componente real. Nunca importe componentes Leaflet diretamente em Server Components.
+
+O CSS do Leaflet é importado localmente (`import "leaflet/dist/leaflet.css"` dentro do componente) — **não use CDN**, pois falha em redes locais. O popup do mapa exibe o logo do comércio (72×72px) quando disponível, ou o nome como fallback.
 
 ### Horários de funcionamento
 

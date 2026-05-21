@@ -24,6 +24,11 @@ export const FEATURES_DISPONIVEIS = [
     label: "QR Code",
     descricao: "Geração de QR Code personalizado do perfil para impressão",
   },
+  {
+    key: "cardapio",
+    label: "Cardápio",
+    descricao: "Cardápio digital com categorias e itens organizados por ordem",
+  },
 ] as const
 
 export type FeatureKey = (typeof FEATURES_DISPONIVEIS)[number]["key"]

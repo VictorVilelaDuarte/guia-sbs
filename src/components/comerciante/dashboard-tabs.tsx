@@ -6,6 +6,7 @@ import { EditarComercioForm } from "@/components/comerciante/editar-comercio-for
 import { LogoUploader } from "@/components/comerciante/logo-uploader"
 import { FotosUploader } from "@/components/comerciante/fotos-uploader"
 import { ProdutosManager } from "@/components/comerciante/produtos-manager"
+import { CardapioManager } from "@/components/comerciante/cardapio-manager"
 import { TagsEditor } from "@/components/comerciante/tags-editor"
 import { EventosManager, type Evento } from "@/components/comerciante/eventos-manager"
 import { cn } from "@/lib/utils"
@@ -46,6 +47,17 @@ export interface ComercioParaDashboard {
   tags: Tag[]
   produtos: Produto[]
   eventos: Evento[]
+  cardapioCategorias: CardapioCategoria[]
+}
+
+interface CardapioItem {
+  id: string; titulo: string; descricao: string | null
+  preco: number | null; imagem: string | null
+  disponivel: boolean; ordem: number; categoriaId: string
+}
+
+interface CardapioCategoria {
+  id: string; nome: string; ordem: number; itens: CardapioItem[]
 }
 
 interface AbaConfig {
@@ -58,6 +70,7 @@ const ABAS: AbaConfig[] = [
   { id: "informacoes", label: "Informações" },
   { id: "fotos",       label: "Fotos" },
   { id: "produtos",    label: "Produtos e serviços" },
+  { id: "cardapio",    label: "Cardápio", feature: "cardapio" },
   { id: "eventos",     label: "Eventos", feature: "eventos" },
   { id: "tags",        label: "Palavras-chave" },
 ]
@@ -157,6 +170,20 @@ export function DashboardTabs({ comercio }: { comercio: ComercioParaDashboard })
             </CardHeader>
             <CardContent>
               <ProdutosManager produtosIniciais={comercio.produtos} limite={produtoLimite} />
+            </CardContent>
+          </Card>
+        )}
+
+        {aba === "cardapio" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Cardápio</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Organize itens por categoria e defina a ordem de exibição no perfil.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <CardapioManager categoriasIniciais={comercio.cardapioCategorias} />
             </CardContent>
           </Card>
         )}

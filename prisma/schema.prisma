@@ -110,6 +110,8 @@ model Comercio {
   fotos    Foto[]
   eventos  Evento[]
   produtos Produto[]
+  cardapioCategorias CardapioCategoria[]
+  cardapioItens      CardapioItem[]
 
   @@map("comercios")
 }
@@ -154,6 +156,37 @@ model Produto {
   comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
 
   @@map("produtos")
+}
+
+model CardapioCategoria {
+  id         String         @id @default(cuid())
+  nome       String
+  ordem      Int            @default(0)
+  comercioId String
+  comercio   Comercio       @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  itens      CardapioItem[]
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@map("cardapio_categorias")
+}
+
+model CardapioItem {
+  id          String            @id @default(cuid())
+  titulo      String
+  descricao   String?           @db.Text
+  preco       Float?
+  imagem      String?
+  disponivel  Boolean           @default(true)
+  ordem       Int               @default(0)
+  categoriaId String
+  categoria   CardapioCategoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
+  comercioId  String
+  comercio    Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("cardapio_itens")
 }
 
 model Evento {

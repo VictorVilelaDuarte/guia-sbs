@@ -39,6 +39,7 @@ async function main() {
         destaque_busca: true,
         analytics: true,
         qr_code: true,
+        cardapio: true,
       },
     },
   })
