@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
+import { slugify } from "@/lib/slugify"
 
 const createSchema = z.object({
   nome: z.string().min(2),
@@ -34,8 +35,16 @@ export async function POST(req: NextRequest) {
   const planFree = await prisma.plan.findUnique({ where: { slug: "free" } })
   if (!planFree) return NextResponse.json({ error: "Plano padrão não encontrado. Execute o seed." }, { status: 500 })
 
+  const base = slugify(parsed.data.nome)
+  let slug = base
+  let count = 1
+  while (await prisma.comercio.findUnique({ where: { slug } })) {
+    slug = `${base}-${count++}`
+  }
+
   const comercio = await prisma.comercio.create({
     data: {
+      slug,
       nome: parsed.data.nome,
       categoria: parsed.data.categoria,
       descricao: parsed.data.descricao,

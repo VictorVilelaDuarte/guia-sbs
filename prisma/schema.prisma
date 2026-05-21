@@ -79,6 +79,7 @@ model Session {
 
 model Comercio {
   id        String         @id @default(cuid())
+  slug      String         @unique
   nome      String
   descricao String?        @db.Text
   categoria Categoria

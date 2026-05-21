@@ -2,24 +2,29 @@
 
 import { useEffect, useRef } from "react"
 import type { Map } from "leaflet"
+import "leaflet/dist/leaflet.css"
 
 interface MapaViewProps {
   lat: number
   lng: number
   nome: string
+  logo?: string | null
 }
 
-export function MapaView({ lat, lng, nome }: MapaViewProps) {
+export function MapaView({ lat, lng, nome, logo }: MapaViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
 
   useEffect(() => {
-    if (document.getElementById("leaflet-css")) return
-    const link = document.createElement("link")
-    link.id = "leaflet-css"
-    link.rel = "stylesheet"
-    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    document.head.appendChild(link)
+    if (!document.getElementById("leaflet-logo-popup-css")) {
+      const style = document.createElement("style")
+      style.id = "leaflet-logo-popup-css"
+      style.textContent = `
+        .leaflet-logo-popup .leaflet-popup-content-wrapper { padding: 1px; border-radius: 10px; overflow: hidden; }
+        .leaflet-logo-popup .leaflet-popup-content { margin: 0; font-size: 0; line-height: 0; }
+      `
+      document.head.appendChild(style)
+    }
   }, [])
 
   useEffect(() => {
@@ -50,7 +55,18 @@ export function MapaView({ lat, lng, nome }: MapaViewProps) {
         maxZoom: 19,
       }).addTo(map)
 
-      L.marker([lat, lng], { icon: pinIcon }).addTo(map).bindPopup(nome).openPopup()
+      const popupContent = logo
+        ? `<img src="${logo}" alt="${nome}" style="width:72px;height:72px;object-fit:contain;display:block;" />`
+        : nome
+
+      L.marker([lat, lng], { icon: pinIcon })
+        .addTo(map)
+        .bindPopup(popupContent, {
+          maxWidth: logo ? 74 : 200,
+          className: logo ? "leaflet-logo-popup" : "",
+          closeButton: !logo,
+        })
+        .openPopup()
 
       mapRef.current = map
     })
