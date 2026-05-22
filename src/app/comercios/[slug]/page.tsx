@@ -196,7 +196,11 @@ export default async function PaginaComercio({
       cardapioCategorias: {
         orderBy: { ordem: "asc" },
         include: {
-          itens: { where: { disponivel: true }, orderBy: { ordem: "asc" } },
+          itens: {
+              where: { disponivel: true },
+              orderBy: { ordem: "asc" },
+              include: { variacoes: { orderBy: { ordem: "asc" } } },
+            },
         },
       },
     },
@@ -431,17 +435,30 @@ export default async function PaginaComercio({
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-sm font-medium leading-snug">{item.titulo}</p>
-                                {item.preco != null && item.preco > 0 && (
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium leading-snug">{item.titulo}</p>
+                                  {item.descricao && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.descricao}</p>
+                                  )}
+                                </div>
+                                {item.variacoes.length > 0 ? (
+                                  <div className="flex gap-4 shrink-0 text-right">
+                                    {item.variacoes.map((v) => (
+                                      <div key={v.id}>
+                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{v.nome}</p>
+                                        <p className="text-sm font-semibold text-primary">
+                                          {v.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                        </p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : item.preco != null && item.preco > 0 ? (
                                   <span className="text-sm font-semibold text-primary shrink-0">
                                     {item.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                                   </span>
-                                )}
+                                ) : null}
                               </div>
-                              {item.descricao && (
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.descricao}</p>
-                              )}
                             </div>
                           </div>
                         ))}

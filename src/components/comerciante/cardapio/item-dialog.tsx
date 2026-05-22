@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, ImagePlus, X, Eye, EyeOff } from "lucide-react";
+import { Loader2, ImagePlus, X, Eye, EyeOff, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CardapioItem, CardapioCategoria, ItemFormState } from "./types";
 import { formatPreco, parsePreco } from "./utils";
@@ -42,10 +42,13 @@ export function ItemDialog({
     imagem: null,
     disponivel: true,
     categoriaId: "",
+    variacoes: [],
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const temVariacoes = form.variacoes.length > 0;
 
   useEffect(() => {
     if (open) {
@@ -64,6 +67,12 @@ export function ItemDialog({
               imagem: item.imagem,
               disponivel: item.disponivel,
               categoriaId: item.categoriaId,
+              variacoes: item.variacoes.map((v) => ({
+                nome: v.nome,
+                preco: v.preco.toLocaleString("pt-BR", {
+                  minimumFractionDigits: 2,
+                }),
+              })),
             }
           : {
               titulo: "",
@@ -72,6 +81,7 @@ export function ItemDialog({
               imagem: null,
               disponivel: true,
               categoriaId: defaultCategoriaId ?? categorias[0]?.id ?? "",
+              variacoes: [],
             },
       );
     }
@@ -102,17 +112,62 @@ export function ItemDialog({
     e.target.value = "";
   }
 
+  function addVariacao() {
+    setForm((f) => ({ ...f, variacoes: [...f.variacoes, { nome: "", preco: "" }] }));
+  }
+
+  function removeVariacao(index: number) {
+    setForm((f) => ({
+      ...f,
+      variacoes: f.variacoes.filter((_, i) => i !== index),
+    }));
+  }
+
+  function updateVariacao(index: number, field: "nome" | "preco", value: string) {
+    setForm((f) => {
+      const next = [...f.variacoes];
+      next[index] = {
+        ...next[index],
+        [field]: field === "preco" ? formatPreco(value) : value,
+      };
+      return { ...f, variacoes: next };
+    });
+  }
+
+  function ativarVariacoes() {
+    setForm((f) => ({ ...f, variacoes: [{ nome: "", preco: f.preco }] }));
+  }
+
+  function desativarVariacoes() {
+    setForm((f) => ({ ...f, variacoes: [] }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (temVariacoes) {
+      const invalida = form.variacoes.some((v) => !v.nome.trim() || !v.preco.trim());
+      if (invalida) {
+        toast.error("Preencha nome e preço de todas as variações.");
+        return;
+      }
+    }
+
     setSaving(true);
+
+    const variacoes = form.variacoes.map((v) => ({
+      nome: v.nome.trim(),
+      preco: parsePreco(v.preco) ?? 0,
+    }));
 
     const payload = {
       titulo: form.titulo.trim(),
       descricao: form.descricao.trim() || null,
-      preco: parsePreco(form.preco),
+      preco: temVariacoes ? null : parsePreco(form.preco),
       imagem: form.imagem,
       disponivel: form.disponivel,
       categoriaId: form.categoriaId,
+      variacoes,
     };
 
     const res = await fetch(
@@ -140,7 +195,7 @@ export function ItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEdicao ? "Editar item" : "Novo item"}</DialogTitle>
         </DialogHeader>
@@ -258,21 +313,35 @@ export function ItemDialog({
             />
           </div>
 
-          {/* Preço + Disponível */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="preco-item">
-                Preço{" "}
-                <span className="text-muted-foreground font-normal">
-                  (opcional)
-                </span>
-              </Label>
+          {/* Preço / Variações */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>{temVariacoes ? "Variações de preço" : "Preço"}</Label>
+              {temVariacoes ? (
+                <button
+                  type="button"
+                  onClick={desativarVariacoes}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Usar preço único
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={ativarVariacoes}
+                  className="text-xs text-primary hover:underline cursor-pointer"
+                >
+                  + Adicionar variações
+                </button>
+              )}
+            </div>
+
+            {!temVariacoes ? (
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                   R$
                 </span>
                 <Input
-                  id="preco-item"
                   inputMode="numeric"
                   placeholder="0,00"
                   className="pl-9"
@@ -285,32 +354,80 @@ export function ItemDialog({
                   }
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Disponível</Label>
-              <button
-                type="button"
-                onClick={() =>
-                  setForm((f) => ({ ...f, disponivel: !f.disponivel }))
-                }
-                className={cn(
-                  "w-full h-9 rounded-md px-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors border cursor-pointer",
-                  form.disponivel
-                    ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
-                    : "bg-muted border-input text-muted-foreground hover:bg-muted/70",
-                )}
-              >
-                {form.disponivel ? (
-                  <>
-                    <Eye className="h-3.5 w-3.5" /> Visível
-                  </>
-                ) : (
-                  <>
-                    <EyeOff className="h-3.5 w-3.5" /> Oculto
-                  </>
-                )}
-              </button>
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-[1fr_7rem_2rem] gap-2 px-1">
+                  <span className="text-xs text-muted-foreground">Nome</span>
+                  <span className="text-xs text-muted-foreground">Preço</span>
+                  <span />
+                </div>
+                {form.variacoes.map((v, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_7rem_2rem] gap-2 items-center">
+                    <Input
+                      placeholder="Ex: Pequeno, Cápsula..."
+                      maxLength={80}
+                      value={v.nome}
+                      onChange={(e) => updateVariacao(i, "nome", e.target.value)}
+                    />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                        R$
+                      </span>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="0,00"
+                        className="pl-9"
+                        value={v.preco}
+                        onChange={(e) => updateVariacao(i, "preco", e.target.value)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeVariacao(i)}
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                      aria-label="Remover variação"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addVariacao}
+                  className="flex items-center gap-1 text-xs text-primary hover:underline cursor-pointer mt-1"
+                >
+                  <Plus className="h-3 w-3" />
+                  Adicionar variação
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Disponível */}
+          <div className="space-y-2">
+            <Label>Disponível</Label>
+            <button
+              type="button"
+              onClick={() =>
+                setForm((f) => ({ ...f, disponivel: !f.disponivel }))
+              }
+              className={cn(
+                "w-full h-9 rounded-md px-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors border cursor-pointer",
+                form.disponivel
+                  ? "bg-green-50 border-green-200 text-green-700 hover:bg-green-100"
+                  : "bg-muted border-input text-muted-foreground hover:bg-muted/70",
+              )}
+            >
+              {form.disponivel ? (
+                <>
+                  <Eye className="h-3.5 w-3.5" /> Visível
+                </>
+              ) : (
+                <>
+                  <EyeOff className="h-3.5 w-3.5" /> Oculto
+                </>
+              )}
+            </button>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

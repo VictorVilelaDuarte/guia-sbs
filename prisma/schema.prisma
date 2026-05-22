@@ -183,10 +183,22 @@ model CardapioItem {
   categoria   CardapioCategoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
   comercioId  String
   comercio    Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  variacoes   CardapioVariacao[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
   @@map("cardapio_itens")
+}
+
+model CardapioVariacao {
+  id     String       @id @default(cuid())
+  nome   String
+  preco  Float
+  ordem  Int          @default(0)
+  itemId String
+  item   CardapioItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("cardapio_variacoes")
 }
 
 model Evento {

@@ -4,6 +4,11 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { deleteFile } from "@/lib/supabase-storage"
 
+const variacaoSchema = z.object({
+  nome: z.string().min(1).max(80),
+  preco: z.number().nonnegative(),
+})
+
 const patchSchema = z.object({
   titulo: z.string().min(1).max(120).optional(),
   descricao: z.string().max(1000).optional().nullable(),
@@ -11,6 +16,7 @@ const patchSchema = z.object({
   imagem: z.string().url().optional().nullable(),
   disponivel: z.boolean().optional(),
   categoriaId: z.string().optional(),
+  variacoes: z.array(variacaoSchema).optional(),
 })
 
 async function ownerCheck(itemId: string) {
@@ -38,10 +44,30 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
 
-  const updated = await prisma.cardapioItem.update({
-    where: { id },
-    data: parsed.data,
-  })
+  const { variacoes, ...itemData } = parsed.data
+
+  let updated
+  if (variacoes !== undefined) {
+    updated = await prisma.$transaction(async (tx) => {
+      await tx.cardapioVariacao.deleteMany({ where: { itemId: id } })
+      if (variacoes.length > 0) {
+        await tx.cardapioVariacao.createMany({
+          data: variacoes.map((v, i) => ({ ...v, itemId: id, ordem: i })),
+        })
+      }
+      return tx.cardapioItem.update({
+        where: { id },
+        data: itemData,
+        include: { variacoes: { orderBy: { ordem: "asc" } } },
+      })
+    })
+  } else {
+    updated = await prisma.cardapioItem.update({
+      where: { id },
+      data: itemData,
+      include: { variacoes: { orderBy: { ordem: "asc" } } },
+    })
+  }
 
   return NextResponse.json(updated)
 }

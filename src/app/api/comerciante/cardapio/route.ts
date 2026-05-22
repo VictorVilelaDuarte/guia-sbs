@@ -22,6 +22,7 @@ export async function GET() {
     include: {
       itens: {
         orderBy: { ordem: "asc" },
+        include: { variacoes: { orderBy: { ordem: "asc" } } },
       },
     },
   })

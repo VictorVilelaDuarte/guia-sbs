@@ -423,12 +423,18 @@ export function CardapioManager({
                                         {item.descricao}
                                       </p>
                                     )}
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                      {item.preco != null && (
+                                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                      {item.variacoes.length > 0 ? (
+                                        <span className="text-xs font-semibold text-primary">
+                                          {item.variacoes
+                                            .map((v) => `${v.nome}: ${displayPreco(v.preco)}`)
+                                            .join(" · ")}
+                                        </span>
+                                      ) : item.preco != null ? (
                                         <span className="text-xs font-semibold text-primary">
                                           {displayPreco(item.preco)}
                                         </span>
-                                      )}
+                                      ) : null}
                                       <span
                                         className={cn(
                                           "text-[10px] font-medium px-1.5 py-0.5 rounded-full",

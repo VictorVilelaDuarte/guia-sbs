@@ -65,6 +65,14 @@ export interface ComercioParaDashboard {
   cardapioCategorias: CardapioCategoria[];
 }
 
+interface CardapioVariacao {
+  id: string;
+  nome: string;
+  preco: number;
+  ordem: number;
+  itemId: string;
+}
+
 interface CardapioItem {
   id: string;
   titulo: string;
@@ -74,6 +82,7 @@ interface CardapioItem {
   disponivel: boolean;
   ordem: number;
   categoriaId: string;
+  variacoes: CardapioVariacao[];
 }
 
 interface CardapioCategoria {

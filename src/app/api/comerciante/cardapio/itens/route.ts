@@ -3,6 +3,11 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
+const variacaoSchema = z.object({
+  nome: z.string().min(1).max(80),
+  preco: z.number().nonnegative(),
+})
+
 const createSchema = z.object({
   titulo: z.string().min(1).max(120),
   descricao: z.string().max(1000).optional().nullable(),
@@ -10,6 +15,7 @@ const createSchema = z.object({
   imagem: z.string().url().optional().nullable(),
   disponivel: z.boolean().optional(),
   categoriaId: z.string(),
+  variacoes: z.array(variacaoSchema).optional(),
 })
 
 async function getComerciante() {
@@ -30,7 +36,6 @@ export async function POST(req: NextRequest) {
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos.", issues: parsed.error.issues }, { status: 400 })
 
-  // Verifica que a categoria pertence ao comércio
   const categoria = await prisma.cardapioCategoria.findUnique({
     where: { id: parsed.data.categoriaId },
     select: { comercioId: true },
@@ -39,10 +44,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
   }
 
-  const count = await prisma.cardapioItem.count({ where: { categoriaId: parsed.data.categoriaId } })
+  const { variacoes, ...itemData } = parsed.data
+  const count = await prisma.cardapioItem.count({ where: { categoriaId: itemData.categoriaId } })
 
   const item = await prisma.cardapioItem.create({
-    data: { ...parsed.data, comercioId: ctx.comercioId, ordem: count },
+    data: {
+      ...itemData,
+      comercioId: ctx.comercioId,
+      ordem: count,
+      variacoes: variacoes?.length
+        ? { create: variacoes.map((v, i) => ({ ...v, ordem: i })) }
+        : undefined,
+    },
+    include: { variacoes: { orderBy: { ordem: "asc" } } },
   })
 
   return NextResponse.json(item, { status: 201 })

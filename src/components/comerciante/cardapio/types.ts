@@ -1,3 +1,11 @@
+export interface CardapioVariacao {
+  id: string
+  nome: string
+  preco: number
+  ordem: number
+  itemId: string
+}
+
 export interface CardapioItem {
   id: string
   titulo: string
@@ -7,6 +15,7 @@ export interface CardapioItem {
   disponivel: boolean
   ordem: number
   categoriaId: string
+  variacoes: CardapioVariacao[]
 }
 
 export interface CardapioCategoria {
@@ -23,4 +32,5 @@ export interface ItemFormState {
   imagem: string | null
   disponivel: boolean
   categoriaId: string
+  variacoes: { nome: string; preco: string }[]
 }

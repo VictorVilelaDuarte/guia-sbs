@@ -35,7 +35,12 @@ export default async function ComercinateDashboard() {
       eventos:  { orderBy: { dataInicio: "asc" } },
       cardapioCategorias: {
         orderBy: { ordem: "asc" },
-        include: { itens: { orderBy: { ordem: "asc" } } },
+        include: {
+          itens: {
+            orderBy: { ordem: "asc" },
+            include: { variacoes: { orderBy: { ordem: "asc" } } },
+          },
+        },
       },
     },
   })
