@@ -212,7 +212,7 @@ export function PlanoDialog({ plano }: PlanoDialogProps) {
                     key={feature.key}
                     type="button"
                     onClick={() => toggleFeature(feature.key)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors ${
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg border text-left transition-colors cursor-pointer ${
                       ativo
                         ? "border-primary/40 bg-primary/5"
                         : "border-border hover:bg-muted/50"
@@ -242,7 +242,7 @@ export function PlanoDialog({ plano }: PlanoDialogProps) {
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, ativo: !f.ativo }))}
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors cursor-pointer ${
                   form.ativo
                     ? "bg-primary border-primary text-primary-foreground"
                     : "border-input bg-background"
