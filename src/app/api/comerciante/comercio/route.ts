@@ -20,8 +20,8 @@ const patchSchema = z.object({
   instagram: z.string().optional(),
   horarios: z.string().optional(),
   logo: z.string().url().optional().or(z.literal("")),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
+  lat: z.number().optional().nullable(),
+  lng: z.number().optional().nullable(),
 })
 
 async function requireComerciante() {

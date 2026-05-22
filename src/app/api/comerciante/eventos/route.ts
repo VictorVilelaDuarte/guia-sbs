@@ -5,7 +5,7 @@ import { z } from "zod"
 
 const createSchema = z.object({
   titulo:      z.string().min(1).max(150),
-  descricao:   z.string().max(2000).optional(),
+  descricao:   z.string().max(2000).optional().nullable(),
   dataInicio:  z.coerce.date(),
   dataFim:     z.coerce.date().optional().nullable(),
   imagem:      z.string().url().optional().nullable(),
