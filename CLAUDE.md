@@ -90,7 +90,7 @@ if (!session || session.user.role !== "COMERCIANTE") return 401
 
 ### Dashboard do comerciante
 
-`/comerciante/dashboard/page.tsx` é um Server Component que busca o comércio completo (com fotos, tags, produtos, eventos) e passa para `<DashboardTabs>` (Client Component). As abas são: Informações, Fotos, Produtos e serviços, Eventos, Palavras-chave.
+`/comerciante/dashboard/page.tsx` é um Server Component que busca o comércio completo (com fotos, tags, produtos, eventos, cardápio) e passa para `<DashboardTabs>` (Client Component). As abas são: Informações, Fotos, Cardápio, Produtos e serviços, Eventos, Palavras-chave. Abas controladas por feature flags do plano são ocultadas quando a feature não está disponível.
 
 ### Perfil público
 
@@ -100,13 +100,14 @@ Status aberto/fechado usa `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paul
 
 ### Upload de imagens
 
-Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:
+Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:
 
 ```
 {userId}/logo.{ext}
 {userId}/fotos/{timestamp}.{ext}
 {userId}/produtos/{timestamp}.{ext}
 {userId}/eventos/{timestamp}.{ext}
+{userId}/cardapio/{timestamp}.{ext}
 ```
 
 ### Auth config separada (Edge-compatible)
@@ -151,13 +152,59 @@ Array sempre com 7 elementos (Segunda a Domingo). O campo `temPausa`, `pausaInic
 
 ## Banco de Dados
 
-Entidades principais: `User` → `Comercio` (1:1) → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`. Todas as relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
+Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (1:1). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`. `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. Todas as relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
 
 Enums:
 - `Role`: SUPER_ADMIN | ADMIN | COMERCIANTE
-- `PlanType`: FREE | PREMIUM
 - `ComercioStatus`: PENDENTE | ATIVO | INATIVO | REJEITADO
 - `Categoria`: RESTAURANTE | HOSPEDAGEM | TURISMO | SERVICO | COMERCIO | ENTRETENIMENTO
+
+> O enum `PlanType` (FREE/PREMIUM) foi substituído pelo model `Plan` — ver seção Planos abaixo.
+
+### Planos e feature flags
+
+Planos são gerenciados pelo admin em `/admin/planos`. Cada comércio está associado a um `Plan` (relação N:1). O model `Plan` tem um campo `features: Json` com as features habilitadas para aquele plano.
+
+Features disponíveis (definidas em `src/lib/plan-features.ts`):
+
+| Key | Descrição |
+|---|---|
+| `cardapio` | Cardápio digital com categorias e itens |
+| `eventos` | Criar e exibir eventos no perfil público |
+| `fotos_ilimitadas` | Upload sem limite (FREE tem limite de 3 fotos) |
+| `destaque_busca` | Perfil em posição destacada nos resultados |
+| `analytics` | Estatísticas de visualizações e cliques |
+| `qr_code` | QR Code personalizado do perfil |
+
+A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
+
+Limites do plano FREE (definidos em `LIMITES_FREE` no mesmo arquivo): `fotos: 3`, `tags: 5`, `produtos: 3`.
+
+### Cardápio digital
+
+Feature controlada pelo plano (`key: "cardapio"`). Estrutura de dados:
+
+```
+CardapioCategoria (nome, ordem)
+  └── CardapioItem (titulo, descricao, preco, imagem, disponivel, ordem)
+        └── CardapioVariacao (nome, preco, ordem)
+```
+
+**Variações de preço:** quando um item tem variações (ex: Cápsula / Artesanal, Pequeno / Grande), o campo `preco` do `CardapioItem` fica `null` e os preços são armazenados em `CardapioVariacao`. No perfil público, as variações são exibidas como colunas com o nome em uppercase e o preço abaixo (layout tipo cardápio de cafeteria).
+
+**APIs** em `/api/comerciante/cardapio/`:
+- `GET /` — retorna todas as categorias com itens e variações
+- `POST/PATCH/DELETE /categorias` e `/categorias/[id]` — CRUD de categorias
+- `POST /itens` e `PATCH/DELETE /itens/[id]` — CRUD de itens; o payload aceita `variacoes[]` (quando presente, substitui todas as variações existentes via transaction; quando ausente, preserva as variações — útil para toggles de disponibilidade)
+- `PATCH /ordem` — reordenação de categorias e itens via drag-and-drop; aceita `{ tipo: "categoria", ids }` ou `{ tipo: "item", categoriaId, ids }`
+
+**Componentes** em `src/components/comerciante/cardapio/`:
+- `manager.tsx` — lista com drag-and-drop (@dnd-kit), colapso de categorias, ações inline
+- `item-dialog.tsx` — formulário de item com alternância entre preço único e variações
+- `categoria-dialog.tsx` — formulário simples de categoria
+- `sortable-wrappers.tsx` — wrappers do @dnd-kit para categorias e itens
+- `types.ts` — interfaces `CardapioCategoria`, `CardapioItem`, `CardapioVariacao`, `ItemFormState`
+- `utils.ts` — `formatPreco`, `parsePreco`, `displayPreco`
 
 ## Fontes
 
@@ -170,7 +217,6 @@ Enums:
 - Página pública de listagem de comércios por categoria
 - Página pública de eventos da cidade (`/eventos`)
 - Avaliações de visitantes
-- Analytics para comerciantes (visualizações, cliques)
+- Analytics para comerciantes (visualizações, cliques) — feature flag já existe, falta implementar
 - Promoções/ofertas com validade
-- QR Code do perfil para impressão
-- Diferenciação de features entre plano FREE e PREMIUM
+- QR Code do perfil para impressão — feature flag já existe, falta implementar
