@@ -176,7 +176,7 @@ model CardapioItem {
   titulo      String
   descricao   String?           @db.Text
   preco       Float?
-  imagem      String?
+  imagens     String[]
   disponivel  Boolean           @default(true)
   ordem       Int               @default(0)
   categoriaId String

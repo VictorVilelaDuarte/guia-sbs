@@ -399,9 +399,9 @@ export function CardapioManager({
 
                                   {/* Imagem */}
                                   <div className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden bg-muted">
-                                    {item.imagem ? (
+                                    {item.imagens[0] ? (
                                       <Image
-                                        src={item.imagem}
+                                        src={item.imagens[0]}
                                         alt={item.titulo}
                                         fill
                                         className="object-cover"

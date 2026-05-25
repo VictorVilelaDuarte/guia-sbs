@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 import type { CardapioItem, CardapioCategoria, ItemFormState } from "./types";
 import { formatPreco, parsePreco } from "./utils";
 
+const MAX_IMAGENS = 3;
+
 interface ItemDialogProps {
   open: boolean;
   item: CardapioItem | null;
@@ -39,7 +41,7 @@ export function ItemDialog({
     titulo: "",
     descricao: "",
     preco: "",
-    imagem: null,
+    imagens: [],
     disponivel: true,
     categoriaId: "",
     variacoes: [],
@@ -64,7 +66,7 @@ export function ItemDialog({
                       minimumFractionDigits: 2,
                     })
                   : "",
-              imagem: item.imagem,
+              imagens: item.imagens,
               disponivel: item.disponivel,
               categoriaId: item.categoriaId,
               variacoes: item.variacoes.map((v) => ({
@@ -78,7 +80,7 @@ export function ItemDialog({
               titulo: "",
               descricao: "",
               preco: "",
-              imagem: null,
+              imagens: [],
               disponivel: true,
               categoriaId: defaultCategoriaId ?? categorias[0]?.id ?? "",
               variacoes: [],
@@ -94,6 +96,8 @@ export function ItemDialog({
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (form.imagens.length >= MAX_IMAGENS) return;
+
     const fd = new FormData();
     fd.append("file", file);
     fd.append("tipo", "cardapio");
@@ -108,8 +112,15 @@ export function ItemDialog({
       return;
     }
     const { url } = await res.json();
-    setForm((f) => ({ ...f, imagem: url }));
+    setForm((f) => ({ ...f, imagens: [...f.imagens, url] }));
     e.target.value = "";
+  }
+
+  function removeImagem(index: number) {
+    setForm((f) => ({
+      ...f,
+      imagens: f.imagens.filter((_, i) => i !== index),
+    }));
   }
 
   function addVariacao() {
@@ -164,7 +175,7 @@ export function ItemDialog({
       titulo: form.titulo.trim(),
       descricao: form.descricao.trim() || null,
       preco: temVariacoes ? null : parsePreco(form.preco),
-      imagem: form.imagem,
+      imagens: form.imagens,
       disponivel: form.disponivel,
       categoriaId: form.categoriaId,
       variacoes,
@@ -200,47 +211,46 @@ export function ItemDialog({
           <DialogTitle>{isEdicao ? "Editar item" : "Novo item"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          {/* Imagem */}
+          {/* Fotos */}
           <div className="space-y-2">
             <Label>
-              Imagem{" "}
+              Fotos{" "}
               <span className="text-muted-foreground font-normal">
-                (opcional)
+                (opcional, até {MAX_IMAGENS})
               </span>
             </Label>
-            <div
-              className={cn(
-                "relative flex items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted/30 overflow-hidden cursor-pointer transition-colors hover:bg-muted/50",
-                form.imagem ? "h-40" : "h-28",
-              )}
-              onClick={() => fileRef.current?.click()}
-            >
-              {form.imagem ? (
-                <>
+            <div className="flex gap-2 flex-wrap">
+              {form.imagens.map((url, i) => (
+                <div
+                  key={i}
+                  className="relative h-24 w-24 shrink-0 rounded-lg overflow-hidden bg-muted"
+                >
                   <Image
-                    src={form.imagem}
-                    alt="Preview"
+                    src={url}
+                    alt={`Foto ${i + 1}`}
                     fill
                     className="object-cover"
                   />
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setForm((f) => ({ ...f, imagem: null }));
-                    }}
-                    className="absolute top-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
-                    aria-label="Remover imagem"
+                    onClick={() => removeImagem(i)}
+                    className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
+                    aria-label="Remover foto"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3 w-3" />
                   </button>
-                </>
-              ) : uploading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              ) : (
-                <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
-                  <ImagePlus className="h-6 w-6" />
-                  <span className="text-xs">Clique para adicionar imagem</span>
+                </div>
+              ))}
+              {form.imagens.length < MAX_IMAGENS && (
+                <div
+                  className="flex h-24 w-24 shrink-0 items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {uploading ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  ) : (
+                    <ImagePlus className="h-5 w-5 text-muted-foreground" />
+                  )}
                 </div>
               )}
             </div>

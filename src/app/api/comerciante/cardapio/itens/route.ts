@@ -12,7 +12,7 @@ const createSchema = z.object({
   titulo: z.string().min(1).max(120),
   descricao: z.string().max(1000).optional().nullable(),
   preco: z.number().positive().optional().nullable(),
-  imagem: z.string().url().optional().nullable(),
+  imagens: z.array(z.string().url()).max(3).optional(),
   disponivel: z.boolean().optional(),
   categoriaId: z.string(),
   variacoes: z.array(variacaoSchema).optional(),
@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
   const item = await prisma.cardapioItem.create({
     data: {
       ...itemData,
+      imagens: itemData.imagens ?? [],
       comercioId: ctx.comercioId,
       ordem: count,
       variacoes: variacoes?.length

@@ -16,7 +16,7 @@ Dois públicos principais:
 
 Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/comercios/[slug]` (slug gerado automaticamente a partir do nome na criação do comércio).
 
-**Modelo de negócio:** SaaS B2B local — comerciantes pagam planos (FREE / PREMIUM) para acessar recursos da plataforma. A diferenciação de features entre os planos é estratégica e ainda está sendo definida. Ao implementar novas features, considerar se faz sentido restringi-las ao plano PREMIUM.
+**Modelo de negócio:** SaaS B2B local — comerciantes pagam planos para acessar recursos da plataforma. Os planos são configuráveis pelo admin (model `Plan` no banco), cada um com um conjunto de features habilitadas via JSON. Ao implementar novas features, considerar se faz sentido restringi-las a planos pagos via feature flag.
 
 ## Como trabalhar neste projeto
 
@@ -62,6 +62,7 @@ NEXTAUTH_SECRET="..."
 | Validação | Zod |
 | Datas | date-fns com locale ptBR |
 | Toasts | Sonner |
+| Drag-and-drop | @dnd-kit/core + @dnd-kit/sortable (cardápio) |
 
 ## Arquitetura
 
@@ -94,7 +95,7 @@ if (!session || session.user.role !== "COMERCIANTE") return 401
 
 ### Perfil público
 
-`/comercios/[slug]/page.tsx` — Server Component público. Exibe todos os dados do comércio: identidade (logo + descrição), status aberto/fechado (timezone `America/Sao_Paulo`), CTAs rápidos, galeria de fotos, eventos, horários, mapa, contatos e produtos. Comércios com `status !== ATIVO` mostram um banner de pré-visualização mas não bloqueiam o acesso (útil para o comerciante revisar antes da aprovação).
+`/comercios/[slug]/page.tsx` — Server Component público. Exibe todos os dados do comércio: identidade (logo + descrição), status aberto/fechado (timezone `America/Sao_Paulo`), CTAs rápidos, galeria de fotos, cardápio, eventos, horários, mapa, contatos e produtos. Comércios com `status !== ATIVO` mostram um banner de pré-visualização mas não bloqueiam o acesso (útil para o comerciante revisar antes da aprovação).
 
 Status aberto/fechado usa `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paulo"` — calculado no servidor. Quando fechado, exibe "Volta amanhã às HH:MM" ou "Volta [dia] às HH:MM" com base no próximo dia com abertura cadastrada.
 
@@ -186,9 +187,11 @@ Feature controlada pelo plano (`key: "cardapio"`). Estrutura de dados:
 
 ```
 CardapioCategoria (nome, ordem)
-  └── CardapioItem (titulo, descricao, preco, imagem, disponivel, ordem)
+  └── CardapioItem (titulo, descricao, preco, imagens String[], disponivel, ordem)
         └── CardapioVariacao (nome, preco, ordem)
 ```
+
+> `imagens` é um array nativo PostgreSQL (`String[]`). A primeira posição é usada como thumbnail em listas. O limite de 3 fotos é validado no payload (Zod `.max(3)`) — não no banco.
 
 **Variações de preço:** quando um item tem variações (ex: Cápsula / Artesanal, Pequeno / Grande), o campo `preco` do `CardapioItem` fica `null` e os preços são armazenados em `CardapioVariacao`. No perfil público, as variações são exibidas como colunas com o nome em uppercase e o preço abaixo (layout tipo cardápio de cafeteria).
 
@@ -200,7 +203,7 @@ CardapioCategoria (nome, ordem)
 
 **Componentes** em `src/components/comerciante/cardapio/`:
 - `manager.tsx` — lista com drag-and-drop (@dnd-kit), colapso de categorias, ações inline
-- `item-dialog.tsx` — formulário de item com alternância entre preço único e variações
+- `item-dialog.tsx` — formulário de item com galeria de até 3 fotos e alternância entre preço único e variações
 - `categoria-dialog.tsx` — formulário simples de categoria
 - `sortable-wrappers.tsx` — wrappers do @dnd-kit para categorias e itens
 - `types.ts` — interfaces `CardapioCategoria`, `CardapioItem`, `CardapioVariacao`, `ItemFormState`

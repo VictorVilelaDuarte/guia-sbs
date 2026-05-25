@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { IconSearch } from "./icons";
-import { HeroIllustration } from "./hero-illustration";
+// import { HeroIllustration } from "./hero-illustration";
 import { HeroBottomCurve } from "./waves";
 
 interface HeroProps {
@@ -38,7 +39,13 @@ export function Hero({ query, setQuery, focused, setFocused }: HeroProps) {
         background: "#3a2615",
       }}
     >
-      <HeroIllustration />
+      {/* <HeroIllustration /> */}
+      <Image
+        src="/assets/home/sbs1.jpg"
+        alt="..."
+        layout="fill"
+        objectFit="cover"
+      />
       <div className="grain" />
       <div
         style={{

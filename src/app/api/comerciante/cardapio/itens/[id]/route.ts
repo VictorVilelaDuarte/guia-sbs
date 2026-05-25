@@ -13,7 +13,7 @@ const patchSchema = z.object({
   titulo: z.string().min(1).max(120).optional(),
   descricao: z.string().max(1000).optional().nullable(),
   preco: z.number().positive().optional().nullable(),
-  imagem: z.string().url().optional().nullable(),
+  imagens: z.array(z.string().url()).max(3).optional(),
   disponivel: z.boolean().optional(),
   categoriaId: z.string().optional(),
   variacoes: z.array(variacaoSchema).optional(),
@@ -80,10 +80,12 @@ export async function DELETE(
   const item = await ownerCheck(id)
   if (!item) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
-  if (item.imagem) {
-    const url = new URL(item.imagem)
-    const path = url.pathname.split("/object/public/comercios/")[1]
-    if (path) await deleteFile(path).catch(() => {})
+  for (const url of item.imagens) {
+    try {
+      const parsed = new URL(url)
+      const path = parsed.pathname.split("/object/public/comercios/")[1]
+      if (path) await deleteFile(path)
+    } catch {}
   }
 
   await prisma.cardapioItem.delete({ where: { id } })

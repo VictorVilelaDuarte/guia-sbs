@@ -11,7 +11,7 @@ export interface CardapioItem {
   titulo: string
   descricao: string | null
   preco: number | null
-  imagem: string | null
+  imagens: string[]
   disponivel: boolean
   ordem: number
   categoriaId: string
@@ -29,7 +29,7 @@ export interface ItemFormState {
   titulo: string
   descricao: string
   preco: string
-  imagem: string | null
+  imagens: string[]
   disponivel: boolean
   categoriaId: string
   variacoes: { nome: string; preco: string }[]

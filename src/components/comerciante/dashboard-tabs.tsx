@@ -78,7 +78,7 @@ interface CardapioItem {
   titulo: string;
   descricao: string | null;
   preco: number | null;
-  imagem: string | null;
+  imagens: string[];
   disponivel: boolean;
   ordem: number;
   categoriaId: string;

@@ -429,9 +429,9 @@ export default async function PaginaComercio({
                       <div className="space-y-3">
                         {cat.itens.map((item) => (
                           <div key={item.id} className="flex items-start gap-3">
-                            {item.imagem && (
+                            {item.imagens[0] && (
                               <div className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden bg-muted">
-                                <Image src={item.imagem} alt={item.titulo} fill className="object-cover" />
+                                <Image src={item.imagens[0]} alt={item.titulo} fill className="object-cover" />
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
