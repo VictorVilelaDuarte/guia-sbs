@@ -63,6 +63,7 @@ NEXTAUTH_SECRET="..."
 | Datas | date-fns com locale ptBR |
 | Toasts | Sonner |
 | Drag-and-drop | @dnd-kit/core + @dnd-kit/sortable (cardápio) |
+| Conversão HEIC | heic2any (client-side, HEIC→JPEG antes do upload) |
 
 ## Arquitetura
 
@@ -103,6 +104,8 @@ Status aberto/fechado usa `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paul
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:
 
+**Upload de fotos de produtos (cardápio):** o componente `produto-dialog.tsx` suporta múltiplos arquivos simultâneos, drag-and-drop e conversão de HEIC/HEIF para JPEG antes do envio (via `heic2any`). A detecção de HEIC usa tanto o MIME type quanto a extensão do arquivo (iOS Safari às vezes omite o MIME type). A quantidade máxima de slots disponíveis (`MAX_IMAGENS - imagens.length`) limita dinamicamente tanto o seletor de arquivos (`multiple` é `false` quando só resta 1 slot) quanto o drop handler.
+
 ```
 {userId}/logo.{ext}
 {userId}/fotos/{timestamp}.{ext}
@@ -123,6 +126,25 @@ O middleware roda no Edge runtime da Vercel (limite de 1 MB). Para não ultrapas
 ### Slug de comércio
 
 `src/lib/slugify.ts` — utilitário que normaliza NFD, remove diacríticos e converte para kebab-case. Usado na criação do comércio (`/api/admin/comercios`) para gerar slug único com sufixo numérico caso já exista (ex: `chao-bento-2`).
+
+### Bottom sheet de produto (cardápio público)
+
+`src/components/public/produto-bottom-sheet.tsx` — exibe detalhes do produto selecionado em um painel deslizante de baixo para cima, com carrossel de imagens, thumbnails, variações de preço e animação de entrada/saída.
+
+**Portal e `#portal-root`:** o sheet é renderizado via `createPortal` para `#portal-root` (fallback: `document.body`). O `#portal-root` está declarado em `src/app/layout.tsx` como irmão da div principal, fora de qualquer contexto flex — isso é intencional:
+
+```tsx
+<body>
+  <div className="min-h-full flex flex-col">{children}</div>
+  <div id="portal-root" />   {/* fora do flex — isolado */}
+</body>
+```
+
+**Bug Safari iOS — `position: fixed` dentro de flex:** quando `<body>` tem `display: flex`, elementos com `position: fixed` podem usar o container flex como containing block em vez do viewport. O sheet fica mais estreito que a tela. A solução é **não usar `position: fixed` no sheet em si**: um wrapper externo único com `position: fixed; inset: 0` cobre 100% do viewport (garantido), e o backdrop + sheet usam `position: absolute` dentro dele. Nunca mova o sheet para `position: fixed` diretamente.
+
+**Carrossel:** cada slide usa `absolute inset-0` + `translateX((i - currentIndex) * 100%)`. **Não use** a abordagem flex-track (`display: flex` no container + `w-full shrink-0` nos slides) — o `w-full` no filho flex cria uma dependência circular de largura e o carrossel fica estreito no mobile.
+
+**Gestos:** arrastar o handle vertical > 80px fecha o sheet. Swipe horizontal no carrossel navega entre fotos. Os estados de toque usam `useRef` para evitar re-renders durante o gesto.
 
 ### Galeria de fotos pública
 
@@ -201,13 +223,20 @@ CardapioCategoria (nome, ordem)
 - `POST /itens` e `PATCH/DELETE /itens/[id]` — CRUD de itens; o payload aceita `variacoes[]` (quando presente, substitui todas as variações existentes via transaction; quando ausente, preserva as variações — útil para toggles de disponibilidade)
 - `PATCH /ordem` — reordenação de categorias e itens via drag-and-drop; aceita `{ tipo: "categoria", ids }` ou `{ tipo: "item", categoriaId, ids }`
 
-**Componentes** em `src/components/comerciante/cardapio/`:
+**Componentes do painel** em `src/components/comerciante/cardapio/`:
 - `manager.tsx` — lista com drag-and-drop (@dnd-kit), colapso de categorias, ações inline
-- `item-dialog.tsx` — formulário de item com galeria de até 3 fotos e alternância entre preço único e variações
+- `produto-dialog.tsx` — formulário de item com galeria de até 3 fotos (multi-seleção, drag-and-drop, HEIC) e alternância entre preço único e variações
 - `categoria-dialog.tsx` — formulário simples de categoria
 - `sortable-wrappers.tsx` — wrappers do @dnd-kit para categorias e itens
 - `types.ts` — interfaces `CardapioCategoria`, `CardapioItem`, `CardapioVariacao`, `ItemFormState`
 - `utils.ts` — `formatPreco`, `parsePreco`, `displayPreco`
+
+**Componentes públicos** em `src/components/public/cardapio/`:
+- `types.ts` — interfaces `Variacao`, `Produto`, `Categoria` + funções `formatBRL`, `isPromoAtiva`
+- `item-row.tsx` — linha de item na listagem (thumbnail, título, descrição, preço/variações)
+- `destaque-card.tsx` — card no carrossel horizontal de destaques
+
+O orquestrador é `src/components/public/cardapio-view.tsx` — gerencia tabs, busca, IntersectionObserver para tab ativa e abre o `ProdutoBottomSheet`.
 
 ## Fontes
 

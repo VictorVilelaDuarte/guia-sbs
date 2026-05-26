@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -176,7 +177,7 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
       <div
         className={cn(
           "absolute left-0 right-0 bottom-0 flex flex-col rounded-t-3xl overflow-hidden bg-white",
-          "max-h-[90svh] transition-transform duration-[380ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
+          "max-h-[96svh] transition-transform duration-[380ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
           isVisible ? "translate-y-0" : "translate-y-full",
         )}
         style={
@@ -211,7 +212,9 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
                 <div
                   key={i}
                   className="absolute inset-0 transition-transform duration-300 ease-out"
-                  style={{ transform: `translateX(${(i - carouselIndex) * 100}%)` }}
+                  style={{
+                    transform: `translateX(${(i - carouselIndex) * 100}%)`,
+                  }}
                 >
                   <Image
                     src={url}
@@ -339,7 +342,9 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
 
           {/* Descrição */}
           {descricao && (
-            <p className="text-sm text-stone-600 leading-relaxed">{descricao}</p>
+            <p className="text-sm text-stone-600 leading-relaxed">
+              {descricao}
+            </p>
           )}
 
           {/* Preço */}
