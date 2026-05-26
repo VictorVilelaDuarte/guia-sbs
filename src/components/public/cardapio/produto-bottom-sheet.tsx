@@ -78,11 +78,23 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
     }
   }, [produto]);
 
-  // Bloqueia scroll da página quando aberto
+  // Bloqueia scroll da página quando aberto.
+  // overflow:hidden no body não funciona no iOS Safari — o fix confiável é
+  // travar o body em position:fixed (salva e restaura a posição do scroll).
   useEffect(() => {
-    document.body.style.overflow = isVisible ? "hidden" : "";
+    if (!isVisible) return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
     return () => {
-      document.body.style.overflow = "";
+      body.style.overflow = "";
+      body.style.position = "";
+      body.style.top = "";
+      body.style.width = "";
+      window.scrollTo(0, scrollY);
     };
   }, [isVisible]);
 
@@ -322,7 +334,7 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
         )}
 
         {/* Conteúdo scrollável */}
-        <div className="overflow-y-auto flex-1 px-5 pt-4 pb-10">
+        <div className="overflow-y-auto overscroll-y-contain flex-1 px-5 pt-4 pb-10">
           {/* Badges */}
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <span className="text-xs font-bold uppercase tracking-widest text-stone-400">

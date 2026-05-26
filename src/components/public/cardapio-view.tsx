@@ -220,7 +220,7 @@ export function CardapioView({
                 placeholder="Buscar no cardápio..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
-                className="w-full h-9 rounded-full bg-white border border-stone-200 pl-9 pr-4 text-sm placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+                className="w-full h-9 rounded-full bg-white border border-stone-200 pl-9 pr-4 text-[16px] placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
               />
               {busca && (
                 <button

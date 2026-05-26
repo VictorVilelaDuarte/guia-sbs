@@ -1,7 +1,12 @@
+import type { Viewport } from "next"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { temFeature } from "@/lib/plan-features"
 import { CardapioView } from "@/components/public/cardapio-view"
+
+export const viewport: Viewport = {
+  userScalable: false,
+}
 
 interface HorarioDia {
   dia: string
