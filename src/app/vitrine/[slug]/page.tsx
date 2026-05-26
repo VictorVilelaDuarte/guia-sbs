@@ -19,10 +19,12 @@ import {
   Camera,
   ShoppingBag,
   UtensilsCrossed,
+  Wrench,
 } from "lucide-react";
 import { MapaView } from "@/components/public/mapa-view-dynamic";
 import { ShareButton } from "@/components/public/share-button";
 import { GaleriaFotos } from "@/components/public/galeria-fotos";
+import { CardapioDestaquesVitrine } from "@/components/public/cardapio-destaques-vitrine";
 import { temFeature } from "@/lib/plan-features";
 import { format, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -191,7 +193,7 @@ export default async function PaginaComercio({
       fotos: { orderBy: { ordem: "asc" } },
       tags: { orderBy: { nome: "asc" } },
       produtos: {
-        where: { disponivel: true, categoriaCardapioId: null },
+        where: { disponivel: true, destaque: true, categoriaCardapioId: null },
         orderBy: { ordem: "asc" },
         include: { variacoes: { orderBy: { ordem: "asc" } } },
       },
@@ -201,7 +203,7 @@ export default async function PaginaComercio({
         orderBy: { ordem: "asc" },
         include: {
           produtos: {
-            where: { disponivel: true },
+            where: { disponivel: true, destaque: true },
             orderBy: { ordem: "asc" },
             include: { variacoes: { orderBy: { ordem: "asc" } } },
           },
@@ -213,8 +215,53 @@ export default async function PaginaComercio({
   if (!comercio) notFound();
 
   const isPublicado = comercio.status === "ATIVO";
-  const temEventos = temFeature(comercio.plan.features, "eventos")
+  const temEventos = temFeature(comercio.plan.features, "eventos");
   const temCardapio = temFeature(comercio.plan.features, "cardapio");
+  const temCatalogo = temFeature(comercio.plan.features, "catalogo");
+
+  const itensDestaque = temCardapio
+    ? comercio.cardapioCategorias.flatMap((cat) =>
+        cat.produtos.map((p) => ({
+          id: p.id,
+          titulo: p.titulo,
+          descricao: p.descricao,
+          preco: p.preco,
+          precoPromo: p.precoPromo,
+          promoFim: p.promoFim ? p.promoFim.toISOString() : null,
+          destaque: p.destaque,
+          imagens: p.imagens,
+          variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
+          categoriaNome: cat.nome,
+        })),
+      )
+    : [];
+
+  function mapItemParaDestaque(p: { id: string; titulo: string; descricao: string | null; preco: number | null; precoPromo: number | null; promoFim: Date | null; destaque: boolean; imagens: string[]; variacoes: { id: string; nome: string; preco: number }[] }, categoriaNome: string) {
+    return {
+      id: p.id,
+      titulo: p.titulo,
+      descricao: p.descricao,
+      preco: p.preco,
+      precoPromo: p.precoPromo,
+      promoFim: p.promoFim ? p.promoFim.toISOString() : null,
+      destaque: p.destaque,
+      imagens: p.imagens,
+      variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
+      categoriaNome,
+    };
+  }
+
+  const produtosDestaque = temCatalogo
+    ? comercio.produtos
+        .filter((p) => p.tipo === "PRODUTO")
+        .map((p) => mapItemParaDestaque(p, "Produto"))
+    : [];
+
+  const servicosDestaque = temCatalogo
+    ? comercio.produtos
+        .filter((p) => p.tipo === "SERVICO")
+        .map((p) => mapItemParaDestaque(p, "Serviço"))
+    : [];
 
   const horarios = parseHorarios(comercio.horarios);
   const diaAtual = getDiaAtual();
@@ -417,8 +464,8 @@ export default async function PaginaComercio({
           </>
         )}
 
-        {/* Cardápio (apenas planos com a feature) */}
-        {temCardapio && comercio.cardapioCategorias.length > 0 && (
+        {/* Cardápio — apenas destaques */}
+        {temCardapio && itensDestaque.length > 0 && (
           <>
             <section className="mb-6">
               <div className="flex items-center justify-between mb-4">
@@ -427,59 +474,63 @@ export default async function PaginaComercio({
                   Cardápio
                 </h2>
                 <Link
-                  href={`/comercios/${comercio.slug}/cardapio`}
+                  href={`/vitrine/${comercio.slug}/cardapio`}
                   className="text-xs text-primary hover:underline flex items-center gap-0.5"
                 >
-                  Ver cardápio completo
+                  Ver completo
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
-              <div className="space-y-6">
-                {comercio.cardapioCategorias.map((cat) => (
-                  cat.produtos.length > 0 && (
-                    <div key={cat.id}>
-                      <h3 className="text-sm font-semibold mb-3 pb-1 border-b border-border">{cat.nome}</h3>
-                      <div className="space-y-3">
-                        {cat.produtos.map((produto) => (
-                          <div key={produto.id} className="flex items-start gap-3">
-                            {produto.imagens[0] && (
-                              <div className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden bg-muted">
-                                <Image src={produto.imagens[0]} alt={produto.titulo} fill className="object-cover" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium leading-snug">{produto.titulo}</p>
-                                  {produto.descricao && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{produto.descricao}</p>
-                                  )}
-                                </div>
-                                {produto.variacoes.length > 0 ? (
-                                  <div className="flex gap-4 shrink-0 text-right">
-                                    {produto.variacoes.map((v) => (
-                                      <div key={v.id}>
-                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{v.nome}</p>
-                                        <p className="text-sm font-semibold text-primary">
-                                          {v.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                                        </p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : produto.preco != null && produto.preco > 0 ? (
-                                  <span className="text-sm font-semibold text-primary shrink-0">
-                                    {produto.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                ))}
+              <CardapioDestaquesVitrine
+                produtos={itensDestaque}
+                now={Date.now()}
+              />
+            </section>
+            <Separator className="mb-6" />
+          </>
+        )}
+
+        {/* Produtos em destaque */}
+        {temCatalogo && produtosDestaque.length > 0 && (
+          <>
+            <section className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                  <ShoppingBag className="h-3.5 w-3.5" />
+                  Produtos
+                </h2>
+                <Link
+                  href={`/vitrine/${comercio.slug}/catalogo`}
+                  className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                >
+                  Ver catálogo
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
               </div>
+              <CardapioDestaquesVitrine produtos={produtosDestaque} now={Date.now()} />
+            </section>
+            <Separator className="mb-6" />
+          </>
+        )}
+
+        {/* Serviços em destaque */}
+        {temCatalogo && servicosDestaque.length > 0 && (
+          <>
+            <section className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                  <Wrench className="h-3.5 w-3.5" />
+                  Serviços
+                </h2>
+                <Link
+                  href={`/vitrine/${comercio.slug}/catalogo`}
+                  className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                >
+                  Ver catálogo
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+              <CardapioDestaquesVitrine produtos={servicosDestaque} now={Date.now()} />
             </section>
             <Separator className="mb-6" />
           </>
@@ -720,65 +771,6 @@ export default async function PaginaComercio({
           </section>
         )}
 
-        {/* Produtos e serviços */}
-        {comercio.produtos.length > 0 && (
-          <>
-            <section className="mb-6">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                <ShoppingBag className="h-3.5 w-3.5" />
-                Produtos e serviços
-              </h2>
-              <div className="space-y-3">
-                {comercio.produtos.map((produto) => (
-                  <div key={produto.id} className="flex items-start gap-3">
-                    {produto.imagens[0] && (
-                      <div className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden bg-muted">
-                        <Image
-                          src={produto.imagens[0]}
-                          alt={produto.titulo}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium leading-snug">
-                          {produto.titulo}
-                        </p>
-                        {produto.variacoes.length > 0 ? (
-                          <div className="flex gap-3 shrink-0 text-right">
-                            {produto.variacoes.map((v) => (
-                              <div key={v.id}>
-                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{v.nome}</p>
-                                <p className="text-sm font-semibold text-primary">
-                                  {v.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        ) : produto.preco != null && produto.preco > 0 ? (
-                          <span className="text-sm font-semibold text-primary shrink-0">
-                            {formatPreco(produto.preco)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            Consulte
-                          </span>
-                        )}
-                      </div>
-                      {produto.descricao && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                          {produto.descricao}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
       </div>
 
       {/* Footer */}

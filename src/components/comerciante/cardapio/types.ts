@@ -6,8 +6,11 @@ export interface CardapioVariacao {
   produtoId: string
 }
 
+export type TipoProduto = "PRODUTO" | "SERVICO"
+
 export interface Produto {
   id: string
+  tipo: TipoProduto
   titulo: string
   descricao: string | null
   preco: number | null
@@ -33,6 +36,7 @@ export interface CardapioCategoria {
 }
 
 export interface ProdutoFormState {
+  tipo: TipoProduto
   titulo: string
   descricao: string
   preco: string

@@ -113,7 +113,7 @@ export default async function ComerciosPage({
               <TableRow key={c.id}>
                 <TableCell className="font-medium">
                   <Link
-                    href={`/comercios/${c.slug}`}
+                    href={`/vitrine/${c.slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 hover:text-primary transition-colors group"

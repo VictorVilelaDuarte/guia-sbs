@@ -10,6 +10,7 @@ const variacaoSchema = z.object({
 })
 
 const patchSchema = z.object({
+  tipo: z.enum(["PRODUTO", "SERVICO"]).optional(),
   titulo: z.string().min(1).max(120).optional(),
   descricao: z.string().max(1000).optional().nullable(),
   preco: z.number().positive().optional().nullable(),

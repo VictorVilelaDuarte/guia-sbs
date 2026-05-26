@@ -32,6 +32,11 @@ enum Categoria {
   ENTRETENIMENTO
 }
 
+enum TipoProduto {
+  PRODUTO
+  SERVICO
+}
+
 model Plan {
   id        String   @id @default(cuid())
   slug      String   @unique
@@ -142,6 +147,7 @@ model Foto {
 
 model Produto {
   id                  String             @id @default(cuid())
+  tipo                TipoProduto        @default(PRODUTO)
   titulo              String
   descricao           String?            @db.Text
   preco               Float?

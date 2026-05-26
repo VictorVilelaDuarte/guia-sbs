@@ -25,7 +25,7 @@ import {
   Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Produto, CardapioCategoria, ProdutoFormState } from "./types";
+import type { Produto, CardapioCategoria, ProdutoFormState, TipoProduto } from "./types";
 import { formatPreco, parsePreco } from "./utils";
 
 const MAX_IMAGENS = 3;
@@ -33,6 +33,7 @@ const MAX_IMAGENS = 3;
 interface ProdutoDialogProps {
   open: boolean;
   produto: Produto | null;
+  tipo?: TipoProduto;
   categorias: CardapioCategoria[];
   defaultCategoriaId?: string;
   onClose: () => void;
@@ -42,13 +43,19 @@ interface ProdutoDialogProps {
 export function ProdutoDialog({
   open,
   produto,
+  tipo: tipoProp = "PRODUTO",
   categorias,
   defaultCategoriaId,
   onClose,
   onSaved,
 }: ProdutoDialogProps) {
   const isEdicao = !!produto;
+  const tipoEfetivo: TipoProduto = produto?.tipo ?? tipoProp;
+  const isServico = tipoEfetivo === "SERVICO";
+  const label = isServico ? "serviço" : "produto";
+
   const [form, setForm] = useState<ProdutoFormState>({
+    tipo: tipoProp,
     titulo: "",
     descricao: "",
     preco: "",
@@ -77,6 +84,7 @@ export function ProdutoDialog({
         ? new Date(produto.promoFim).toISOString().slice(0, 10)
         : "";
       setForm({
+        tipo: produto.tipo,
         titulo: produto.titulo,
         descricao: produto.descricao ?? "",
         preco:
@@ -106,6 +114,7 @@ export function ProdutoDialog({
     } else {
       const catId = defaultCategoriaId ?? categorias[0]?.id ?? "";
       setForm({
+        tipo: tipoProp,
         titulo: "",
         descricao: "",
         preco: "",
@@ -270,6 +279,7 @@ export function ProdutoDialog({
 
     const precoPromoNum = parsePreco(form.precoPromo);
     const payload = {
+      tipo: tipoEfetivo,
       titulo: form.titulo.trim(),
       descricao: form.descricao.trim() || null,
       preco: temVariacoes ? null : parsePreco(form.preco),
@@ -281,9 +291,8 @@ export function ProdutoDialog({
         precoPromoNum && form.promoFim
           ? new Date(form.promoFim).toISOString()
           : null,
-      categoriaCardapioId: form.incluirNoCardapio
-        ? form.categoriaCardapioId
-        : null,
+      categoriaCardapioId:
+        !isServico && form.incluirNoCardapio ? form.categoriaCardapioId : null,
       variacoes: form.variacoes.map((v) => ({
         nome: v.nome.trim(),
         preco: parsePreco(v.preco) ?? 0,
@@ -319,7 +328,7 @@ export function ProdutoDialog({
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {isEdicao ? "Editar produto" : "Novo produto"}
+            {isEdicao ? `Editar ${label}` : `Novo ${label}`}
           </DialogTitle>
         </DialogHeader>
 
@@ -563,8 +572,45 @@ export function ProdutoDialog({
             </button>
           </div>
 
-          {/* Incluir no cardápio */}
-          {categorias.length > 0 && (
+          {/* Destaque */}
+          <button
+            type="button"
+            onClick={() =>
+              setForm((f) => ({ ...f, destaque: !f.destaque }))
+            }
+            className="flex w-full items-center justify-between cursor-pointer py-1"
+          >
+            <div className="flex items-center gap-2">
+              <Star
+                className={cn(
+                  "h-4 w-4",
+                  form.destaque ? "text-amber-500" : "text-muted-foreground",
+                )}
+              />
+              <div className="text-left">
+                <span className="text-sm font-medium">Destaque</span>
+                <p className="text-xs text-muted-foreground">
+                  Aparece em destaque na vitrine
+                </p>
+              </div>
+            </div>
+            <div
+              className={cn(
+                "h-5 w-9 rounded-full transition-colors relative shrink-0",
+                form.destaque ? "bg-amber-400" : "bg-input",
+              )}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-200",
+                  form.destaque ? "left-[18px]" : "left-0.5",
+                )}
+              />
+            </div>
+          </button>
+
+          {/* Incluir no cardápio — oculto para serviços */}
+          {!isServico && categorias.length > 0 && (
             <div className="rounded-lg border border-input p-3 space-y-3">
               <button
                 type="button"
@@ -574,7 +620,7 @@ export function ProdutoDialog({
                     incluirNoCardapio: !f.incluirNoCardapio,
                     ...(!f.incluirNoCardapio
                       ? {}
-                      : { destaque: false, precoPromo: "", promoFim: "" }),
+                      : { precoPromo: "", promoFim: "" }),
                   }))
                 }
                 className="flex w-full items-center justify-between cursor-pointer"
@@ -627,45 +673,6 @@ export function ProdutoDialog({
                       ))}
                     </select>
                   </div>
-
-                  {/* Destaque */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm((f) => ({ ...f, destaque: !f.destaque }))
-                    }
-                    className="flex w-full items-center justify-between cursor-pointer py-1"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Star
-                        className={cn(
-                          "h-4 w-4",
-                          form.destaque
-                            ? "text-amber-500"
-                            : "text-muted-foreground",
-                        )}
-                      />
-                      <div className="text-left">
-                        <span className="text-sm font-medium">Destaque</span>
-                        <p className="text-xs text-muted-foreground">
-                          Aparece em destaque no cardápio
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className={cn(
-                        "h-5 w-9 rounded-full transition-colors relative shrink-0",
-                        form.destaque ? "bg-amber-400" : "bg-input",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all duration-200",
-                          form.destaque ? "left-[18px]" : "left-0.5",
-                        )}
-                      />
-                    </div>
-                  </button>
 
                   {/* Promoção */}
                   <div className="space-y-3">
@@ -766,7 +773,7 @@ export function ProdutoDialog({
             </Button>
             <Button type="submit" disabled={saving || uploading}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isEdicao ? "Salvar" : "Criar produto"}
+              {isEdicao ? "Salvar" : `Criar ${label}`}
             </Button>
           </div>
         </form>

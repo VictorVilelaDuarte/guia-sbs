@@ -66,7 +66,8 @@ const ABAS: AbaConfig[] = [
   { id: "informacoes", label: "Informações" },
   { id: "fotos", label: "Fotos" },
   { id: "cardapio", label: "Cardápio", feature: "cardapio" },
-  { id: "produtos", label: "Produtos e serviços" },
+  { id: "produtos", label: "Produtos" },
+  { id: "servicos", label: "Serviços" },
   { id: "eventos", label: "Eventos", feature: "eventos" },
   { id: "tags", label: "Palavras-chave" },
 ];
@@ -167,11 +168,11 @@ export function DashboardTabs({
         {aba === "produtos" && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Produtos e serviços</CardTitle>
+              <CardTitle className="text-base">Catálogo de produtos</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Exibidos no perfil público e usados na busca do guia.
+                Produtos físicos ou digitais exibidos no perfil público.
                 {produtoLimite
-                  ? ` Plano Gratuito: até ${produtoLimite} produtos.`
+                  ? ` Plano Gratuito: até ${produtoLimite} itens por aba.`
                   : ""}
               </p>
             </CardHeader>
@@ -179,6 +180,29 @@ export function DashboardTabs({
               <ProdutosManager
                 produtosIniciais={comercio.produtos}
                 categoriasCardapio={comercio.cardapioCategorias}
+                tipo="PRODUTO"
+                limite={produtoLimite}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {aba === "servicos" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Catálogo de serviços</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Serviços oferecidos exibidos no perfil público.
+                {produtoLimite
+                  ? ` Plano Gratuito: até ${produtoLimite} itens por aba.`
+                  : ""}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ProdutosManager
+                produtosIniciais={comercio.produtos}
+                categoriasCardapio={comercio.cardapioCategorias}
+                tipo="SERVICO"
                 limite={produtoLimite}
               />
             </CardContent>

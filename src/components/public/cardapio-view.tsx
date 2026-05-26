@@ -134,7 +134,7 @@ export function CardapioView({
       {/* Header */}
       <div className="px-4 pt-4 pb-5">
         <Link
-          href={`/comercios/${slug}`}
+          href={`/vitrine/${slug}`}
           className="inline-flex items-center gap-1 text-xs text-stone-500 hover:text-stone-800 mb-4 transition-colors"
         >
           <ChevronLeft className="h-3.5 w-3.5" />

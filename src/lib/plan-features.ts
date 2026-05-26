@@ -29,6 +29,11 @@ export const FEATURES_DISPONIVEIS = [
     label: "Cardápio",
     descricao: "Cardápio digital com categorias e itens organizados por ordem",
   },
+  {
+    key: "catalogo",
+    label: "Catálogo",
+    descricao: "Catálogo público de produtos e serviços no perfil do comércio",
+  },
 ] as const
 
 export type FeatureKey = (typeof FEATURES_DISPONIVEIS)[number]["key"]

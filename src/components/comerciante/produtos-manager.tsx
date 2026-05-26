@@ -6,23 +6,33 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import {
   Plus, Pencil, Trash2, Loader2,
-  PackageOpen, Eye, EyeOff, UtensilsCrossed, Search, X, Star, Tag,
+  PackageOpen, Eye, EyeOff, UtensilsCrossed, Search, X, Star, Tag, Wrench,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { Produto, CardapioCategoria } from "./cardapio/types"
+import type { Produto, CardapioCategoria, TipoProduto } from "./cardapio/types"
 import { displayPreco } from "./cardapio/utils"
 import { ProdutoDialog } from "./cardapio/produto-dialog"
 
 export function ProdutosManager({
   produtosIniciais,
   categoriasCardapio,
+  tipo = "PRODUTO",
   limite,
 }: {
   produtosIniciais: Produto[]
   categoriasCardapio: CardapioCategoria[]
+  tipo?: TipoProduto
   limite?: number
 }) {
-  const [produtos, setProdutos] = useState<Produto[]>(produtosIniciais)
+  const label = tipo === "SERVICO" ? "serviço" : "produto"
+  const labelPlural = tipo === "SERVICO" ? "serviços" : "produtos"
+
+  // Filtra apenas os itens do tipo correto que não estão vinculados ao cardápio
+  const itensFiltradosPorTipo = produtosIniciais.filter(
+    (p) => p.tipo === tipo && !p.categoriaCardapioId,
+  )
+
+  const [produtos, setProdutos] = useState<Produto[]>(itensFiltradosPorTipo)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<Produto | null>(null)
   const [removendoId, setRemovendoId] = useState<string | null>(null)
@@ -35,15 +45,14 @@ export function ProdutosManager({
         const q = busca.toLowerCase()
         return (
           p.titulo.toLowerCase().includes(q) ||
-          p.descricao?.toLowerCase().includes(q) ||
-          p.categoriaCardapio?.nome.toLowerCase().includes(q)
+          p.descricao?.toLowerCase().includes(q)
         )
       })
     : produtos
 
   function abrirNovo() {
     if (atingiuLimite) {
-      toast.warning(`Limite de ${limite} produtos atingido. Faça upgrade para o plano Premium.`)
+      toast.warning(`Limite de ${limite} ${labelPlural} atingido. Faça upgrade para o plano Premium.`)
       return
     }
     setEditando(null)
@@ -79,13 +88,13 @@ export function ProdutosManager({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Excluir este produto?")) return
+    if (!confirm(`Excluir este ${label}?`)) return
     setRemovendoId(id)
     const res = await fetch(`/api/comerciante/produtos/${id}`, { method: "DELETE" })
     setRemovendoId(null)
-    if (!res.ok) { toast.error("Erro ao excluir produto."); return }
+    if (!res.ok) { toast.error(`Erro ao excluir ${label}.`); return }
     setProdutos((prev) => prev.filter((p) => p.id !== id))
-    toast.success("Produto excluído.")
+    toast.success(`${label.charAt(0).toUpperCase() + label.slice(1)} excluído.`)
   }
 
   return (
@@ -95,7 +104,7 @@ export function ProdutosManager({
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="text"
-            placeholder="Buscar produto ou categoria..."
+            placeholder={`Buscar ${labelPlural}...`}
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="w-full h-9 rounded-md border border-input bg-background pl-8 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -112,39 +121,43 @@ export function ProdutosManager({
         </div>
         <Button size="sm" onClick={abrirNovo} disabled={atingiuLimite}>
           <Plus className="h-4 w-4 mr-1.5" />
-          Novo produto
+          {`Novo ${label}`}
         </Button>
       </div>
 
       <p className={`text-sm ${atingiuLimite ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
         {produtos.length === 0
-          ? "Nenhum produto cadastrado."
+          ? `Nenhum ${label} cadastrado.`
           : busca && produtosFiltrados.length === 0
             ? `Nenhum resultado para "${busca}".`
             : busca
-              ? `${produtosFiltrados.length} de ${produtos.length} ${produtos.length === 1 ? "produto" : "produtos"}`
-              : `${produtos.length}${limite !== undefined ? `/${limite}` : ""} ${produtos.length === 1 ? "produto" : "produtos"}`}
+              ? `${produtosFiltrados.length} de ${produtos.length} ${produtos.length === 1 ? label : labelPlural}`
+              : `${produtos.length}${limite !== undefined ? `/${limite}` : ""} ${produtos.length === 1 ? label : labelPlural}`}
       </p>
 
       {atingiuLimite && (
         <p className="text-xs text-amber-600 font-medium">
-          Limite de {limite} produtos atingido. Faça upgrade para o plano Premium para adicionar mais.
+          Limite de {limite} {labelPlural} atingido. Faça upgrade para o plano Premium para adicionar mais.
         </p>
       )}
 
       {produtos.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-12 rounded-lg border border-dashed border-input text-muted-foreground">
-          <PackageOpen className="h-10 w-10 opacity-40" />
-          <p className="text-sm">Adicione produtos ou serviços para exibir no seu perfil.</p>
+          {tipo === "SERVICO" ? (
+            <Wrench className="h-10 w-10 opacity-40" />
+          ) : (
+            <PackageOpen className="h-10 w-10 opacity-40" />
+          )}
+          <p className="text-sm">Adicione {labelPlural} para exibir no seu perfil.</p>
           <Button variant="outline" size="sm" onClick={abrirNovo}>
             <Plus className="h-4 w-4 mr-1.5" />
-            Adicionar primeiro produto
+            {`Adicionar primeiro ${label}`}
           </Button>
         </div>
       ) : produtosFiltrados.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 py-10 text-muted-foreground">
           <Search className="h-8 w-8 opacity-30" />
-          <p className="text-sm">Nenhum produto encontrado para &quot;{busca}&quot;.</p>
+          <p className="text-sm">Nenhum {label} encontrado para &quot;{busca}&quot;.</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -156,13 +169,15 @@ export function ProdutosManager({
                 !p.disponivel && "opacity-60"
               )}
             >
-              {/* Imagem (primeira do array) */}
+              {/* Imagem */}
               <div className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden bg-muted">
                 {p.imagens[0] ? (
                   <Image src={p.imagens[0]} alt={p.titulo} fill className="object-cover" />
                 ) : (
                   <div className="h-full w-full flex items-center justify-center">
-                    <PackageOpen className="h-6 w-6 text-muted-foreground/40" />
+                    {tipo === "SERVICO"
+                      ? <Wrench className="h-6 w-6 text-muted-foreground/40" />
+                      : <PackageOpen className="h-6 w-6 text-muted-foreground/40" />}
                   </div>
                 )}
               </div>
@@ -246,7 +261,8 @@ export function ProdutosManager({
       <ProdutoDialog
         open={dialogOpen}
         produto={editando}
-        categorias={categoriasCardapio}
+        tipo={tipo}
+        categorias={tipo === "PRODUTO" ? categoriasCardapio : []}
         onClose={() => setDialogOpen(false)}
         onSaved={handleSaved}
       />

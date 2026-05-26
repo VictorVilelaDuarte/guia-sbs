@@ -14,7 +14,7 @@ Dois públicos principais:
 - **Comerciante:** gerencia seu próprio perfil (informações, fotos, produtos, eventos, palavras-chave) via dashboard privado.
 - **Visitante/turista:** consulta o guia público sem login — comércios, eventos, mapa.
 
-Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/comercios/[slug]` (slug gerado automaticamente a partir do nome na criação do comércio).
+Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/vitrine/[slug]` (slug gerado automaticamente a partir do nome na criação do comércio).
 
 **Modelo de negócio:** SaaS B2B local — comerciantes pagam planos para acessar recursos da plataforma. Os planos são configuráveis pelo admin (model `Plan` no banco), cada um com um conjunto de features habilitadas via JSON. Ao implementar novas features, considerar se faz sentido restringi-las a planos pagos via feature flag.
 
@@ -92,11 +92,17 @@ if (!session || session.user.role !== "COMERCIANTE") return 401
 
 ### Dashboard do comerciante
 
-`/comerciante/dashboard/page.tsx` é um Server Component que busca o comércio completo (com fotos, tags, produtos, eventos, cardápio) e passa para `<DashboardTabs>` (Client Component). As abas são: Informações, Fotos, Cardápio, Produtos e serviços, Eventos, Palavras-chave. Abas controladas por feature flags do plano são ocultadas quando a feature não está disponível.
+`/comerciante/dashboard/page.tsx` é um Server Component que busca o comércio completo (com fotos, tags, produtos, eventos, cardápio) e passa para `<DashboardTabs>` (Client Component). As abas são: Informações, Fotos, Cardápio, **Produtos**, **Serviços**, Eventos, Palavras-chave. Abas controladas por feature flags do plano são ocultadas quando a feature não está disponível.
 
-### Perfil público
+As abas Produtos e Serviços são instâncias separadas de `<ProdutosManager>` com `tipo="PRODUTO"` e `tipo="SERVICO"` respectivamente. O manager filtra `p.tipo === tipo && !p.categoriaCardapioId` para mostrar apenas itens do catálogo (não vinculados ao cardápio).
 
-`/comercios/[slug]/page.tsx` — Server Component público. Exibe todos os dados do comércio: identidade (logo + descrição), status aberto/fechado (timezone `America/Sao_Paulo`), CTAs rápidos, galeria de fotos, cardápio, eventos, horários, mapa, contatos e produtos. Comércios com `status !== ATIVO` mostram um banner de pré-visualização mas não bloqueiam o acesso (útil para o comerciante revisar antes da aprovação).
+### Vitrine pública
+
+`/vitrine/[slug]/page.tsx` — Server Component público. Exibe identidade, status aberto/fechado, CTAs rápidos, galeria de fotos, destaques do cardápio, destaques de produtos/serviços do catálogo, eventos, horários, mapa e contatos. Comércios com `status !== ATIVO` mostram banner de pré-visualização mas não bloqueiam o acesso.
+
+**Ordem das seções:** Fotos → Cardápio (destaques) → Produtos em destaque → Serviços em destaque → Eventos → Horários → Localização → Contato.
+
+Cada seção de destaques usa `<CardapioDestaquesVitrine>` (Client Component em `src/components/public/cardapio-destaques-vitrine.tsx`) que gerencia o state do bottom sheet localmente — necessário porque o Server Component não pode manter state.
 
 Status aberto/fechado usa `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paulo"` — calculado no servidor. Quando fechado, exibe "Volta amanhã às HH:MM" ou "Volta [dia] às HH:MM" com base no próximo dia com abertura cadastrada.
 
@@ -142,6 +148,8 @@ O middleware roda no Edge runtime da Vercel (limite de 1 MB). Para não ultrapas
 
 **Bug Safari iOS — `position: fixed` dentro de flex:** quando `<body>` tem `display: flex`, elementos com `position: fixed` podem usar o container flex como containing block em vez do viewport. O sheet fica mais estreito que a tela. A solução é **não usar `position: fixed` no sheet em si**: um wrapper externo único com `position: fixed; inset: 0` cobre 100% do viewport (garantido), e o backdrop + sheet usam `position: absolute` dentro dele. Nunca mova o sheet para `position: fixed` diretamente.
 
+**Scroll lock no iOS Safari:** `overflow: hidden` no body é ignorado pelo iOS Safari quando há scroll. A solução correta é salvar `window.scrollY`, aplicar `position: fixed; top: -scrollY; width: 100%` no body ao abrir, e restaurar tudo (incluindo `window.scrollTo`) ao fechar. Isso é feito via `useEffect` dentro do bottom sheet quando `isVisible` muda.
+
 **Carrossel:** cada slide usa `absolute inset-0` + `translateX((i - currentIndex) * 100%)`. **Não use** a abordagem flex-track (`display: flex` no container + `w-full shrink-0` nos slides) — o `w-full` no filho flex cria uma dependência circular de largura e o carrossel fica estreito no mobile.
 
 **Gestos:** arrastar o handle vertical > 80px fecha o sheet. Swipe horizontal no carrossel navega entre fotos. Os estados de toque usam `useRef` para evitar re-renders durante o gesto.
@@ -181,6 +189,7 @@ Enums:
 - `Role`: SUPER_ADMIN | ADMIN | COMERCIANTE
 - `ComercioStatus`: PENDENTE | ATIVO | INATIVO | REJEITADO
 - `Categoria`: RESTAURANTE | HOSPEDAGEM | TURISMO | SERVICO | COMERCIO | ENTRETENIMENTO
+- `TipoProduto`: PRODUTO | SERVICO
 
 > O enum `PlanType` (FREE/PREMIUM) foi substituído pelo model `Plan` — ver seção Planos abaixo.
 
@@ -193,6 +202,7 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 | Key | Descrição |
 |---|---|
 | `cardapio` | Cardápio digital com categorias e itens |
+| `catalogo` | Catálogo público de produtos e serviços (sem categorias) |
 | `eventos` | Criar e exibir eventos no perfil público |
 | `fotos_ilimitadas` | Upload sem limite (FREE tem limite de 3 fotos) |
 | `destaque_busca` | Perfil em posição destacada nos resultados |
@@ -225,23 +235,40 @@ CardapioCategoria (nome, ordem)
 
 **Componentes do painel** em `src/components/comerciante/cardapio/`:
 - `manager.tsx` — lista com drag-and-drop (@dnd-kit), colapso de categorias, ações inline
-- `produto-dialog.tsx` — formulário de item com galeria de até 3 fotos (multi-seleção, drag-and-drop, HEIC) e alternância entre preço único e variações
+- `produto-dialog.tsx` — formulário unificado para produtos do catálogo e itens do cardápio, com galeria de até 3 fotos (multi-seleção, drag-and-drop, HEIC), alternância preço único/variações, toggle de **destaque** (sempre visível, independente de cardápio) e seção "Incluir no cardápio" (oculta para serviços)
 - `categoria-dialog.tsx` — formulário simples de categoria
 - `sortable-wrappers.tsx` — wrappers do @dnd-kit para categorias e itens
-- `types.ts` — interfaces `CardapioCategoria`, `CardapioItem`, `CardapioVariacao`, `ItemFormState`
+- `types.ts` — interfaces `CardapioCategoria`, `CardapioItem`, `CardapioVariacao`, `ItemFormState`, `TipoProduto`
 - `utils.ts` — `formatPreco`, `parsePreco`, `displayPreco`
 
 **Componentes públicos** em `src/components/public/cardapio/`:
 - `types.ts` — interfaces `Variacao`, `Produto`, `Categoria` + funções `formatBRL`, `isPromoAtiva`
 - `item-row.tsx` — linha de item na listagem (thumbnail, título, descrição, preço/variações)
-- `destaque-card.tsx` — card no carrossel horizontal de destaques
+- `destaque-card.tsx` — card no carrossel horizontal de destaques (usado tanto no cardápio completo quanto na vitrine)
 
-O orquestrador é `src/components/public/cardapio-view.tsx` — gerencia tabs, busca, IntersectionObserver para tab ativa e abre o `ProdutoBottomSheet`.
+O orquestrador do cardápio completo é `src/components/public/cardapio-view.tsx` — gerencia tabs, busca, IntersectionObserver para tab ativa e abre o `ProdutoBottomSheet`.
+
+### Catálogo de produtos e serviços
+
+Feature controlada pelo plano (`key: "catalogo"`). Produtos e serviços são instâncias do mesmo model `Produto`, diferenciados pelo campo `tipo: TipoProduto` (PRODUTO | SERVICO). Um produto pode estar no catálogo **ou** no cardápio — não nos dois ao mesmo tempo (por ora): `categoriaCardapioId != null` indica que pertence ao cardápio.
+
+**Flag `destaque`:** campo independente no model `Produto`. Não requer cardápio vinculado. Produtos com `destaque: true` aparecem na vitrine do comércio no carrossel horizontal da seção correspondente (Cardápio, Produtos ou Serviços). Para o cardápio, a query filtra `destaque: true` nas `cardapioCategorias`; para o catálogo, filtra `destaque: true, categoriaCardapioId: null` nos `produtos`.
+
+**Página pública do catálogo:** `/vitrine/[slug]/catalogo` — grid 2 colunas (3 em telas maiores), tabs Produtos/Serviços, busca, reusa `ProdutoBottomSheet`. Retorna 404 se a feature não estiver habilitada ou se não houver itens disponíveis.
+
+**Componentes:**
+- `src/components/public/catalogo-view.tsx` — grid público de produtos e serviços
+- `src/components/public/cardapio-destaques-vitrine.tsx` — carrossel de destaques para a vitrine (Client Component wrapper necessário pois a vitrine é Server Component)
+- `src/components/comerciante/produtos-manager.tsx` — lista de produtos/serviços do catálogo no painel, com prop `tipo` para filtrar
 
 ## Fontes
 
 - Serif: `Fraunces` (variável `--font-serif`)
 - Sans: `Plus Jakarta Sans` (variável `--font-sans`)
+
+### Zoom e viewport em páginas de cardápio
+
+A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = { userScalable: false }` para desabilitar pinch-to-zoom (comportamento esperado num cardápio estilo app). Qualquer `<input>` nessas páginas deve usar `text-[16px]` (ou maior) para evitar o auto-zoom do iOS Safari ao focar campos com fonte < 16px.
 
 ## Próximas features planejadas
 
@@ -250,5 +277,5 @@ O orquestrador é `src/components/public/cardapio-view.tsx` — gerencia tabs, b
 - Página pública de eventos da cidade (`/eventos`)
 - Avaliações de visitantes
 - Analytics para comerciantes (visualizações, cliques) — feature flag já existe, falta implementar
-- Promoções/ofertas com validade
 - QR Code do perfil para impressão — feature flag já existe, falta implementar
+- Produto simultâneo no cardápio e no catálogo (atualmente exclusivos)
