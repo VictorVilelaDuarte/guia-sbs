@@ -35,7 +35,7 @@ export async function PATCH(
   const updated = await prisma.cardapioCategoria.update({
     where: { id },
     data: parsed.data,
-    include: { itens: { orderBy: { ordem: "asc" } } },
+    include: { produtos: { orderBy: { ordem: "asc" } } },
   })
 
   return NextResponse.json(updated)

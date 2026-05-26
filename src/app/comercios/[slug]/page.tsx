@@ -190,17 +190,21 @@ export default async function PaginaComercio({
     include: {
       fotos: { orderBy: { ordem: "asc" } },
       tags: { orderBy: { nome: "asc" } },
-      produtos: { where: { disponivel: true }, orderBy: { ordem: "asc" } },
+      produtos: {
+        where: { disponivel: true, categoriaCardapioId: null },
+        orderBy: { ordem: "asc" },
+        include: { variacoes: { orderBy: { ordem: "asc" } } },
+      },
       eventos: { orderBy: { dataInicio: "asc" } },
       plan: true,
       cardapioCategorias: {
         orderBy: { ordem: "asc" },
         include: {
-          itens: {
-              where: { disponivel: true },
-              orderBy: { ordem: "asc" },
-              include: { variacoes: { orderBy: { ordem: "asc" } } },
-            },
+          produtos: {
+            where: { disponivel: true },
+            orderBy: { ordem: "asc" },
+            include: { variacoes: { orderBy: { ordem: "asc" } } },
+          },
         },
       },
     },
@@ -417,34 +421,43 @@ export default async function PaginaComercio({
         {temCardapio && comercio.cardapioCategorias.length > 0 && (
           <>
             <section className="mb-6">
-              <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-1.5">
-                <UtensilsCrossed className="h-3.5 w-3.5" />
-                Cardápio
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                  <UtensilsCrossed className="h-3.5 w-3.5" />
+                  Cardápio
+                </h2>
+                <Link
+                  href={`/comercios/${comercio.slug}/cardapio`}
+                  className="text-xs text-primary hover:underline flex items-center gap-0.5"
+                >
+                  Ver cardápio completo
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
               <div className="space-y-6">
                 {comercio.cardapioCategorias.map((cat) => (
-                  cat.itens.length > 0 && (
+                  cat.produtos.length > 0 && (
                     <div key={cat.id}>
                       <h3 className="text-sm font-semibold mb-3 pb-1 border-b border-border">{cat.nome}</h3>
                       <div className="space-y-3">
-                        {cat.itens.map((item) => (
-                          <div key={item.id} className="flex items-start gap-3">
-                            {item.imagens[0] && (
+                        {cat.produtos.map((produto) => (
+                          <div key={produto.id} className="flex items-start gap-3">
+                            {produto.imagens[0] && (
                               <div className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden bg-muted">
-                                <Image src={item.imagens[0]} alt={item.titulo} fill className="object-cover" />
+                                <Image src={produto.imagens[0]} alt={produto.titulo} fill className="object-cover" />
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <p className="text-sm font-medium leading-snug">{item.titulo}</p>
-                                  {item.descricao && (
-                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.descricao}</p>
+                                  <p className="text-sm font-medium leading-snug">{produto.titulo}</p>
+                                  {produto.descricao && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{produto.descricao}</p>
                                   )}
                                 </div>
-                                {item.variacoes.length > 0 ? (
+                                {produto.variacoes.length > 0 ? (
                                   <div className="flex gap-4 shrink-0 text-right">
-                                    {item.variacoes.map((v) => (
+                                    {produto.variacoes.map((v) => (
                                       <div key={v.id}>
                                         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{v.nome}</p>
                                         <p className="text-sm font-semibold text-primary">
@@ -453,9 +466,9 @@ export default async function PaginaComercio({
                                       </div>
                                     ))}
                                   </div>
-                                ) : item.preco != null && item.preco > 0 ? (
+                                ) : produto.preco != null && produto.preco > 0 ? (
                                   <span className="text-sm font-semibold text-primary shrink-0">
-                                    {item.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                    {produto.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                                   </span>
                                 ) : null}
                               </div>
@@ -718,10 +731,10 @@ export default async function PaginaComercio({
               <div className="space-y-3">
                 {comercio.produtos.map((produto) => (
                   <div key={produto.id} className="flex items-start gap-3">
-                    {produto.imagem && (
+                    {produto.imagens[0] && (
                       <div className="relative h-16 w-16 shrink-0 rounded-lg overflow-hidden bg-muted">
                         <Image
-                          src={produto.imagem}
+                          src={produto.imagens[0]}
                           alt={produto.titulo}
                           fill
                           className="object-cover"
@@ -733,12 +746,22 @@ export default async function PaginaComercio({
                         <p className="text-sm font-medium leading-snug">
                           {produto.titulo}
                         </p>
-                        {produto.preco != null && produto.preco > 0 && (
+                        {produto.variacoes.length > 0 ? (
+                          <div className="flex gap-3 shrink-0 text-right">
+                            {produto.variacoes.map((v) => (
+                              <div key={v.id}>
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{v.nome}</p>
+                                <p className="text-sm font-semibold text-primary">
+                                  {v.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : produto.preco != null && produto.preco > 0 ? (
                           <span className="text-sm font-semibold text-primary shrink-0">
                             {formatPreco(produto.preco)}
                           </span>
-                        )}
-                        {(produto.preco == null || produto.preco === 0) && (
+                        ) : (
                           <span className="text-xs text-muted-foreground shrink-0">
                             Consulte
                           </span>

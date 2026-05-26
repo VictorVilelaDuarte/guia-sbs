@@ -32,7 +32,10 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${fraunces.variable} ${jakartaSans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body suppressHydrationWarning>
+        <div className="min-h-full flex flex-col">{children}</div>
+        <div id="portal-root" />
+      </body>
     </html>
   );
 }

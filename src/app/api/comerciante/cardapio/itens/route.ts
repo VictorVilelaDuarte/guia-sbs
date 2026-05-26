@@ -8,6 +8,7 @@ const variacaoSchema = z.object({
   preco: z.number().nonnegative(),
 })
 
+// categoriaId no payload é mapeado para categoriaCardapioId no Produto
 const createSchema = z.object({
   titulo: z.string().min(1).max(120),
   descricao: z.string().max(1000).optional().nullable(),
@@ -44,14 +45,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
   }
 
-  const { variacoes, ...itemData } = parsed.data
-  const count = await prisma.cardapioItem.count({ where: { categoriaId: itemData.categoriaId } })
+  const { variacoes, categoriaId, ...itemData } = parsed.data
+  const count = await prisma.produto.count({
+    where: { comercioId: ctx.comercioId, categoriaCardapioId: categoriaId },
+  })
 
-  const item = await prisma.cardapioItem.create({
+  const produto = await prisma.produto.create({
     data: {
       ...itemData,
       imagens: itemData.imagens ?? [],
       comercioId: ctx.comercioId,
+      categoriaCardapioId: categoriaId,
       ordem: count,
       variacoes: variacoes?.length
         ? { create: variacoes.map((v, i) => ({ ...v, ordem: i })) }
@@ -60,5 +64,5 @@ export async function POST(req: NextRequest) {
     include: { variacoes: { orderBy: { ordem: "asc" } } },
   })
 
-  return NextResponse.json(item, { status: 201 })
+  return NextResponse.json(produto, { status: 201 })
 }

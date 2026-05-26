@@ -3,12 +3,22 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 
+const variacaoSchema = z.object({
+  nome: z.string().min(1).max(80),
+  preco: z.number().nonnegative(),
+})
+
 const createSchema = z.object({
   titulo: z.string().min(1).max(120),
   descricao: z.string().max(1000).optional().nullable(),
   preco: z.number().positive().optional().nullable(),
-  imagem: z.string().url().optional().nullable(),
+  imagens: z.array(z.string().url()).max(3).optional(),
   disponivel: z.boolean().optional(),
+  destaque: z.boolean().optional(),
+  precoPromo: z.number().positive().optional().nullable(),
+  promoFim: z.string().datetime({ offset: true }).optional().nullable(),
+  categoriaCardapioId: z.string().optional().nullable(),
+  variacoes: z.array(variacaoSchema).optional(),
 })
 
 async function getComerciante() {
@@ -28,6 +38,10 @@ export async function GET() {
   const produtos = await prisma.produto.findMany({
     where: { comercioId: ctx.comercioId },
     orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
+    include: {
+      variacoes: { orderBy: { ordem: "asc" } },
+      categoriaCardapio: { select: { id: true, nome: true } },
+    },
   })
 
   return NextResponse.json(produtos)
@@ -39,12 +53,35 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const parsed = createSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
+  if (!parsed.success) return NextResponse.json({ error: "Dados inválidos.", issues: parsed.error.issues }, { status: 400 })
 
+  if (parsed.data.categoriaCardapioId) {
+    const categoria = await prisma.cardapioCategoria.findUnique({
+      where: { id: parsed.data.categoriaCardapioId },
+      select: { comercioId: true },
+    })
+    if (!categoria || categoria.comercioId !== ctx.comercioId) {
+      return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
+    }
+  }
+
+  const { variacoes, ...produtoData } = parsed.data
   const count = await prisma.produto.count({ where: { comercioId: ctx.comercioId } })
 
   const produto = await prisma.produto.create({
-    data: { ...parsed.data, comercioId: ctx.comercioId, ordem: count },
+    data: {
+      ...produtoData,
+      imagens: produtoData.imagens ?? [],
+      comercioId: ctx.comercioId,
+      ordem: count,
+      variacoes: variacoes?.length
+        ? { create: variacoes.map((v, i) => ({ ...v, ordem: i })) }
+        : undefined,
+    },
+    include: {
+      variacoes: { orderBy: { ordem: "asc" } },
+      categoriaCardapio: { select: { id: true, nome: true } },
+    },
   })
 
   return NextResponse.json(produto, { status: 201 })

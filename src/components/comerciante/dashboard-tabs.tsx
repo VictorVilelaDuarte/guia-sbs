@@ -7,6 +7,7 @@ import { LogoUploader } from "@/components/comerciante/logo-uploader";
 import { FotosUploader } from "@/components/comerciante/fotos-uploader";
 import { ProdutosManager } from "@/components/comerciante/produtos-manager";
 import { CardapioManager } from "@/components/comerciante/cardapio-manager";
+import type { Produto, CardapioCategoria } from "@/components/comerciante/cardapio/types";
 import { TagsEditor } from "@/components/comerciante/tags-editor";
 import {
   EventosManager,
@@ -27,16 +28,6 @@ interface Tag {
   id: string;
   nome: string;
 }
-interface Produto {
-  id: string;
-  titulo: string;
-  descricao: string | null;
-  preco: number | null;
-  imagem: string | null;
-  disponivel: boolean;
-  ordem: number;
-}
-
 export interface ComercioParaDashboard {
   id: string;
   nome: string;
@@ -63,33 +54,6 @@ export interface ComercioParaDashboard {
   produtos: Produto[];
   eventos: Evento[];
   cardapioCategorias: CardapioCategoria[];
-}
-
-interface CardapioVariacao {
-  id: string;
-  nome: string;
-  preco: number;
-  ordem: number;
-  itemId: string;
-}
-
-interface CardapioItem {
-  id: string;
-  titulo: string;
-  descricao: string | null;
-  preco: number | null;
-  imagens: string[];
-  disponivel: boolean;
-  ordem: number;
-  categoriaId: string;
-  variacoes: CardapioVariacao[];
-}
-
-interface CardapioCategoria {
-  id: string;
-  nome: string;
-  ordem: number;
-  itens: CardapioItem[];
 }
 
 interface AbaConfig {
@@ -214,6 +178,7 @@ export function DashboardTabs({
             <CardContent>
               <ProdutosManager
                 produtosIniciais={comercio.produtos}
+                categoriasCardapio={comercio.cardapioCategorias}
                 limite={produtoLimite}
               />
             </CardContent>

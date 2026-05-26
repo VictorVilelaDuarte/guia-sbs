@@ -20,7 +20,7 @@ export async function GET() {
     where: { comercioId: ctx.comercioId },
     orderBy: { ordem: "asc" },
     include: {
-      itens: {
+      produtos: {
         orderBy: { ordem: "asc" },
         include: { variacoes: { orderBy: { ordem: "asc" } } },
       },

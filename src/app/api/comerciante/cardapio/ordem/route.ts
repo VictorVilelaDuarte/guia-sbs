@@ -48,8 +48,8 @@ export async function PATCH(req: NextRequest) {
 
     await prisma.$transaction(
       ids.map((id, ordem) =>
-        prisma.cardapioItem.updateMany({
-          where: { id, categoriaId },
+        prisma.produto.updateMany({
+          where: { id, categoriaCardapioId: categoriaId },
           data: { ordem },
         })
       )

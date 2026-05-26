@@ -109,9 +109,8 @@ model Comercio {
   tags     Tag[]
   fotos    Foto[]
   eventos  Evento[]
-  produtos Produto[]
+  produtos           Produto[]
   cardapioCategorias CardapioCategoria[]
-  cardapioItens      CardapioItem[]
 
   @@map("comercios")
 }
@@ -142,61 +141,49 @@ model Foto {
 }
 
 model Produto {
-  id         String   @id @default(cuid())
-  titulo     String
-  descricao  String?  @db.Text
-  preco      Float?
-  imagem     String?
-  disponivel Boolean  @default(true)
-  ordem      Int      @default(0)
-  comercioId String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                  String             @id @default(cuid())
+  titulo              String
+  descricao           String?            @db.Text
+  preco               Float?
+  imagens             String[]
+  disponivel          Boolean            @default(true)
+  destaque            Boolean            @default(false)
+  precoPromo          Float?
+  promoFim            DateTime?
+  ordem               Int                @default(0)
+  comercioId          String
+  categoriaCardapioId String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
-  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  comercio          Comercio            @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  categoriaCardapio CardapioCategoria?  @relation(fields: [categoriaCardapioId], references: [id], onDelete: SetNull)
+  variacoes         CardapioVariacao[]
 
   @@map("produtos")
 }
 
 model CardapioCategoria {
-  id         String         @id @default(cuid())
+  id         String     @id @default(cuid())
   nome       String
-  ordem      Int            @default(0)
+  ordem      Int        @default(0)
   comercioId String
-  comercio   Comercio       @relation(fields: [comercioId], references: [id], onDelete: Cascade)
-  itens      CardapioItem[]
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  comercio   Comercio   @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  produtos   Produto[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
   @@map("cardapio_categorias")
 }
 
-model CardapioItem {
-  id          String            @id @default(cuid())
-  titulo      String
-  descricao   String?           @db.Text
-  preco       Float?
-  imagens     String[]
-  disponivel  Boolean           @default(true)
-  ordem       Int               @default(0)
-  categoriaId String
-  categoria   CardapioCategoria @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
-  comercioId  String
-  comercio    Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
-  variacoes   CardapioVariacao[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-
-  @@map("cardapio_itens")
-}
 
 model CardapioVariacao {
-  id     String       @id @default(cuid())
-  nome   String
-  preco  Float
-  ordem  Int          @default(0)
-  itemId String
-  item   CardapioItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  nome      String
+  preco     Float
+  ordem     Int      @default(0)
+  produtoId String
+  produto   Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
 
   @@map("cardapio_variacoes")
 }

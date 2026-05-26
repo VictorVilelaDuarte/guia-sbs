@@ -31,14 +31,23 @@ export default async function ComercinateDashboard() {
       plan:     true,
       fotos:    { orderBy: { ordem: "asc" } },
       tags:     { orderBy: { createdAt: "asc" }, select: { id: true, nome: true } },
-      produtos: { orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] },
+      produtos: {
+        orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
+        include: {
+          variacoes: { orderBy: { ordem: "asc" } },
+          categoriaCardapio: { select: { id: true, nome: true } },
+        },
+      },
       eventos:  { orderBy: { dataInicio: "asc" } },
       cardapioCategorias: {
         orderBy: { ordem: "asc" },
         include: {
-          itens: {
+          produtos: {
             orderBy: { ordem: "asc" },
-            include: { variacoes: { orderBy: { ordem: "asc" } } },
+            include: {
+              variacoes: { orderBy: { ordem: "asc" } },
+              categoriaCardapio: { select: { id: true, nome: true } },
+            },
           },
         },
       },

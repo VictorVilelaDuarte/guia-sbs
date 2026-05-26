@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   const categoria = await prisma.cardapioCategoria.create({
     data: { nome: parsed.data.nome, comercioId: ctx.comercioId, ordem: count },
-    include: { itens: true },
+    include: { produtos: true },
   })
 
   return NextResponse.json(categoria, { status: 201 })

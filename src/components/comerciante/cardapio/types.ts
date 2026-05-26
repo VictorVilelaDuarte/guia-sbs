@@ -3,34 +3,45 @@ export interface CardapioVariacao {
   nome: string
   preco: number
   ordem: number
-  itemId: string
+  produtoId: string
 }
 
-export interface CardapioItem {
+export interface Produto {
   id: string
   titulo: string
   descricao: string | null
   preco: number | null
   imagens: string[]
   disponivel: boolean
+  destaque: boolean
+  precoPromo: number | null
+  promoFim: Date | string | null
   ordem: number
-  categoriaId: string
+  comercioId: string
+  categoriaCardapioId: string | null
+  categoriaCardapio: { id: string; nome: string } | null
   variacoes: CardapioVariacao[]
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 
 export interface CardapioCategoria {
   id: string
   nome: string
   ordem: number
-  itens: CardapioItem[]
+  produtos: Produto[]
 }
 
-export interface ItemFormState {
+export interface ProdutoFormState {
   titulo: string
   descricao: string
   preco: string
   imagens: string[]
   disponivel: boolean
-  categoriaId: string
+  destaque: boolean
+  precoPromo: string
+  promoFim: string
   variacoes: { nome: string; preco: string }[]
+  incluirNoCardapio: boolean
+  categoriaCardapioId: string
 }

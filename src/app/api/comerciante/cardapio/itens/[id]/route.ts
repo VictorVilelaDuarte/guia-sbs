@@ -19,17 +19,17 @@ const patchSchema = z.object({
   variacoes: z.array(variacaoSchema).optional(),
 })
 
-async function ownerCheck(itemId: string) {
+async function ownerCheck(produtoId: string) {
   const session = await auth()
   if (!session || session.user.role !== "COMERCIANTE") return null
 
-  const item = await prisma.cardapioItem.findUnique({
-    where: { id: itemId },
+  const produto = await prisma.produto.findUnique({
+    where: { id: produtoId },
     include: { comercio: { select: { ownerId: true } } },
   })
 
-  if (!item || item.comercio.ownerId !== session.user.id) return null
-  return item
+  if (!produto || produto.comercio.ownerId !== session.user.id) return null
+  return produto
 }
 
 export async function PATCH(
@@ -37,34 +37,38 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const item = await ownerCheck(id)
-  if (!item) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const produto = await ownerCheck(id)
+  if (!produto) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const body = await req.json()
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
 
-  const { variacoes, ...itemData } = parsed.data
+  const { variacoes, categoriaId, ...itemData } = parsed.data
+  const produtoData = {
+    ...itemData,
+    ...(categoriaId !== undefined ? { categoriaCardapioId: categoriaId } : {}),
+  }
 
   let updated
   if (variacoes !== undefined) {
     updated = await prisma.$transaction(async (tx) => {
-      await tx.cardapioVariacao.deleteMany({ where: { itemId: id } })
+      await tx.cardapioVariacao.deleteMany({ where: { produtoId: id } })
       if (variacoes.length > 0) {
         await tx.cardapioVariacao.createMany({
-          data: variacoes.map((v, i) => ({ ...v, itemId: id, ordem: i })),
+          data: variacoes.map((v, i) => ({ ...v, produtoId: id, ordem: i })),
         })
       }
-      return tx.cardapioItem.update({
+      return tx.produto.update({
         where: { id },
-        data: itemData,
+        data: produtoData,
         include: { variacoes: { orderBy: { ordem: "asc" } } },
       })
     })
   } else {
-    updated = await prisma.cardapioItem.update({
+    updated = await prisma.produto.update({
       where: { id },
-      data: itemData,
+      data: produtoData,
       include: { variacoes: { orderBy: { ordem: "asc" } } },
     })
   }
@@ -77,10 +81,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const item = await ownerCheck(id)
-  if (!item) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const produto = await ownerCheck(id)
+  if (!produto) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
-  for (const url of item.imagens) {
+  for (const url of produto.imagens) {
     try {
       const parsed = new URL(url)
       const path = parsed.pathname.split("/object/public/comercios/")[1]
@@ -88,7 +92,7 @@ export async function DELETE(
     } catch {}
   }
 
-  await prisma.cardapioItem.delete({ where: { id } })
+  await prisma.produto.delete({ where: { id } })
 
   return NextResponse.json({ ok: true })
 }
