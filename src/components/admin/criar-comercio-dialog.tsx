@@ -23,7 +23,7 @@ import { toast } from "sonner"
 import { Loader2, Plus } from "lucide-react"
 
 const categorias = [
-  { value: "RESTAURANTE", label: "Restaurante" },
+  { value: "ALIMENTACAO", label: "Alimentação" },
   { value: "HOSPEDAGEM", label: "Hospedagem" },
   { value: "TURISMO", label: "Turismo" },
   { value: "SERVICO", label: "Serviço" },

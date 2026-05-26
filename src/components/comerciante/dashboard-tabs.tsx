@@ -28,6 +28,12 @@ interface Tag {
   id: string;
   nome: string;
 }
+export interface SubcategoriaBasica {
+  id: string;
+  nome: string;
+  categoria: string;
+}
+
 export interface ComercioParaDashboard {
   id: string;
   nome: string;
@@ -51,6 +57,7 @@ export interface ComercioParaDashboard {
   plan: { slug: string; features: unknown };
   fotos: Foto[];
   tags: Tag[];
+  subcategorias: SubcategoriaBasica[];
   produtos: Produto[];
   eventos: Evento[];
   cardapioCategorias: CardapioCategoria[];
@@ -74,8 +81,10 @@ const ABAS: AbaConfig[] = [
 
 export function DashboardTabs({
   comercio,
+  subcategoriasDisponiveis,
 }: {
   comercio: ComercioParaDashboard;
+  subcategoriasDisponiveis: SubcategoriaBasica[];
 }) {
   const [aba, setAba] = useState("informacoes");
   const features = comercio.plan.features;
@@ -140,7 +149,10 @@ export function DashboardTabs({
                 <CardTitle className="text-base">Informações gerais</CardTitle>
               </CardHeader>
               <CardContent>
-                <EditarComercioForm comercio={comercio} />
+                <EditarComercioForm
+                  comercio={comercio}
+                  subcategoriasDisponiveis={subcategoriasDisponiveis}
+                />
               </CardContent>
             </Card>
           </>

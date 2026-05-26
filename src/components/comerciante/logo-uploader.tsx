@@ -8,9 +8,15 @@ import { Loader2, Upload, X } from "lucide-react"
 
 interface LogoUploaderProps {
   logoAtual: string | null
+  comercioId?: string   // quando presente, usa rota admin
+  saveUrl?: string      // URL para salvar o campo logo (default: /api/comerciante/comercio)
 }
 
-export function LogoUploader({ logoAtual }: LogoUploaderProps) {
+export function LogoUploader({
+  logoAtual,
+  comercioId,
+  saveUrl = "/api/comerciante/comercio",
+}: LogoUploaderProps) {
   const [logo, setLogo] = useState<string | null>(logoAtual)
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -21,6 +27,7 @@ export function LogoUploader({ logoAtual }: LogoUploaderProps) {
     const form = new FormData()
     form.append("file", file)
     form.append("tipo", "logo")
+    if (comercioId) form.append("comercioId", comercioId)
 
     const uploadRes = await fetch("/api/comerciante/upload", { method: "POST", body: form })
     if (!uploadRes.ok) {
@@ -32,7 +39,7 @@ export function LogoUploader({ logoAtual }: LogoUploaderProps) {
 
     const { url } = await uploadRes.json()
 
-    const saveRes = await fetch("/api/comerciante/comercio", {
+    const saveRes = await fetch(saveUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ logo: url }),
@@ -51,7 +58,7 @@ export function LogoUploader({ logoAtual }: LogoUploaderProps) {
 
   async function handleRemove() {
     setLoading(true)
-    const res = await fetch("/api/comerciante/comercio", {
+    const res = await fetch(saveUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ logo: "" }),

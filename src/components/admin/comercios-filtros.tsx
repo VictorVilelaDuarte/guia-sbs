@@ -68,7 +68,7 @@ export function ComerciosFiltros() {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="todas">Todas as categorias</SelectItem>
-          <SelectItem value="RESTAURANTE">Restaurante</SelectItem>
+          <SelectItem value="ALIMENTACAO">Alimentação</SelectItem>
           <SelectItem value="HOSPEDAGEM">Hospedagem</SelectItem>
           <SelectItem value="TURISMO">Turismo</SelectItem>
           <SelectItem value="SERVICO">Serviço</SelectItem>

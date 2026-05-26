@@ -24,7 +24,7 @@ enum ComercioStatus {
 }
 
 enum Categoria {
-  RESTAURANTE
+  ALIMENTACAO
   HOSPEDAGEM
   TURISMO
   SERVICO
@@ -109,15 +109,31 @@ model Comercio {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  owner    User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  plan     Plan      @relation(fields: [planId], references: [id])
-  tags     Tag[]
-  fotos    Foto[]
-  eventos  Evento[]
+  owner              User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  plan               Plan               @relation(fields: [planId], references: [id])
+  tags               Tag[]
+  fotos              Foto[]
+  eventos            Evento[]
   produtos           Produto[]
   cardapioCategorias CardapioCategoria[]
+  subcategorias      Subcategoria[]
 
   @@map("comercios")
+}
+
+model Subcategoria {
+  id        String    @id @default(cuid())
+  nome      String
+  categoria Categoria
+  ativo     Boolean   @default(true)
+  ordem     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  comercios Comercio[]
+
+  @@unique([nome, categoria])
+  @@map("subcategorias")
 }
 
 model Tag {

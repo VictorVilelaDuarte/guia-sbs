@@ -25,34 +25,42 @@ export default async function ComercinateDashboard() {
   const session = await auth()
   if (!session) redirect("/admin/login")
 
-  const comercio = await prisma.comercio.findUnique({
-    where: { ownerId: session.user.id },
-    include: {
-      plan:     true,
-      fotos:    { orderBy: { ordem: "asc" } },
-      tags:     { orderBy: { createdAt: "asc" }, select: { id: true, nome: true } },
-      produtos: {
-        orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
-        include: {
-          variacoes: { orderBy: { ordem: "asc" } },
-          categoriaCardapio: { select: { id: true, nome: true } },
+  const [comercio, subcategoriasDisponiveis] = await Promise.all([
+    prisma.comercio.findUnique({
+      where: { ownerId: session.user.id },
+      include: {
+        plan:     true,
+        fotos:    { orderBy: { ordem: "asc" } },
+        tags:     { orderBy: { createdAt: "asc" }, select: { id: true, nome: true } },
+        subcategorias: { select: { id: true, nome: true, categoria: true } },
+        produtos: {
+          orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
+          include: {
+            variacoes: { orderBy: { ordem: "asc" } },
+            categoriaCardapio: { select: { id: true, nome: true } },
+          },
         },
-      },
-      eventos:  { orderBy: { dataInicio: "asc" } },
-      cardapioCategorias: {
-        orderBy: { ordem: "asc" },
-        include: {
-          produtos: {
-            orderBy: { ordem: "asc" },
-            include: {
-              variacoes: { orderBy: { ordem: "asc" } },
-              categoriaCardapio: { select: { id: true, nome: true } },
+        eventos:  { orderBy: { dataInicio: "asc" } },
+        cardapioCategorias: {
+          orderBy: { ordem: "asc" },
+          include: {
+            produtos: {
+              orderBy: { ordem: "asc" },
+              include: {
+                variacoes: { orderBy: { ordem: "asc" } },
+                categoriaCardapio: { select: { id: true, nome: true } },
+              },
             },
           },
         },
       },
-    },
-  })
+    }),
+    prisma.subcategoria.findMany({
+      where: { ativo: true },
+      orderBy: [{ categoria: "asc" }, { ordem: "asc" }, { nome: "asc" }],
+      select: { id: true, nome: true, categoria: true },
+    }),
+  ])
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -111,7 +119,7 @@ export default async function ComercinateDashboard() {
               </div>
             </div>
 
-            <DashboardTabs comercio={comercio} />
+            <DashboardTabs comercio={comercio} subcategoriasDisponiveis={subcategoriasDisponiveis} />
           </div>
         )}
       </main>

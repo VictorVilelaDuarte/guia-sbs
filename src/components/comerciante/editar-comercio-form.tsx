@@ -20,7 +20,7 @@ import {
 } from "@/components/comerciante/endereco-input";
 
 const categorias = [
-  { value: "RESTAURANTE", label: "Restaurante" },
+  { value: "ALIMENTACAO", label: "Alimentação" },
   { value: "HOSPEDAGEM", label: "Hospedagem" },
   { value: "TURISMO", label: "Turismo" },
   { value: "SERVICO", label: "Serviço" },
@@ -32,11 +32,18 @@ const categoriaLabels: Record<string, string> = Object.fromEntries(
   categorias.map((c) => [c.value, c.label]),
 );
 
+interface SubcategoriaBasica {
+  id: string;
+  nome: string;
+  categoria: string;
+}
+
 interface Comercio {
   id: string;
   nome: string;
   descricao: string | null;
   categoria: string;
+  subcategorias: SubcategoriaBasica[];
   cep: string | null;
   endereco: string | null;
   numero: string | null;
@@ -53,7 +60,19 @@ interface Comercio {
   lng: number | null;
 }
 
-export function EditarComercioForm({ comercio }: { comercio: Comercio }) {
+export function EditarComercioForm({
+  comercio,
+  subcategoriasDisponiveis,
+  saveUrl = "/api/comerciante/comercio",
+  saveMethod = "PATCH",
+  adminMode = false,
+}: {
+  comercio: Comercio;
+  subcategoriasDisponiveis: SubcategoriaBasica[];
+  saveUrl?: string;
+  saveMethod?: "PATCH" | "PUT";
+  adminMode?: boolean;
+}) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     nome: comercio.nome,
@@ -66,6 +85,9 @@ export function EditarComercioForm({ comercio }: { comercio: Comercio }) {
     instagram: comercio.instagram ?? "",
     horarios: comercio.horarios ?? "",
   });
+  const [subcategoriaIds, setSubcategoriaIds] = useState<string[]>(
+    comercio.subcategorias.map((s) => s.id),
+  );
   const [endereco, setEndereco] = useState<EnderecoData>({
     cep: comercio.cep ?? "",
     endereco: comercio.endereco ?? "",
@@ -114,10 +136,10 @@ export function EditarComercioForm({ comercio }: { comercio: Comercio }) {
     e.preventDefault();
     setLoading(true);
 
-    const res = await fetch("/api/comerciante/comercio", {
-      method: "PATCH",
+    const res = await fetch(saveUrl, {
+      method: saveMethod,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, ...endereco }),
+      body: JSON.stringify({ ...form, ...endereco, subcategoriaIds }),
     });
 
     setLoading(false);
@@ -157,30 +179,70 @@ export function EditarComercioForm({ comercio }: { comercio: Comercio }) {
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="categoria">Categoria</Label>
-          <Select
-            value={form.categoria}
-            onValueChange={(v) =>
-              setForm({ ...form, categoria: v ?? form.categoria })
-            }
-          >
-            <SelectTrigger id="categoria">
-              <SelectValue>
-                {(value: string | null) =>
-                  value ? (categoriaLabels[value] ?? value) : "Selecione..."
-                }
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {categorias.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {adminMode && (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="categoria">Categoria</Label>
+              <Select
+                value={form.categoria}
+                onValueChange={(v) => {
+                  setForm({ ...form, categoria: v ?? form.categoria });
+                  setSubcategoriaIds([]);
+                }}
+              >
+                <SelectTrigger id="categoria">
+                  <SelectValue>
+                    {(value: string | null) =>
+                      value ? (categoriaLabels[value] ?? value) : "Selecione..."
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {categorias.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {(() => {
+              const chips = subcategoriasDisponiveis.filter(
+                (s) => s.categoria === form.categoria,
+              );
+              if (chips.length === 0) return null;
+              return (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>Subcategorias</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {chips.map((s) => {
+                      const ativo = subcategoriaIds.includes(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() =>
+                            setSubcategoriaIds((ids) =>
+                              ativo ? ids.filter((id) => id !== s.id) : [...ids, s.id],
+                            )
+                          }
+                          className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
+                            ativo
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background text-muted-foreground border-input hover:bg-muted"
+                          }`}
+                        >
+                          {s.nome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
       </div>
 
       <div className="space-y-3">

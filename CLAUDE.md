@@ -14,7 +14,7 @@ Dois públicos principais:
 - **Comerciante:** gerencia seu próprio perfil (informações, fotos, produtos, eventos, palavras-chave) via dashboard privado.
 - **Visitante/turista:** consulta o guia público sem login — comércios, eventos, mapa.
 
-Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/vitrine/[slug]` (slug gerado automaticamente a partir do nome na criação do comércio).
+Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/vitrine/[slug]` (slug gerado automaticamente a partir do nome na criação do comércio). O painel admin (`/admin`) inclui: Comércios, Subcategorias, Planos, Usuários.
 
 **Modelo de negócio:** SaaS B2B local — comerciantes pagam planos para acessar recursos da plataforma. Os planos são configuráveis pelo admin (model `Plan` no banco), cada um com um conjunto de features habilitadas via JSON. Ao implementar novas features, considerar se faz sentido restringi-las a planos pagos via feature flag.
 
@@ -106,9 +106,23 @@ Cada seção de destaques usa `<CardapioDestaquesVitrine>` (Client Component em 
 
 Status aberto/fechado usa `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paulo"` — calculado no servidor. Quando fechado, exibe "Volta amanhã às HH:MM" ou "Volta [dia] às HH:MM" com base no próximo dia com abertura cadastrada.
 
+### Edição de comércio pelo admin
+
+`/admin/comercios/[id]/page.tsx` — Server Component. Busca o comércio por `id` (não por `ownerId`), incluindo `subcategorias` e `plan`. Busca também todas as `subcategoriasDisponiveis` ativas. Renderiza `LogoUploader` e `EditarComercioForm` com `saveUrl = /api/admin/comercios/${id}`.
+
+A rota `/api/admin/comercios/[id]` (PATCH) aceita todos os campos do formulário completo: `nome`, `descricao`, `categoria`, `subcategoriaIds`, campos de endereço, contato, `horarios`, `logo`, `lat`, `lng`. Quando `subcategoriaIds` está presente, usa `{ subcategorias: { set: [...] } }` para substituir as subcategorias atuais.
+
+**`adminMode` pattern:** `EditarComercioForm` aceita prop `adminMode?: boolean` (padrão `false`). Quando `true`, exibe os campos de categoria e subcategorias — normalmente ocultos para o comerciante. O mesmo formulário é reusado no dashboard do comerciante (sem `adminMode`) e na página de edição admin (com `adminMode`). `saveUrl` e `saveMethod` são injetados como props para permitir o mesmo componente salvar em rotas diferentes.
+
+**`LogoUploader` props adicionais:** `comercioId?: string` e `saveUrl?: string`. Quando `comercioId` está presente, ele é incluído no formData do upload para que a API resolva o `userId` correto (ver seção Upload).
+
+**`ComerciosActions`:** o dropdown da lista de comércios tem apenas: "Editar" (navega para `/admin/comercios/[id]`), Aprovar/Rejeitar e Tornar Premium/Remover Premium. Toda edição de dados do comércio — incluindo subcategorias — é feita na página de edição dedicada.
+
 ### Upload de imagens
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:
+
+**Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload, inclui `comercioId` no formData. A rota busca `ownerId` via `prisma.comercio.findUnique({ where: { id: comercioId }, select: { ownerId: true } })` para montar o path correto no storage (que é sempre keyed por `userId = ownerId`). Sem `comercioId`, usa `session.user.id` normalmente (fluxo do comerciante).
 
 **Upload de fotos de produtos (cardápio):** o componente `produto-dialog.tsx` suporta múltiplos arquivos simultâneos, drag-and-drop e conversão de HEIC/HEIF para JPEG antes do envio (via `heic2any`). A detecção de HEIC usa tanto o MIME type quanto a extensão do arquivo (iOS Safari às vezes omite o MIME type). A quantidade máxima de slots disponíveis (`MAX_IMAGENS - imagens.length`) limita dinamicamente tanto o seletor de arquivos (`multiple` é `false` quando só resta 1 slot) quanto o drop handler.
 
@@ -183,13 +197,15 @@ Array sempre com 7 elementos (Segunda a Domingo). O campo `temPausa`, `pausaInic
 
 ## Banco de Dados
 
-Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (1:1). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`. `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. Todas as relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
+Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (1:1). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`, `Subcategoria[]` (N:M). `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. Todas as relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
 
 Enums:
 - `Role`: SUPER_ADMIN | ADMIN | COMERCIANTE
 - `ComercioStatus`: PENDENTE | ATIVO | INATIVO | REJEITADO
-- `Categoria`: RESTAURANTE | HOSPEDAGEM | TURISMO | SERVICO | COMERCIO | ENTRETENIMENTO
+- `Categoria`: ALIMENTACAO | HOSPEDAGEM | TURISMO | SERVICO | COMERCIO | ENTRETENIMENTO
 - `TipoProduto`: PRODUTO | SERVICO
+
+> `ALIMENTACAO` foi renomeado de `RESTAURANTE` via `ALTER TYPE "Categoria" RENAME VALUE 'RESTAURANTE' TO 'ALIMENTACAO'` — DDL executado direto no banco (não via migration) usando `prisma db execute --url=<direct_url> --stdin`. Sempre usar o `DIRECT_URL` (porta 5432) para DDL; o pooler (porta 6543) trava operações de schema.
 
 > O enum `PlanType` (FREE/PREMIUM) foi substituído pelo model `Plan` — ver seção Planos abaixo.
 
@@ -212,6 +228,33 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
 
 Limites do plano FREE (definidos em `LIMITES_FREE` no mesmo arquivo): `fotos: 3`, `tags: 5`, `produtos: 3`.
+
+### Subcategorias
+
+Modelo `Subcategoria` com relação N:M implícita com `Comercio` (Prisma cria a join table `_ComercioToSubcategoria` automaticamente). Cada subcategoria pertence a uma `Categoria` — apenas subcategorias da mesma categoria do comércio são exibidas como opção de seleção.
+
+```prisma
+model Subcategoria {
+  id        String    @id @default(cuid())
+  nome      String
+  categoria Categoria
+  ativo     Boolean   @default(true)
+  ordem     Int       @default(0)
+  comercios Comercio[]
+  @@unique([nome, categoria])
+}
+```
+
+**Gestão:** admin cria/edita/desativa subcategorias em `/admin/subcategorias`. O componente `SubcategoriasManager` agrupa por categoria, cada bloco tem seu próprio botão "Adicionar" no header (o mesmo padrão do cardápio com categorias/itens — sem botão global). Exclusão é bloqueada se algum comércio usar a subcategoria (API retorna 409).
+
+**Seleção no comércio:** feita exclusivamente pelo admin na página `/admin/comercios/[id]` — o comerciante não vê categoria nem subcategorias no próprio formulário (ver `adminMode` abaixo). As subcategorias aparecem como chips clicáveis filtrados pela categoria atual do comércio. Trocar de categoria zera as subcategorias selecionadas.
+
+**APIs:**
+- `GET/POST /api/admin/subcategorias` — lista (com `_count.comercios`) e criação
+- `PATCH/DELETE /api/admin/subcategorias/[id]` — edição e exclusão (bloqueada se em uso)
+- `GET /api/subcategorias` — rota pública sem auth, retorna apenas subcategorias ativas (usada por formulários de admin e outros contextos que não precisam de autenticação extra)
+
+**Vitrine pública:** as subcategorias do comércio aparecem como badges abaixo da descrição, antes do status aberto/fechado. Query inclui `subcategorias: { select: { id, nome }, orderBy: { ordem: 'asc' } }`.
 
 ### Cardápio digital
 

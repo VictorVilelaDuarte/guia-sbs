@@ -6,7 +6,8 @@ import { z } from "zod"
 const patchSchema = z.object({
   nome: z.string().min(2).optional(),
   descricao: z.string().optional(),
-  categoria: z.enum(["RESTAURANTE", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"]).optional(),
+  categoria: z.enum(["ALIMENTACAO", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"]).optional(),
+  subcategoriaIds: z.array(z.string()).optional(),
   cep: z.string().optional(),
   endereco: z.string().optional(),
   numero: z.string().optional(),
@@ -91,13 +92,16 @@ export async function PATCH(req: NextRequest) {
       if (coords) { lat = coords.lat; lng = coords.lng }
     }
 
-    const { lat: _lat, lng: _lng, ...rest } = fields
+    const { lat: _lat, lng: _lng, subcategoriaIds, ...rest } = fields
 
     await prisma.comercio.update({
       where: { ownerId: session.user.id },
       data: {
         ...rest,
         ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
+        ...(subcategoriaIds !== undefined
+          ? { subcategorias: { set: subcategoriaIds.map((id) => ({ id })) } }
+          : {}),
       },
     })
 

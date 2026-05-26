@@ -33,7 +33,7 @@ const statusLabels: Record<string, string> = {
 }
 
 const categoriaLabels: Record<string, string> = {
-  RESTAURANTE: "Restaurante",
+  ALIMENTACAO: "Alimentação",
   HOSPEDAGEM: "Hospedagem",
   TURISMO: "Turismo",
   SERVICO: "Serviço",
@@ -42,7 +42,7 @@ const categoriaLabels: Record<string, string> = {
 }
 
 const statusValidos: ComercioStatus[] = ["PENDENTE", "ATIVO", "INATIVO", "REJEITADO"]
-const categoriaValidas: Categoria[] = ["RESTAURANTE", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"]
+const categoriaValidas: Categoria[] = ["ALIMENTACAO", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"]
 
 export default async function ComerciosPage({
   searchParams,

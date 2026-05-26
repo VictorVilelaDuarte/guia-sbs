@@ -15,14 +15,16 @@ import {
   LogOut,
   MapPin,
   CreditCard,
+  Tag,
 } from "lucide-react"
 
 const navItems = [
-  { href: "/admin/dashboard",  label: "Dashboard",  icon: LayoutDashboard },
-  { href: "/admin/usuarios",   label: "Usuários",   icon: Users },
-  { href: "/admin/comercios",  label: "Comércios",  icon: Store },
-  { href: "/admin/eventos",    label: "Eventos",    icon: CalendarDays },
-  { href: "/admin/planos",     label: "Planos",     icon: CreditCard },
+  { href: "/admin/dashboard",       label: "Dashboard",      icon: LayoutDashboard },
+  { href: "/admin/usuarios",        label: "Usuários",       icon: Users },
+  { href: "/admin/comercios",       label: "Comércios",      icon: Store },
+  { href: "/admin/subcategorias",   label: "Subcategorias",  icon: Tag },
+  { href: "/admin/eventos",         label: "Eventos",        icon: CalendarDays },
+  { href: "/admin/planos",          label: "Planos",         icon: CreditCard },
 ]
 
 interface AdminSidebarProps {

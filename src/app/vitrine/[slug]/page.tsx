@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/purity */
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Image from "next/image";
@@ -192,6 +193,10 @@ export default async function PaginaComercio({
     include: {
       fotos: { orderBy: { ordem: "asc" } },
       tags: { orderBy: { nome: "asc" } },
+      subcategorias: {
+        select: { id: true, nome: true },
+        orderBy: { ordem: "asc" },
+      },
       produtos: {
         where: { disponivel: true, destaque: true, categoriaCardapioId: null },
         orderBy: { ordem: "asc" },
@@ -230,13 +235,30 @@ export default async function PaginaComercio({
           promoFim: p.promoFim ? p.promoFim.toISOString() : null,
           destaque: p.destaque,
           imagens: p.imagens,
-          variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
+          variacoes: p.variacoes.map((v) => ({
+            id: v.id,
+            nome: v.nome,
+            preco: v.preco,
+          })),
           categoriaNome: cat.nome,
         })),
       )
     : [];
 
-  function mapItemParaDestaque(p: { id: string; titulo: string; descricao: string | null; preco: number | null; precoPromo: number | null; promoFim: Date | null; destaque: boolean; imagens: string[]; variacoes: { id: string; nome: string; preco: number }[] }, categoriaNome: string) {
+  function mapItemParaDestaque(
+    p: {
+      id: string;
+      titulo: string;
+      descricao: string | null;
+      preco: number | null;
+      precoPromo: number | null;
+      promoFim: Date | null;
+      destaque: boolean;
+      imagens: string[];
+      variacoes: { id: string; nome: string; preco: number }[];
+    },
+    categoriaNome: string,
+  ) {
     return {
       id: p.id,
       titulo: p.titulo,
@@ -246,7 +268,11 @@ export default async function PaginaComercio({
       promoFim: p.promoFim ? p.promoFim.toISOString() : null,
       destaque: p.destaque,
       imagens: p.imagens,
-      variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
+      variacoes: p.variacoes.map((v) => ({
+        id: v.id,
+        nome: v.nome,
+        preco: v.preco,
+      })),
       categoriaNome,
     };
   }
@@ -352,6 +378,20 @@ export default async function PaginaComercio({
             </p>
           </div>
         </div>
+
+        {/* Subcategorias */}
+        {comercio.subcategorias.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {comercio.subcategorias.map((s) => (
+              <span
+                key={s.id}
+                className="text-xs font-medium px-2.5 py-1 rounded-full bg-muted border border-border text-muted-foreground"
+              >
+                {s.nome}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Status aberto/fechado */}
         {statusAgora && (
@@ -507,7 +547,10 @@ export default async function PaginaComercio({
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
-              <CardapioDestaquesVitrine produtos={produtosDestaque} now={Date.now()} />
+              <CardapioDestaquesVitrine
+                produtos={produtosDestaque}
+                now={Date.now()}
+              />
             </section>
             <Separator className="mb-6" />
           </>
@@ -530,7 +573,10 @@ export default async function PaginaComercio({
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
-              <CardapioDestaquesVitrine produtos={servicosDestaque} now={Date.now()} />
+              <CardapioDestaquesVitrine
+                produtos={servicosDestaque}
+                now={Date.now()}
+              />
             </section>
             <Separator className="mb-6" />
           </>
@@ -770,7 +816,6 @@ export default async function PaginaComercio({
             </div>
           </section>
         )}
-
       </div>
 
       {/* Footer */}

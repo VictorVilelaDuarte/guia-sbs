@@ -6,7 +6,7 @@ import { slugify } from "@/lib/slugify"
 
 const createSchema = z.object({
   nome: z.string().min(2),
-  categoria: z.enum(["RESTAURANTE", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"]),
+  categoria: z.enum(["ALIMENTACAO", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"]),
   ownerId: z.string(),
   descricao: z.string().optional(),
 })
