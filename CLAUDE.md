@@ -98,9 +98,23 @@ As abas Produtos e Serviços são instâncias separadas de `<ProdutosManager>` c
 
 ### Vitrine pública
 
-`/vitrine/[slug]/page.tsx` — Server Component público. Exibe identidade, status aberto/fechado, CTAs rápidos, galeria de fotos, destaques do cardápio, destaques de produtos/serviços do catálogo, eventos, horários, mapa e contatos. Comércios com `status !== ATIVO` mostram banner de pré-visualização mas não bloqueiam o acesso.
+`/vitrine/[slug]/page.tsx` — Server Component público. Responsabilidade única: buscar dados do Prisma, computar derivados (`statusAgora`, `itensDestaque`, etc.) e compor componentes. Comércios com `status !== ATIVO` mostram banner de pré-visualização mas não bloqueiam o acesso.
 
 **Ordem das seções:** Fotos → Cardápio (destaques) → Produtos em destaque → Serviços em destaque → Eventos → Horários → Localização → Contato.
+
+**Estrutura de componentes co-localizados** em `src/app/vitrine/[slug]/`:
+- `_utils.ts` — interface `HorarioDia` + todas as funções auxiliares (`parseHorarios`, `getDiaAtual`, `estaAbertoAgora`, `formatHorario`, `formatPhone`, `formatPreco`, `formatDataEvento`)
+- `_components/topbar.tsx` — banner de pré-visualização + nav sticky com nome e share button
+- `_components/identidade.tsx` — logo + descrição
+- `_components/status-aberto.tsx` — indicador aberto/fechado com dot animado
+- `_components/ctas-rapidos.tsx` — strip de botões de ação rápida (WhatsApp, Instagram, Como chegar, Site, Ligar)
+- `_components/icon-instagram.tsx` — SVG do Instagram (compartilhado entre CTAs e contato)
+- `_components/secao-horarios.tsx` — tabela de horários por dia da semana
+- `_components/secao-eventos.tsx` — cards de eventos com ordenação ativos/passados internamente
+- `_components/secao-localizacao.tsx` — endereço + `MapaView`
+- `_components/secao-contato.tsx` — links de contato completos
+
+Todos os componentes são Server Components. As seções de fotos, cardápio e catálogo ficam inline no `page.tsx` por terem lógica de feature flag acoplada ao slug do link.
 
 Cada seção de destaques usa `<CardapioDestaquesVitrine>` (Client Component em `src/components/public/cardapio-destaques-vitrine.tsx`) que gerencia o state do bottom sheet localmente — necessário porque o Server Component não pode manter state.
 
@@ -254,7 +268,7 @@ model Subcategoria {
 - `PATCH/DELETE /api/admin/subcategorias/[id]` — edição e exclusão (bloqueada se em uso)
 - `GET /api/subcategorias` — rota pública sem auth, retorna apenas subcategorias ativas (usada por formulários de admin e outros contextos que não precisam de autenticação extra)
 
-**Vitrine pública:** as subcategorias do comércio aparecem como badges abaixo da descrição, antes do status aberto/fechado. Query inclui `subcategorias: { select: { id, nome }, orderBy: { ordem: 'asc' } }`.
+**Vitrine pública:** subcategorias não são exibidas na vitrine — são informação de gestão interna, visível apenas no painel admin.
 
 ### Cardápio digital
 
