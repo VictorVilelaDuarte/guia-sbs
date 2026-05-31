@@ -14,7 +14,7 @@ Dois públicos principais:
 - **Comerciante:** gerencia seu próprio perfil (informações, fotos, produtos, eventos, palavras-chave) via dashboard privado.
 - **Visitante/turista:** consulta o guia público sem login — comércios, eventos, mapa.
 
-Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/vitrine/[slug]` (slug gerado automaticamente a partir do nome na criação do comércio). O painel admin (`/admin`) inclui: Comércios, Subcategorias, Planos, Usuários.
+Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em `/vitrine/[slug]` (slug gerado automaticamente a partir do nome na criação do comércio). O painel admin (`/admin`) inclui: Comércios, Subcategorias, Planos, Usuários, **Pontos Turísticos**.
 
 **Modelo de negócio:** SaaS B2B local — comerciantes pagam planos para acessar recursos da plataforma. Os planos são configuráveis pelo admin (model `Plan` no banco), cada um com um conjunto de features habilitadas via JSON. Ao implementar novas features, considerar se faz sentido restringi-las a planos pagos via feature flag.
 
@@ -218,6 +218,8 @@ Enums:
 - `ComercioStatus`: PENDENTE | ATIVO | INATIVO | REJEITADO
 - `Categoria`: ALIMENTACAO | HOSPEDAGEM | TURISMO | SERVICO | COMERCIO | ENTRETENIMENTO
 - `TipoProduto`: PRODUTO | SERVICO
+- `CategoriaPonto`: MIRANTE | TRILHA | HISTORICO | CACHOEIRA
+- `Dificuldade`: FACIL | MODERADA | DIFICIL
 
 > `ALIMENTACAO` foi renomeado de `RESTAURANTE` via `ALTER TYPE "Categoria" RENAME VALUE 'RESTAURANTE' TO 'ALIMENTACAO'` — DDL executado direto no banco (não via migration) usando `prisma db execute --url=<direct_url> --stdin`. Sempre usar o `DIRECT_URL` (porta 5432) para DDL; o pooler (porta 6543) trava operações de schema.
 
@@ -269,6 +271,53 @@ model Subcategoria {
 - `GET /api/subcategorias` — rota pública sem auth, retorna apenas subcategorias ativas (usada por formulários de admin e outros contextos que não precisam de autenticação extra)
 
 **Vitrine pública:** subcategorias não são exibidas na vitrine — são informação de gestão interna, visível apenas no painel admin.
+
+### Pontos Turísticos
+
+Entidade independente gerenciada exclusivamente pelo admin — sem vínculo com comércios.
+
+```prisma
+model PontoTuristico {
+  id                String         @id @default(cuid())
+  nome              String
+  slug              String         @unique  // gerado via slugify, com sufixo numérico se conflito
+  descricao         String?        @db.Text
+  categoria         CategoriaPonto
+  fotos             String[]       // URLs no bucket "comercios", path: pontos-turisticos/{id}/{ts}.ext
+  cep               String?
+  endereco          String?        // logradouro
+  numero            String?
+  bairro            String?
+  cidade            String?
+  estado            String?
+  lat               Float?
+  lng               Float?
+  dicas             String?        @db.Text
+  // campos condicionais por categoria:
+  dificuldade       Dificuldade?   // TRILHA
+  distanciaKm       Float?         // TRILHA
+  duracaoMin        Int?           // TRILHA
+  altitudeM         Int?           // MIRANTE
+  temPiscinaNatural Boolean?       // CACHOEIRA
+  precisaGuia       Boolean?       // CACHOEIRA
+  periodo           String?        // HISTORICO
+  ativo             Boolean        @default(true)
+}
+```
+
+**Gestão:** `/admin/pontos-turisticos` (lista) e `/admin/pontos-turisticos/[id]` (edição). Criar abre dialog com nome + categoria → redireciona para a página de edição.
+
+**APIs:**
+- `GET/POST /api/admin/pontos-turisticos` — lista e criação (slug automático)
+- `PATCH/DELETE /api/admin/pontos-turisticos/[id]` — edição e exclusão
+- `POST/DELETE /api/admin/pontos-turisticos/[id]/fotos` — upload (máx. 8 fotos) e remoção; path no storage: `pontos-turisticos/{id}/{timestamp}.ext` no bucket `comercios`
+
+**Componentes admin** em `src/components/admin/`:
+- `pontos-turisticos-manager.tsx` — tabela com ações (editar, ativar/desativar, excluir) + dialog de criação; exporta `CATEGORIA_LABELS` (usado pela página de edição)
+- `ponto-turistico-form.tsx` — formulário completo; usa `EnderecoInput` para localização (CEP + ViaCEP + mapa); campos específicos por categoria aparecem condicionalmente
+- `ponto-turistico-fotos.tsx` — grid de thumbnails com drag-and-drop, conversão HEIC client-side, slot "+" inline
+
+**Vitrine pública:** ainda não implementada — planejado em `/pontos-turisticos` (lista) e `/pontos-turisticos/[slug]` (detalhe).
 
 ### Cardápio digital
 
@@ -332,6 +381,7 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 - Busca full-text (PostgreSQL `tsvector` com dicionário português)
 - Página pública de listagem de comércios por categoria
 - Página pública de eventos da cidade (`/eventos`)
+- Página pública de pontos turísticos (`/pontos-turisticos` e `/pontos-turisticos/[slug]`) — admin já implementado
 - Avaliações de visitantes
 - Analytics para comerciantes (visualizações, cliques) — feature flag já existe, falta implementar
 - QR Code do perfil para impressão — feature flag já existe, falta implementar

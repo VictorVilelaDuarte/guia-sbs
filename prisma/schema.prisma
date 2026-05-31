@@ -37,6 +37,19 @@ enum TipoProduto {
   SERVICO
 }
 
+enum CategoriaPonto {
+  MIRANTE
+  TRILHA
+  HISTORICO
+  CACHOEIRA
+}
+
+enum Dificuldade {
+  FACIL
+  MODERADA
+  DIFICIL
+}
+
 model Plan {
   id        String   @id @default(cuid())
   slug      String   @unique
@@ -208,6 +221,36 @@ model CardapioVariacao {
   produto   Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
 
   @@map("cardapio_variacoes")
+}
+
+model PontoTuristico {
+  id                String         @id @default(cuid())
+  nome              String
+  slug              String         @unique
+  descricao         String?        @db.Text
+  categoria         CategoriaPonto
+  fotos             String[]
+  lat               Float?
+  lng               Float?
+  cep               String?
+  endereco          String?
+  numero            String?
+  bairro            String?
+  cidade            String?
+  estado            String?
+  dicas             String?        @db.Text
+  dificuldade       Dificuldade?
+  distanciaKm       Float?
+  duracaoMin        Int?
+  altitudeM         Int?
+  temPiscinaNatural Boolean?
+  precisaGuia       Boolean?
+  periodo           String?
+  ativo             Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@map("pontos_turisticos")
 }
 
 model Evento {
