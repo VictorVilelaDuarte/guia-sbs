@@ -317,7 +317,12 @@ model PontoTuristico {
 - `ponto-turistico-form.tsx` — formulário completo; usa `EnderecoInput` para localização (CEP + ViaCEP + mapa); campos específicos por categoria aparecem condicionalmente
 - `ponto-turistico-fotos.tsx` — grid de thumbnails com drag-and-drop, conversão HEIC client-side, slot "+" inline
 
-**Vitrine pública:** ainda não implementada — planejado em `/pontos-turisticos` (lista) e `/pontos-turisticos/[slug]` (detalhe).
+**Vitrine pública:**
+- `/pontos-turisticos` — listagem com filtro por categoria (query param `?categoria=TRILHA` etc.), grid responsivo 2→3 colunas, cards com foto capa, badge de categoria, chips de metadados (dificuldade/distância/duração para trilhas, altitude para mirantes)
+- `/pontos-turisticos/[slug]` — detalhe com galeria (`GaleriaFotos`), badge de categoria, chips de metadados específicos por tipo, seção de dicas (box âmbar), localização com `MapaView` + link "Como chegar" (Google Maps)
+- Topbar: volta para `/pontos-turisticos` + `ShareButton`
+- `generateMetadata` com OpenGraph image na página de detalhe
+- Pontos com `ativo: false` retornam 404 na vitrine
 
 ### Cardápio digital
 
@@ -381,7 +386,7 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 - Busca full-text (PostgreSQL `tsvector` com dicionário português)
 - Página pública de listagem de comércios por categoria
 - Página pública de eventos da cidade (`/eventos`)
-- Página pública de pontos turísticos (`/pontos-turisticos` e `/pontos-turisticos/[slug]`) — admin já implementado
+- ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)
 - Avaliações de visitantes
 - Analytics para comerciantes (visualizações, cliques) — feature flag já existe, falta implementar
 - QR Code do perfil para impressão — feature flag já existe, falta implementar
