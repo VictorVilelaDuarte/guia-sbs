@@ -38,7 +38,7 @@ export interface ComercioParaDashboard {
   id: string;
   nome: string;
   descricao: string | null;
-  categoria: string;
+  categorias: string[];
   cep: string | null;
   endereco: string | null;
   numero: string | null;

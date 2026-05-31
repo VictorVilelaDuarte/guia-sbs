@@ -4,9 +4,11 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { slugify } from "@/lib/slugify"
 
+const CATEGORIAS_ENUM = ["ALIMENTACAO", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"] as const
+
 const createSchema = z.object({
   nome: z.string().min(2),
-  categoria: z.enum(["ALIMENTACAO", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"]),
+  categorias: z.array(z.enum(CATEGORIAS_ENUM)).min(1),
   ownerId: z.string(),
   descricao: z.string().optional(),
 })
@@ -46,7 +48,7 @@ export async function POST(req: NextRequest) {
     data: {
       slug,
       nome: parsed.data.nome,
-      categoria: parsed.data.categoria,
+      categorias: parsed.data.categorias,
       descricao: parsed.data.descricao,
       ownerId: parsed.data.ownerId,
       planId: planFree.id,

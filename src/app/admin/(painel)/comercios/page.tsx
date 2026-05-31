@@ -58,7 +58,7 @@ export default async function ComerciosPage({
         ? { status: status as ComercioStatus }
         : {}),
       ...(categoria && categoriaValidas.includes(categoria as Categoria)
-        ? { categoria: categoria as Categoria }
+        ? { categorias: { has: categoria as Categoria } }
         : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -122,8 +122,14 @@ export default async function ComerciosPage({
                     <ExternalLink className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </Link>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {categoriaLabels[c.categoria] ?? c.categoria}
+                <TableCell>
+                  <div className="flex flex-wrap gap-1">
+                    {c.categorias.map((cat) => (
+                      <span key={cat} className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">
+                        {categoriaLabels[cat] ?? cat}
+                      </span>
+                    ))}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={c.plan.slug === "premium" ? "default" : "outline"}>

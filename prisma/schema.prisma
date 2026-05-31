@@ -99,12 +99,12 @@ model Comercio {
   id        String         @id @default(cuid())
   slug      String         @unique
   nome      String
-  descricao String?        @db.Text
-  categoria Categoria
-  status    ComercioStatus @default(PENDENTE)
-  planId    String
-  cep       String?
-  endereco  String?
+  descricao  String?        @db.Text
+  categorias Categoria[]
+  status     ComercioStatus @default(PENDENTE)
+  planId     String
+  cep        String?
+  endereco   String?
   numero    String?
   bairro    String?
   cidade    String?

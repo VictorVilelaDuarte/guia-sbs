@@ -124,9 +124,11 @@ Status aberto/fechado usa `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paul
 
 `/admin/comercios/[id]/page.tsx` — Server Component. Busca o comércio por `id` (não por `ownerId`), incluindo `subcategorias` e `plan`. Busca também todas as `subcategoriasDisponiveis` ativas. Renderiza `LogoUploader` e `EditarComercioForm` com `saveUrl = /api/admin/comercios/${id}`.
 
-A rota `/api/admin/comercios/[id]` (PATCH) aceita todos os campos do formulário completo: `nome`, `descricao`, `categoria`, `subcategoriaIds`, campos de endereço, contato, `horarios`, `logo`, `lat`, `lng`. Quando `subcategoriaIds` está presente, usa `{ subcategorias: { set: [...] } }` para substituir as subcategorias atuais.
+A rota `/api/admin/comercios/[id]` (PATCH) aceita todos os campos do formulário completo: `nome`, `descricao`, `categorias`, `subcategoriaIds`, campos de endereço, contato, `horarios`, `logo`, `lat`, `lng`. Quando `subcategoriaIds` está presente, usa `{ subcategorias: { set: [...] } }` para substituir as subcategorias atuais.
 
-**`adminMode` pattern:** `EditarComercioForm` aceita prop `adminMode?: boolean` (padrão `false`). Quando `true`, exibe os campos de categoria e subcategorias — normalmente ocultos para o comerciante. O mesmo formulário é reusado no dashboard do comerciante (sem `adminMode`) e na página de edição admin (com `adminMode`). `saveUrl` e `saveMethod` são injetados como props para permitir o mesmo componente salvar em rotas diferentes.
+**`adminMode` pattern:** `EditarComercioForm` aceita prop `adminMode?: boolean` (padrão `false`). Quando `true`, exibe os campos de categorias e subcategorias — normalmente ocultos para o comerciante. O mesmo formulário é reusado no dashboard do comerciante (sem `adminMode`) e na página de edição admin (com `adminMode`). `saveUrl` e `saveMethod` são injetados como props para permitir o mesmo componente salvar em rotas diferentes.
+
+**Seleção de categorias (`adminMode`):** chips clicáveis com multi-seleção. `categorias[0]` é a **categoria principal** — exibida com `★` preenchida. As demais categorias ativas mostram `★` vazia; clicar nela move a categoria para o índice 0. Remover uma categoria também remove automaticamente as subcategorias vinculadas a ela. As subcategorias disponíveis são a união das subcategorias de todas as categorias selecionadas.
 
 **`LogoUploader` props adicionais:** `comercioId?: string` e `saveUrl?: string`. Quando `comercioId` está presente, ele é incluído no formData do upload para que a API resolva o `userId` correto (ver seção Upload).
 
@@ -169,6 +171,8 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 **`Footer`** (`src/components/public/home/footer.tsx`) sempre renderiza a curva de transição com `var(--sand-1)`. Páginas que queiram uma transição específica (como a home que termina em `sand-2`) adicionam o componente `FooterTopCurve` diretamente no final do próprio conteúdo — o footer do layout completa a sequência sem necessidade de props.
 
 **Admin e comerciante** ficam fora do `(public)/` e não recebem BottomNav nem Footer.
+
+**Home page (`(public)/page.tsx`)** é um Server Component que busca os contadores de categoria via `$queryRaw` e passa para `<HomeClient>` (Client Component com todo o estado interativo). O `Categories` component em `src/components/public/home/categories.tsx` recebe `counts: Partial<Record<Categoria, number>>` e usa ícones Lucide (`Utensils`, `BedDouble`, `Compass`, `Wrench`, `ShoppingBag`, `Ticket`) sobre blobs SVG coloridos.
 
 ### Slug de comércio
 
@@ -225,6 +229,8 @@ Array sempre com 7 elementos (Segunda a Domingo). O campo `temPausa`, `pausaInic
 ## Banco de Dados
 
 Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (1:1). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`, `Subcategoria[]` (N:M). `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. Todas as relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
+
+**`Comercio.categorias: Categoria[]`** — array nativo PostgreSQL. Substitui o campo singular `categoria`. O **primeiro elemento é sempre a categoria principal**. Para filtrar: `{ categorias: { has: "ALIMENTACAO" } }`. Para contar por categoria na home page, usar raw query (o `groupBy` do Prisma não suporta arrays): `SELECT unnest(categorias) AS cat, COUNT(*) FROM comercios WHERE status = 'ATIVO' GROUP BY cat`. Migração original: `UPDATE comercios SET categorias = ARRAY[categoria]::"Categoria"[]`.
 
 Enums:
 - `Role`: SUPER_ADMIN | ADMIN | COMERCIANTE

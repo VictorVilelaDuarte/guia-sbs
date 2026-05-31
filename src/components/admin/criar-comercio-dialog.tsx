@@ -48,7 +48,7 @@ export function CriarComercioDialog() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [form, setForm] = useState({
     nome: "",
-    categoria: "",
+    categorias: [] as string[],
     ownerId: "",
     descricao: "",
   })
@@ -87,7 +87,7 @@ export function CriarComercioDialog() {
 
     toast.success("Comércio criado com sucesso.")
     setOpen(false)
-    setForm({ nome: "", categoria: "", ownerId: "", descricao: "" })
+    setForm({ nome: "", categorias: [], ownerId: "", descricao: "" })
     router.refresh()
   }
 
@@ -141,24 +141,26 @@ export function CriarComercioDialog() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="categoria">Categoria</Label>
-            <Select
-              value={form.categoria}
-              onValueChange={(v) => setForm({ ...form, categoria: v ?? form.categoria })}
-            >
-              <SelectTrigger id="categoria">
-                <SelectValue>
-                  {(value: string | null) => value ? (categoriaLabels[value] ?? value) : "Selecione uma categoria..."}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {categorias.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
+            <Label>Categoria principal</Label>
+            <div className="flex flex-wrap gap-2">
+              {categorias.map((c) => {
+                const ativo = form.categorias[0] === c.value
+                return (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, categorias: [c.value] })}
+                    className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors cursor-pointer ${
+                      ativo
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background text-muted-foreground border-input hover:bg-muted"
+                    }`}
+                  >
                     {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  </button>
+                )
+              })}
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="descricao">Descrição (opcional)</Label>
@@ -174,7 +176,7 @@ export function CriarComercioDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !form.ownerId || !form.categoria}>
+            <Button type="submit" disabled={loading || !form.ownerId || form.categorias.length === 0}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Criar
             </Button>

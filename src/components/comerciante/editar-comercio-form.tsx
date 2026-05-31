@@ -4,15 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 import { HorariosEditor } from "@/components/comerciante/horarios-editor";
 import {
   EnderecoInput,
@@ -42,7 +35,7 @@ interface Comercio {
   id: string;
   nome: string;
   descricao: string | null;
-  categoria: string;
+  categorias: string[];
   subcategorias: SubcategoriaBasica[];
   cep: string | null;
   endereco: string | null;
@@ -74,10 +67,10 @@ export function EditarComercioForm({
   adminMode?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
+  const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>(comercio.categorias)
   const [form, setForm] = useState({
     nome: comercio.nome,
     descricao: comercio.descricao ?? "",
-    categoria: comercio.categoria,
     telefone: comercio.telefone ?? "",
     whatsapp: comercio.whatsapp ?? "",
     email: comercio.email ?? "",
@@ -139,7 +132,7 @@ export function EditarComercioForm({
     const res = await fetch(saveUrl, {
       method: saveMethod,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, ...endereco, subcategoriaIds }),
+      body: JSON.stringify({ ...form, ...endereco, categorias: categoriasSelecionadas, subcategoriaIds }),
     });
 
     setLoading(false);
@@ -181,35 +174,79 @@ export function EditarComercioForm({
 
         {adminMode && (
           <>
-            <div className="space-y-2">
-              <Label htmlFor="categoria">Categoria</Label>
-              <Select
-                value={form.categoria}
-                onValueChange={(v) => {
-                  setForm({ ...form, categoria: v ?? form.categoria });
-                  setSubcategoriaIds([]);
-                }}
-              >
-                <SelectTrigger id="categoria">
-                  <SelectValue>
-                    {(value: string | null) =>
-                      value ? (categoriaLabels[value] ?? value) : "Selecione..."
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {categorias.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
-                      {c.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Categorias</Label>
+              <div className="flex flex-wrap gap-2">
+                {categorias.map((c) => {
+                  const ativo = categoriasSelecionadas.includes(c.value)
+                  const isPrincipal = categoriasSelecionadas[0] === c.value
+                  return (
+                    <div key={c.value} className="relative group/cat">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const novas = ativo
+                            ? categoriasSelecionadas.filter((v) => v !== c.value)
+                            : [...categoriasSelecionadas, c.value]
+                          setCategoriasSelecionadas(novas)
+                          if (ativo) {
+                            const idsParaRemover = new Set(
+                              subcategoriasDisponiveis
+                                .filter((s) => s.categoria === c.value)
+                                .map((s) => s.id)
+                            )
+                            setSubcategoriaIds((ids) => ids.filter((id) => !idsParaRemover.has(id)))
+                          }
+                        }}
+                        className={`pl-3 text-sm font-medium border transition-colors cursor-pointer rounded-full ${
+                          ativo && isPrincipal
+                            ? "pr-2 py-1 bg-primary text-primary-foreground border-primary"
+                            : ativo
+                            ? "pr-7 py-1 bg-primary text-primary-foreground border-primary"
+                            : "px-3 py-1 bg-background text-muted-foreground border-input hover:bg-muted"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          {isPrincipal && ativo && (
+                            <Star className="h-3 w-3 fill-current shrink-0" />
+                          )}
+                          {c.label}
+                        </span>
+                      </button>
+                      {/* Botão "tornar principal" — só aparece em categorias ativas não-principais */}
+                      {ativo && !isPrincipal && (
+                        <button
+                          type="button"
+                          title="Tornar principal"
+                          onClick={() =>
+                            setCategoriasSelecionadas([
+                              c.value,
+                              ...categoriasSelecionadas.filter((v) => v !== c.value),
+                            ])
+                          }
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-primary-foreground/60 hover:text-primary-foreground transition-colors"
+                        >
+                          <Star className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+              {categoriasSelecionadas.length === 0 && (
+                <p className="text-xs text-destructive">Selecione ao menos uma categoria.</p>
+              )}
+              {categoriasSelecionadas.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  <Star className="h-3 w-3 inline mr-1 fill-current" />
+                  indica a categoria principal.
+                </p>
+              )}
             </div>
 
             {(() => {
-              const chips = subcategoriasDisponiveis.filter(
-                (s) => s.categoria === form.categoria,
+              const chips = subcategoriasDisponiveis.filter((s) =>
+                categoriasSelecionadas.includes(s.categoria),
               );
               if (chips.length === 0) return null;
               return (

@@ -10,7 +10,7 @@ const patchSchema = z.object({
   // edição completa (página de edição)
   nome: z.string().min(2).optional(),
   descricao: z.string().optional(),
-  categoria: z.enum(["ALIMENTACAO", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"]).optional(),
+  categorias: z.array(z.enum(["ALIMENTACAO", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"])).min(1).optional(),
   subcategoriaIds: z.array(z.string()).optional(),
   cep: z.string().optional(),
   endereco: z.string().optional(),
