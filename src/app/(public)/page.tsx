@@ -7,9 +7,8 @@ import { Categories } from "@/components/public/home/categories";
 import { OpenNow } from "@/components/public/home/open-now";
 import { Events } from "@/components/public/home/events";
 import { Featured } from "@/components/public/home/featured";
-import { Footer } from "@/components/public/home/footer";
-import { BottomNav, type NavId } from "@/components/public/home/bottom-nav";
 import { Wave } from "@/components/public/home/waves";
+import type { NavId } from "@/components/public/home/bottom-nav";
 
 export default function HomePage() {
   const [query, setQuery] = useState("");
@@ -35,11 +34,7 @@ export default function HomePage() {
           <Events />
           <Wave from="var(--sand-1)" to="var(--sand-2)" />
           <Featured />
-          <Footer />
         </main>
-      </div>
-      <div className="bottom-nav-wrap">
-        <BottomNav active={tab} setActive={setTab} />
       </div>
     </div>
   );

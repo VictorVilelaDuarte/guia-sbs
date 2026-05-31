@@ -1,69 +1,74 @@
-import { prisma } from "@/lib/prisma"
-import { notFound } from "next/navigation"
-import Link from "next/link"
-import Image from "next/image"
-import type { Metadata } from "next"
-import type { CategoriaPonto, Dificuldade } from "@prisma/client"
-import { MapPin, Route, Clock, Mountain } from "lucide-react"
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import type { Metadata } from "next";
+import type { CategoriaPonto, Dificuldade } from "@prisma/client";
+import { MapPin, Route, Clock, Mountain } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Pontos Turísticos | Guia SBS",
   description:
     "Mirantes, trilhas, cachoeiras e locais históricos de São Bento do Sapucaí, na Serra da Mantiqueira.",
-}
+};
 
 const CATEGORIAS: { value: CategoriaPonto; label: string; cor: string }[] = [
-  { value: "MIRANTE",  label: "Mirantes",        cor: "bg-sky-500" },
-  { value: "TRILHA",   label: "Trilhas",          cor: "bg-green-600" },
-  { value: "HISTORICO",label: "Histórico",        cor: "bg-amber-600" },
-  { value: "CACHOEIRA",label: "Cachoeiras",       cor: "bg-cyan-600" },
-]
+  { value: "MIRANTE", label: "Mirantes", cor: "bg-sky-500" },
+  { value: "TRILHA", label: "Trilhas", cor: "bg-green-600" },
+  { value: "HISTORICO", label: "Histórico", cor: "bg-amber-600" },
+  { value: "CACHOEIRA", label: "Cachoeiras", cor: "bg-cyan-600" },
+];
 
 const CATEGORIA_LABEL: Record<CategoriaPonto, string> = {
-  MIRANTE:  "Mirante",
-  TRILHA:   "Trilha",
-  HISTORICO:"Histórico",
-  CACHOEIRA:"Cachoeira",
-}
+  MIRANTE: "Mirante",
+  TRILHA: "Trilha",
+  HISTORICO: "Histórico",
+  CACHOEIRA: "Cachoeira",
+};
 
 const CATEGORIA_COR: Record<CategoriaPonto, string> = {
-  MIRANTE:  "bg-sky-500",
-  TRILHA:   "bg-green-600",
-  HISTORICO:"bg-amber-600",
-  CACHOEIRA:"bg-cyan-600",
-}
+  MIRANTE: "bg-sky-500",
+  TRILHA: "bg-green-600",
+  HISTORICO: "bg-amber-600",
+  CACHOEIRA: "bg-cyan-600",
+};
 
 const DIFICULDADE_LABEL: Record<Dificuldade, string> = {
-  FACIL:    "Fácil",
+  FACIL: "Fácil",
   MODERADA: "Moderada",
-  DIFICIL:  "Difícil",
-}
+  DIFICIL: "Difícil",
+};
 
 const DIFICULDADE_COR: Record<Dificuldade, string> = {
-  FACIL:    "bg-green-100 text-green-700",
+  FACIL: "bg-green-100 text-green-700",
   MODERADA: "bg-yellow-100 text-yellow-700",
-  DIFICIL:  "bg-red-100 text-red-700",
-}
+  DIFICIL: "bg-red-100 text-red-700",
+};
 
-const CATEGORIAS_VALIDAS = new Set<string>(["MIRANTE", "TRILHA", "HISTORICO", "CACHOEIRA"])
+const CATEGORIAS_VALIDAS = new Set<string>([
+  "MIRANTE",
+  "TRILHA",
+  "HISTORICO",
+  "CACHOEIRA",
+]);
 
 function formatDuracao(min: number): string {
-  if (min < 60) return `${min} min`
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return m > 0 ? `${h}h ${m}min` : `${h}h`
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
 }
 
 export default async function PontosTuristicosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ categoria?: string }>
+  searchParams: Promise<{ categoria?: string }>;
 }) {
-  const { categoria } = await searchParams
+  const { categoria } = await searchParams;
   const categoriaFiltro =
     categoria && CATEGORIAS_VALIDAS.has(categoria.toUpperCase())
       ? (categoria.toUpperCase() as CategoriaPonto)
-      : null
+      : null;
 
   const pontos = await prisma.pontoTuristico.findMany({
     where: {
@@ -71,7 +76,7 @@ export default async function PontosTuristicosPage({
       ...(categoriaFiltro ? { categoria: categoriaFiltro } : {}),
     },
     orderBy: [{ categoria: "asc" }, { nome: "asc" }],
-  })
+  });
 
   return (
     <div style={{ background: "var(--sand-1)", minHeight: "100vh" }}>
@@ -105,8 +110,16 @@ export default async function PontosTuristicosPage({
           >
             Pontos Turísticos
           </h1>
-          <p style={{ color: "#EDE0C8", marginTop: 8, fontSize: 14, lineHeight: 1.5 }}>
-            Mirantes, trilhas, cachoeiras e locais históricos na Serra da Mantiqueira
+          <p
+            style={{
+              color: "#EDE0C8",
+              marginTop: 8,
+              fontSize: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            Mirantes, trilhas, cachoeiras e locais históricos em São Bento do
+            Sapucaí.
           </p>
         </div>
       </div>
@@ -120,7 +133,11 @@ export default async function PontosTuristicosPage({
             style={
               !categoriaFiltro
                 ? { background: "var(--ink)", color: "var(--sand-1)" }
-                : { background: "var(--sand-2)", color: "var(--ink-2)", border: "1px solid var(--sand-3)" }
+                : {
+                    background: "var(--sand-2)",
+                    color: "var(--ink-2)",
+                    border: "1px solid var(--sand-3)",
+                  }
             }
           >
             Todos
@@ -138,7 +155,7 @@ export default async function PontosTuristicosPage({
             )}
           </Link>
           {CATEGORIAS.map(({ value, label }) => {
-            const ativo = categoriaFiltro === value
+            const ativo = categoriaFiltro === value;
             return (
               <Link
                 key={value}
@@ -147,7 +164,11 @@ export default async function PontosTuristicosPage({
                 style={
                   ativo
                     ? { background: "var(--ink)", color: "var(--sand-1)" }
-                    : { background: "var(--sand-2)", color: "var(--ink-2)", border: "1px solid var(--sand-3)" }
+                    : {
+                        background: "var(--sand-2)",
+                        color: "var(--ink-2)",
+                        border: "1px solid var(--sand-3)",
+                      }
                 }
               >
                 {label}
@@ -165,7 +186,7 @@ export default async function PontosTuristicosPage({
                   </span>
                 )}
               </Link>
-            )
+            );
           })}
         </div>
 
@@ -197,9 +218,15 @@ export default async function PontosTuristicosPage({
                   ) : (
                     <div
                       className="absolute inset-0 flex items-center justify-center"
-                      style={{ background: "linear-gradient(145deg, var(--sand-2), var(--sand-3))" }}
+                      style={{
+                        background:
+                          "linear-gradient(145deg, var(--sand-2), var(--sand-3))",
+                      }}
                     >
-                      <Mountain className="h-10 w-10" style={{ color: "var(--terra)", opacity: .4 }} />
+                      <Mountain
+                        className="h-10 w-10"
+                        style={{ color: "var(--terra)", opacity: 0.4 }}
+                      />
                     </div>
                   )}
                   {/* Badge categoria */}
@@ -212,37 +239,46 @@ export default async function PontosTuristicosPage({
 
                 {/* Info */}
                 <div className="p-3">
-                  <p className="font-semibold text-sm leading-tight line-clamp-1" style={{ color: "var(--ink)" }}>
+                  <p
+                    className="font-semibold text-sm leading-tight line-clamp-1"
+                    style={{ color: "var(--ink)" }}
+                  >
                     {p.nome}
                   </p>
                   {p.descricao && (
-                    <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--muted)" }}>
+                    <p
+                      className="text-xs mt-1 line-clamp-2"
+                      style={{ color: "var(--muted)" }}
+                    >
                       {p.descricao}
                     </p>
                   )}
 
                   {/* Chips específicos */}
-                  {p.categoria === "TRILHA" && (p.dificuldade || p.distanciaKm || p.duracaoMin) && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {p.dificuldade && (
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${DIFICULDADE_COR[p.dificuldade]}`}>
-                          {DIFICULDADE_LABEL[p.dificuldade]}
-                        </span>
-                      )}
-                      {p.distanciaKm && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 inline-flex items-center gap-1">
-                          <Route className="h-2.5 w-2.5" />
-                          {p.distanciaKm} km
-                        </span>
-                      )}
-                      {p.duracaoMin && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 inline-flex items-center gap-1">
-                          <Clock className="h-2.5 w-2.5" />
-                          {formatDuracao(p.duracaoMin)}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  {p.categoria === "TRILHA" &&
+                    (p.dificuldade || p.distanciaKm || p.duracaoMin) && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {p.dificuldade && (
+                          <span
+                            className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${DIFICULDADE_COR[p.dificuldade]}`}
+                          >
+                            {DIFICULDADE_LABEL[p.dificuldade]}
+                          </span>
+                        )}
+                        {p.distanciaKm && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 inline-flex items-center gap-1">
+                            <Route className="h-2.5 w-2.5" />
+                            {p.distanciaKm} km
+                          </span>
+                        )}
+                        {p.duracaoMin && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 inline-flex items-center gap-1">
+                            <Clock className="h-2.5 w-2.5" />
+                            {formatDuracao(p.duracaoMin)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   {p.categoria === "MIRANTE" && p.altitudeM && (
                     <div className="flex gap-1 mt-2">
                       <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 inline-flex items-center gap-1">
@@ -252,12 +288,21 @@ export default async function PontosTuristicosPage({
                     </div>
                   )}
                   {p.categoria === "HISTORICO" && p.periodo && (
-                    <p className="text-[10px] mt-1.5" style={{ color: "var(--amber)" }}>{p.periodo}</p>
+                    <p
+                      className="text-[10px] mt-1.5"
+                      style={{ color: "var(--amber)" }}
+                    >
+                      {p.periodo}
+                    </p>
                   )}
                   {p.cidade && (
-                    <p className="text-[10px] mt-1.5 flex items-center gap-1" style={{ color: "var(--muted)" }}>
+                    <p
+                      className="text-[10px] mt-1.5 flex items-center gap-1"
+                      style={{ color: "var(--muted)" }}
+                    >
                       <MapPin className="h-2.5 w-2.5" />
-                      {p.cidade}{p.estado ? `/${p.estado}` : ""}
+                      {p.cidade}
+                      {p.estado ? `/${p.estado}` : ""}
                     </p>
                   )}
                 </div>
@@ -267,5 +312,5 @@ export default async function PontosTuristicosPage({
         )}
       </div>
     </div>
-  )
+  );
 }

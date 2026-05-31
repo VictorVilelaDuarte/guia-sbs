@@ -45,14 +45,21 @@ export async function PATCH(
   const { id } = await params
   const body = await req.json()
   const parsed = patchSchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Dados inválidos.", details: parsed.error.flatten() }, { status: 400 })
+  }
 
-  const ponto = await prisma.pontoTuristico.update({
-    where: { id },
-    data: parsed.data,
-  })
-
-  return NextResponse.json(ponto)
+  try {
+    const ponto = await prisma.pontoTuristico.update({
+      where: { id },
+      data: parsed.data,
+    })
+    return NextResponse.json(ponto)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error("[PATCH /pontos-turisticos]", msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
 
 export async function DELETE(

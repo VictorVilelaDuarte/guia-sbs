@@ -157,6 +157,19 @@ O middleware roda no Edge runtime da Vercel (limite de 1 MB). Para não ultrapas
 
 **Nunca importe `@/lib/auth` no middleware** — isso puxa Prisma + bcryptjs e estoura o limite do Edge.
 
+### Layout público e navegação global
+
+Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão agrupadas no route group `src/app/(public)/`. O grupo não afeta os URLs — serve apenas para compartilhar o `(public)/layout.tsx`, que injeta automaticamente:
+
+- **`Footer`** — rodapé com curva `FooterTopCurve from="var(--sand-1)"` fixa (neutro para qualquer fundo de página)
+- **`BottomNav`** — barra de navegação fixa no rodapé, estilo app mobile
+
+**`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` acende em qualquer rota `/pontos-turisticos/*`. Todos os itens são `<Link>`. Itens sem página dedicada ainda ("Mapa", "Você") apontam para `/` provisoriamente.
+
+**`Footer`** (`src/components/public/home/footer.tsx`) sempre renderiza a curva de transição com `var(--sand-1)`. Páginas que queiram uma transição específica (como a home que termina em `sand-2`) adicionam o componente `FooterTopCurve` diretamente no final do próprio conteúdo — o footer do layout completa a sequência sem necessidade de props.
+
+**Admin e comerciante** ficam fora do `(public)/` e não recebem BottomNav nem Footer.
+
 ### Slug de comércio
 
 `src/lib/slugify.ts` — utilitário que normaliza NFD, remove diacríticos e converte para kebab-case. Usado na criação do comércio (`/api/admin/comercios`) para gerar slug único com sufixo numérico caso já exista (ex: `chao-bento-2`).

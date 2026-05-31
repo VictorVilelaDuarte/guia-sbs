@@ -9,7 +9,7 @@ interface HeaderProps {
 const NAV_ITEMS: { id: NavId; label: string; Glyph: (p: React.SVGProps<SVGSVGElement>) => React.ReactElement }[] = [
   { id: "home", label: "Início", Glyph: IconHome },
   { id: "map",  label: "Mapa",   Glyph: IconMap },
-  { id: "fav",  label: "Salvos", Glyph: IconHeart },
+  { id: "pt",   label: "Pontos Turísticos", Glyph: IconPeak },
   { id: "me",   label: "Você",   Glyph: IconUser },
 ]
 

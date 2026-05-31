@@ -4,7 +4,7 @@ import { FooterTopCurve } from "./waves"
 export function Footer() {
   return (
     <div>
-      <FooterTopCurve from="var(--sand-2)" to="var(--ink)"/>
+      <FooterTopCurve from="var(--sand-1)" to="var(--ink)"/>
       <div className="home-px footer-body" style={{ background: "var(--ink)", color: "var(--sand-1)", paddingTop: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
           <div style={{
@@ -33,7 +33,7 @@ export function Footer() {
             }}>{l}</a>
           ))}
         </div>
-        <div style={{ color: "var(--ink-2)", fontSize: 11, marginTop: 22, opacity: .8 }}>
+        <div style={{ color: "var(--ink-2)", fontSize: 11, marginTop: 22, paddingBottom: 96, opacity: .8 }}>
           © 2026 Guia SBS · Feito na serra
         </div>
       </div>
