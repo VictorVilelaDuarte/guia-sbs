@@ -172,7 +172,15 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 
 **Admin e comerciante** ficam fora do `(public)/` e não recebem BottomNav nem Footer.
 
-**Home page (`(public)/page.tsx`)** é um Server Component que busca os contadores de categoria via `$queryRaw` e passa para `<HomeClient>` (Client Component com todo o estado interativo). O `Categories` component em `src/components/public/home/categories.tsx` recebe `counts: Partial<Record<Categoria, number>>` e usa ícones Lucide (`Utensils`, `BedDouble`, `Compass`, `Wrench`, `ShoppingBag`, `Ticket`) sobre blobs SVG coloridos.
+**Home page (`(public)/page.tsx`)** é um Server Component que faz duas queries e passa os dados para `<HomeClient>`:
+1. Contadores de categoria via `$queryRaw` (`unnest(categorias)`) → `Categories`
+2. Comércios ATIVO com horários → filtra os abertos agora via `getDiaAtual` + `estaAbertoAgora` de `src/lib/horarios.ts` → `OpenNow`
+
+**`Categories`** recebe `counts: Partial<Record<Categoria, number>>` e usa ícones Lucide (`Utensils`, `BedDouble`, `Compass`, `Wrench`, `ShoppingBag`, `Ticket`) sobre blobs SVG coloridos.
+
+**`OpenNow`** (`src/components/public/home/open-now.tsx`) recebe `items: ComercioAberto[]` e renderiza `null` quando não há nenhum aberto. Cada card é um `<Link href="/vitrine/[slug]">` com logo (`next/image`) ou `PhotoPH` com paleta determinística pelo slug. O container de scroll usa `margin: 0; paddingLeft: 20px; scrollPaddingInlineStart: 20px` — **não usa o padrão `home-px` wrapper + `h-scroll` margin: -20px** porque `scroll-snap-align: start` âncora o primeiro item em `scrollLeft: 0` ignorando o padding, e `scroll-padding-inline-start` corrige o ponto de snap. Sem isso, o primeiro card gruda na borda esquerda mesmo após arrasto manual.
+
+**`src/lib/horarios.ts`** — funções de horário extraídas da vitrine para localização compartilhada: `HorarioDia`, `parseHorarios`, `getDiaAtual`, `estaAbertoAgora`, `formatHorario`, `formatPhone`, `formatPreco`, `formatDataEvento`. O `_utils.ts` da vitrine agora re-exporta dali.
 
 ### Slug de comércio
 

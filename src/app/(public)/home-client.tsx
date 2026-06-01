@@ -8,15 +8,23 @@ import { OpenNow } from "@/components/public/home/open-now";
 import { Events } from "@/components/public/home/events";
 import { Featured } from "@/components/public/home/featured";
 import { Wave } from "@/components/public/home/waves";
-import { FooterTopCurve } from "@/components/public/home/waves";
 import type { NavId } from "@/components/public/home/bottom-nav";
 import type { Categoria } from "@prisma/client";
 
-interface Props {
-  categoryCounts: Partial<Record<Categoria, number>>;
+interface ComercioAberto {
+  slug: string;
+  nome: string;
+  logo: string | null;
+  categorias: string[];
+  fechaLabel: string;
 }
 
-export function HomeClient({ categoryCounts }: Props) {
+interface Props {
+  categoryCounts: Partial<Record<Categoria, number>>;
+  comerciosAbertos: ComercioAberto[];
+}
+
+export function HomeClient({ categoryCounts, comerciosAbertos }: Props) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [activeCat, setActiveCat] = useState<string | null>(null);
@@ -39,12 +47,11 @@ export function HomeClient({ categoryCounts }: Props) {
             counts={categoryCounts}
           />
           <Wave from="var(--sand-1)" to="var(--sand-2)" />
-          <OpenNow />
+          <OpenNow items={comerciosAbertos} />
           <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
           <Events />
           <Wave from="var(--sand-1)" to="var(--sand-2)" />
           <Featured />
-          <FooterTopCurve from="var(--sand-2)" to="var(--ink)" />
         </main>
       </div>
     </div>
