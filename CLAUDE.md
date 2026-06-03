@@ -168,7 +168,7 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 
 **`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` acende em qualquer rota `/pontos-turisticos/*`. Todos os itens são `<Link>`. Itens sem página dedicada ainda ("Mapa", "Você") apontam para `/` provisoriamente.
 
-**`Footer`** (`src/components/public/home/footer.tsx`) sempre renderiza a curva de transição com `var(--sand-1)`. Páginas que queiram uma transição específica (como a home que termina em `sand-2`) adicionam o componente `FooterTopCurve` diretamente no final do próprio conteúdo — o footer do layout completa a sequência sem necessidade de props.
+**`Footer`** (`src/components/public/home/footer.tsx`) sempre renderiza a curva de transição com `from="var(--sand-1)"`. Qualquer página que termine em uma cor diferente deve adicionar um `<Wave>` ao final do próprio conteúdo para voltar ao `sand-1` antes do footer. A home faz isso com `<Wave from="var(--sand-2)" to="var(--sand-1)" flip />` após `<Featured />`. Nunca passe props ao Footer para mudar a cor — a solução fica no conteúdo da página.
 
 **Admin e comerciante** ficam fora do `(public)/` e não recebem BottomNav nem Footer.
 
@@ -345,7 +345,7 @@ model PontoTuristico {
 - `ponto-turistico-fotos.tsx` — grid de thumbnails com drag-and-drop, conversão HEIC client-side, slot "+" inline
 
 **Vitrine pública:**
-- `/pontos-turisticos` — listagem com filtro por categoria (query param `?categoria=TRILHA` etc.), grid responsivo 2→3 colunas, cards com foto capa, badge de categoria, chips de metadados (dificuldade/distância/duração para trilhas, altitude para mirantes)
+- `/pontos-turisticos` — listagem com filtro por categoria (query param `?categoria=TRILHA` etc.), grid responsivo 2→3 colunas, cards com foto capa, badge de categoria, chips de metadados (dificuldade/distância/duração para trilhas, altitude para mirantes). O hero usa foto de fundo com overlay escuro; a transição para o conteúdo é feita com `<Wave from="#1a0d04" to="var(--sand-1)" />` **após** o container do hero (não dentro dele — o container tem `overflow: hidden` que cortaria a wave). Não usar SVG inline para essa transição.
 - `/pontos-turisticos/[slug]` — detalhe com galeria (`GaleriaFotos`), badge de categoria, chips de metadados específicos por tipo, seção de dicas (box âmbar), localização com `MapaView` + link "Como chegar" (Google Maps)
 - Topbar: volta para `/pontos-turisticos` + `ShareButton`
 - `generateMetadata` com OpenGraph image na página de detalhe

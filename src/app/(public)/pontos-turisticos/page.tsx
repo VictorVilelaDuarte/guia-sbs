@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
+import { Wave } from "@/components/public/home/waves";
 import type { CategoriaPonto, Dificuldade } from "@prisma/client";
 import { MapPin, Route, Clock, Mountain } from "lucide-react";
 
@@ -83,13 +84,30 @@ export default async function PontosTuristicosPage({
       {/* Header */}
       <div
         style={{
-          background: "linear-gradient(160deg, #3a2615 0%, #6b3a1f 100%)",
-          padding: "48px 24px 40px",
           position: "relative",
           overflow: "hidden",
+          padding: "48px 24px 32px",
+          background: "var(--sand-1)",
         }}
       >
+        {/* Imagem de fundo */}
+        <Image
+          src="/assets/home/sbs.jpg"
+          alt=""
+          fill
+          className="object-cover"
+          sizes="100vw"
+          priority
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: "rgba(30,16,6,.58)",
+          }}
+        />
         <div className="grain" />
+
         <div className="max-w-5xl mx-auto relative z-10">
           <Link
             href="/"
@@ -106,6 +124,7 @@ export default async function PontosTuristicosPage({
               color: "#F8F2E6",
               letterSpacing: "-0.02em",
               margin: 0,
+              textShadow: "0 2px 16px rgba(20,12,5,.45)",
             }}
           >
             Pontos Turísticos
@@ -116,13 +135,16 @@ export default async function PontosTuristicosPage({
               marginTop: 8,
               fontSize: 14,
               lineHeight: 1.5,
+              textShadow: "0 1px 6px rgba(20,12,5,.5)",
             }}
           >
             Mirantes, trilhas, cachoeiras e locais históricos em São Bento do
             Sapucaí.
           </p>
         </div>
+
       </div>
+      <Wave from="#1a0d04" to="var(--sand-1)" />
 
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Filtros de categoria */}

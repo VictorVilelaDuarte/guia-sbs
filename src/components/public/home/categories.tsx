@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Utensils,
   BedDouble,
@@ -102,24 +103,20 @@ function CategoryCard({
   Glyph,
   blobKey,
   count,
-  active,
-  onClick,
+  href,
 }: Omit<CatItem, "id" | "categoria"> & {
   count: number;
-  active: boolean;
-  onClick: () => void;
+  href: string;
 }) {
   const blob = BLOBS[blobKey];
   return (
-    <button
-      onClick={onClick}
+    <Link
+      href={href}
       className="press"
       style={{
         position: "relative",
-        background: active ? "#fff" : "var(--sand-2)",
-        border: active
-          ? "1.5px solid var(--terra)"
-          : "1px solid rgba(212,201,176,.5)",
+        background: "var(--sand-2)",
+        border: "1px solid rgba(212,201,176,.5)",
         borderRadius: 22,
         padding: "16px 10px 14px",
         display: "flex",
@@ -128,11 +125,10 @@ function CategoryCard({
         gap: 8,
         cursor: "pointer",
         textAlign: "center",
-        boxShadow: active
-          ? "0 8px 22px -10px rgba(139,69,19,.35)"
-          : "0 2px 8px -4px rgba(80,50,20,.18)",
+        boxShadow: "0 2px 8px -4px rgba(80,50,20,.18)",
         transition: "all .2s",
         width: "100%",
+        textDecoration: "none",
       }}
       aria-label={`${label} — ${count} locais`}
     >
@@ -176,17 +172,15 @@ function CategoryCard({
       >
         {count} locais
       </div>
-    </button>
+    </Link>
   );
 }
 
 interface CategoriesProps {
-  active: string | null;
-  setActive: (id: string | null) => void;
   counts: Partial<Record<Categoria, number>>;
 }
 
-export function Categories({ active, setActive, counts }: CategoriesProps) {
+export function Categories({ counts }: CategoriesProps) {
   return (
     <div
       className="home-px"
@@ -212,19 +206,17 @@ export function Categories({ active, setActive, counts }: CategoriesProps) {
         >
           O que você <em style={{ color: "var(--terra)" }}>procura?</em>
         </h2>
-        <button
+        <Link
+          href="/comercios"
           style={{
-            border: "none",
-            background: "transparent",
             color: "var(--terra)",
             fontSize: 12,
             fontWeight: 600,
-            cursor: "pointer",
-            padding: 0,
+            textDecoration: "none",
           }}
         >
           Ver tudo →
-        </button>
+        </Link>
       </div>
       <div className="cat-grid">
         {CATS.map((c) => (
@@ -234,8 +226,7 @@ export function Categories({ active, setActive, counts }: CategoriesProps) {
             Glyph={c.Glyph}
             blobKey={c.blobKey}
             count={counts[c.categoria] ?? 0}
-            active={active === c.id}
-            onClick={() => setActive(active === c.id ? null : c.id)}
+            href={`/comercios?categoria=${c.categoria}`}
           />
         ))}
       </div>

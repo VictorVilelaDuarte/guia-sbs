@@ -27,7 +27,6 @@ interface Props {
 export function HomeClient({ categoryCounts, comerciosAbertos }: Props) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
-  const [activeCat, setActiveCat] = useState<string | null>(null);
   const [tab, setTab] = useState<NavId>("home");
 
   return (
@@ -41,17 +40,14 @@ export function HomeClient({ categoryCounts, comerciosAbertos }: Props) {
             focused={focused}
             setFocused={setFocused}
           />
-          <Categories
-            active={activeCat}
-            setActive={setActiveCat}
-            counts={categoryCounts}
-          />
+          <Categories counts={categoryCounts} />
           <Wave from="var(--sand-1)" to="var(--sand-2)" />
           <OpenNow items={comerciosAbertos} />
           <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
           <Events />
           <Wave from="var(--sand-1)" to="var(--sand-2)" />
           <Featured />
+          <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
         </main>
       </div>
     </div>
