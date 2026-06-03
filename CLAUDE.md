@@ -418,3 +418,36 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 - Analytics para comerciantes (visualizações, cliques) — feature flag já existe, falta implementar
 - QR Code do perfil para impressão — feature flag já existe, falta implementar
 - Produto simultâneo no cardápio e no catálogo (atualmente exclusivos)
+
+### Landing page para comerciantes
+
+`/para-comerciantes` — página de venda do produto para lojistas, dentro do route group `(public)/`. Recebe Footer e BottomNav do layout automaticamente.
+
+**Sequência de cores (Wave entre cada seção):**
+```
+ink (hero + AI section — banda única contínua)
+  Wave ink → sand-1
+sand-1 (features)
+  Wave sand-1 → sand-2
+sand-2 (como funciona)
+  Wave sand-2 → sand-1 flip
+sand-1 (planos)
+  Wave sand-1 → ink
+ink (CTA final)
+  Wave ink → sand-1
+Footer
+```
+
+**`DOT_GRID`** — constante de background (`radial-gradient` de pontos) aplicada em todas as seções escuras (hero, AI section, card Premium, CTA final) para textura futurista:
+```ts
+const DOT_GRID = "radial-gradient(rgba(245,240,232,.055) 1px, transparent 1px)";
+// sempre acompanhado de backgroundSize: "28px 28px"
+```
+
+**Componentes co-localizados** em `src/app/(public)/para-comerciantes/_components/`:
+
+- **`ai-demo.tsx`** — Client Component. Simula a busca por IA com animação em loop: digita a query → loading dots → resultados aparecem um a um → pausa → próxima query. `QUERIES_DATA` define as queries e seus resultados. A função `animate(qIdx)` é declarada dentro do `useEffect` (não `const`) para evitar referência circular (TDZ) ao chamar a si mesma via `setTimeout`. A área dinâmica tem `minHeight: 238` para evitar layout shift entre as fases e queries.
+
+- **`rotating-query.tsx`** — Client Component. Exibe no hero uma query de exemplo que faz fade entre 5 perguntas a cada 3.2s. Usa `setFading(true)` → timeout de 300ms → troca o texto → `setFading(false)`, controlando opacidade via `transition: "opacity 0.28s ease"`.
+
+**Planos:** exibidos como dois cards estáticos (Grátis / Premium). O botão "Fale conosco" do Premium aponta para `/admin/login` por ora — substituir por link de WhatsApp quando o número estiver definido.
