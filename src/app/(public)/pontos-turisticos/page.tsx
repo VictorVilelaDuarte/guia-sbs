@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { Wave } from "@/components/public/home/waves";
+import { HeroBottomCurve } from "@/components/public/home/waves";
 import type { CategoriaPonto, Dificuldade } from "@prisma/client";
 import { MapPin, Route, Clock, Mountain } from "lucide-react";
 
@@ -85,8 +85,7 @@ export default async function PontosTuristicosPage({
       <div
         style={{
           position: "relative",
-          overflow: "hidden",
-          padding: "48px 24px 32px",
+          padding: "48px 24px 64px",
           background: "var(--sand-1)",
         }}
       >
@@ -143,8 +142,8 @@ export default async function PontosTuristicosPage({
           </p>
         </div>
 
+        <HeroBottomCurve color="var(--sand-1)" />
       </div>
-      <Wave from="#1a0d04" to="var(--sand-1)" />
 
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Filtros de categoria */}

@@ -170,6 +170,8 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 
 **`Footer`** (`src/components/public/home/footer.tsx`) sempre renderiza a curva de transição com `from="var(--sand-1)"`. Qualquer página que termine em uma cor diferente deve adicionar um `<Wave>` ao final do próprio conteúdo para voltar ao `sand-1` antes do footer. A home faz isso com `<Wave from="var(--sand-2)" to="var(--sand-1)" flip />` após `<Featured />`. Nunca passe props ao Footer para mudar a cor — a solução fica no conteúdo da página.
 
+**Padrão de hero com foto + curva:** páginas com hero de foto de fundo (comércios, pontos-turisticos) usam `<HeroBottomCurve color="var(--sand-1)" />` posicionado **dentro** do container do hero (`position: absolute; bottom: -1` já embutido no componente). O container deve ter `padding-bottom` generoso (64px) para dar espaço à curva e **não deve ter `overflow: hidden`** — o `overflow: hidden` clipa o SVG na borda exata do container, anulando o `bottom: -1` que fecha a costura de 1px entre o hero e o conteúdo abaixo. O `<Image fill>` usa `inset: 0` e não precisa de `overflow: hidden` para ficar contido. **Não usar** `<Wave>` externa após o hero para este efeito — o wrapper da Wave tem `background: from` que aparece como uma faixa antes da curva. A curva interna faz a foto terminar organicamente na forma da onda.
+
 **Admin e comerciante** ficam fora do `(public)/` e não recebem BottomNav nem Footer.
 
 **Home page (`(public)/page.tsx`)** é um Server Component que faz duas queries e passa os dados para `<HomeClient>`:
@@ -299,6 +301,29 @@ model Subcategoria {
 
 **Vitrine pública:** subcategorias não são exibidas na vitrine — são informação de gestão interna, visível apenas no painel admin.
 
+### Listagem pública de comércios
+
+`/comercios` — listagem pública com filtro por categoria e subcategoria, paginação e ordenação "abertos primeiro". Faz parte do route group `(public)/`.
+
+**Estrutura de arquivos** (todos Server Components):
+```
+src/app/(public)/comercios/
+  page.tsx          — data fetching + composição
+  _utils.ts         — CATEGORIAS, CATEGORIA_LABEL, CATEGORIAS_VALIDAS, CATEGORIA_IMAGE,
+                       DEFAULT_IMAGE, palette(), pageUrl()
+  _components/
+    hero.tsx         — foto de fundo por categoria + título + HeroBottomCurve
+    filtros.tsx      — chips de categoria (sem filtro) ou subcategoria (com filtro)
+    card-comercio.tsx — card individual: foto/logo/PhotoPH, badge aberto/fechado, info
+    paginacao.tsx    — anterior/próxima com pageUrl()
+```
+
+**Imagens do hero por categoria:** em `/public/assets/categorias/{categoria_lowercase}.jpg`. Para trocar a imagem de uma categoria basta substituir o arquivo — o mapeamento está em `CATEGORIA_IMAGE` no `_utils.ts`. A constante `DEFAULT_IMAGE` é usada quando nenhuma categoria está selecionada.
+
+**Paginação:** `PAGE_SIZE = 12`. URL usa `?page=N` preservando `?categoria` e `?subcategoria`. A função `pageUrl()` monta a URL corretamente para todos os casos. A ordenação "abertos primeiro" é aplicada client-side dentro da página atual (não afeta a estabilidade da paginação pois o skip/take é feito por nome no DB).
+
+**Filtros:** sem categoria → chips de categoria. Com categoria → chips de subcategoria (buscados via Prisma filtrados por `categoriaFiltro`). Subcategoria inválida ou não pertencente à categoria é ignorada.
+
 ### Pontos Turísticos
 
 Entidade independente gerenciada exclusivamente pelo admin — sem vínculo com comércios.
@@ -411,7 +436,7 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 ## Próximas features planejadas
 
 - Busca full-text (PostgreSQL `tsvector` com dicionário português)
-- Página pública de listagem de comércios por categoria
+- ~~Página pública de listagem de comércios por categoria~~ — implementada
 - Página pública de eventos da cidade (`/eventos`)
 - ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)
 - Avaliações de visitantes
