@@ -56,7 +56,7 @@ NEXTAUTH_SECRET="..."
 | ORM | Prisma 6 + PostgreSQL via Supabase |
 | Autenticação | NextAuth v5 (JWT + Credentials) |
 | Storage | Supabase Storage (REST API direta — sem SDK) |
-| Mapas | Leaflet 1.9.4 (sempre com `next/dynamic` + `ssr: false`) |
+| Mapas | Google Maps JS API (`@googlemaps/js-api-loader` v2 + `@googlemaps/markerclusterer`) |
 | Geocoding | Nominatim / OpenStreetMap (sem API key) |
 | CEP | ViaCEP (sem API key) |
 | Validação | Zod |

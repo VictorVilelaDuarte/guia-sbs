@@ -1,8 +1,27 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import type { Map } from "leaflet"
-import "leaflet/dist/leaflet.css"
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader"
+
+const MAP_STYLE: google.maps.MapTypeStyle[] = [
+  { elementType: "geometry", stylers: [{ color: "#f5ede0" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#3d2b1a" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#fdf5e9" }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#c9ab8c" }] },
+  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#d8e8c0" }] },
+  { featureType: "landscape.man_made", elementType: "geometry", stylers: [{ color: "#ede5d4" }] },
+  { featureType: "poi", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#c5dba8", visibility: "on" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#7a5c3a" }] },
+  { featureType: "road.arterial", elementType: "geometry", stylers: [{ color: "#f4e4c0" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#edd090" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#d4a840" }] },
+  { featureType: "road.local", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#a8cfe0" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#5c8fa8" }] },
+]
 
 interface MapaViewProps {
   lat: number
@@ -13,66 +32,54 @@ interface MapaViewProps {
 
 export function MapaView({ lat, lng, nome, logo }: MapaViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<Map | null>(null)
-
-  useEffect(() => {
-    if (!document.getElementById("leaflet-logo-popup-css")) {
-      const style = document.createElement("style")
-      style.id = "leaflet-logo-popup-css"
-      style.textContent = `
-        .leaflet-logo-popup .leaflet-popup-content-wrapper { padding: 1px; border-radius: 10px; overflow: hidden; }
-        .leaflet-logo-popup .leaflet-popup-content { margin: 0; font-size: 0; line-height: 0; }
-      `
-      document.head.appendChild(style)
-    }
-  }, [])
+  const mapRef = useRef<google.maps.Map | null>(null)
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    if (!apiKey) return
 
-    import("leaflet").then((L) => {
+    setOptions({ key: apiKey, v: "weekly" })
+    importLibrary("maps").then(({ Map }) => {
       if (!containerRef.current || mapRef.current) return
 
-      const pinIcon = L.divIcon({
-        className: "",
-        html: `<div style="
-          width:22px;height:22px;
-          background:#3b82f6;
-          border:3px solid white;
-          border-radius:50% 50% 50% 0;
-          transform:rotate(-45deg);
-          box-shadow:0 2px 6px rgba(0,0,0,.35);
-        "></div>`,
-        iconSize: [22, 22],
-        iconAnchor: [11, 22],
-        popupAnchor: [0, -22],
+      const map = new Map(containerRef.current, {
+        center: { lat, lng },
+        zoom: 16,
+        disableDefaultUI: true,
+        gestureHandling: "none",
+        keyboardShortcuts: false,
+        styles: MAP_STYLE,
       })
 
-      const map = L.map(containerRef.current).setView([lat, lng], 16)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const marker = new (google.maps as any).Marker({
+        position: { lat, lng },
+        map,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: "#3b82f6",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+          scale: 10,
+        },
+      })
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-        maxZoom: 19,
-      }).addTo(map)
+      const infoContent = logo
+        ? `<img src="${logo}" alt="${nome}" style="width:72px;height:72px;object-fit:contain;display:block;border-radius:8px;" />`
+        : `<div style="font-size:13px;font-weight:600;padding:4px 2px;font-family:inherit;">${nome}</div>`
 
-      const popupContent = logo
-        ? `<img src="${logo}" alt="${nome}" style="width:72px;height:72px;object-fit:contain;display:block;" />`
-        : nome
-
-      L.marker([lat, lng], { icon: pinIcon })
-        .addTo(map)
-        .bindPopup(popupContent, {
-          maxWidth: logo ? 74 : 200,
-          className: logo ? "leaflet-logo-popup" : "",
-          closeButton: !logo,
-        })
-        .openPopup()
+      const infoWindow = new google.maps.InfoWindow({
+        content: infoContent,
+        disableAutoPan: true,
+      })
+      infoWindow.open(map, marker)
 
       mapRef.current = map
     })
 
     return () => {
-      mapRef.current?.remove()
       mapRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

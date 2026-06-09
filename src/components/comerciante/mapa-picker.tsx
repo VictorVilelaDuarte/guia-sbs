@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import type { Map, Marker } from "leaflet"
+import { setOptions, importLibrary } from "@googlemaps/js-api-loader"
 
 interface MapaPickerProps {
   lat: number
@@ -11,56 +11,48 @@ interface MapaPickerProps {
 
 export function MapaPicker({ lat, lng, onPick }: MapaPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<Map | null>(null)
-  const markerRef = useRef<Marker | null>(null)
+  const mapRef = useRef<google.maps.Map | null>(null)
+  const markerRef = useRef<google.maps.Marker | null>(null)
   const onPickRef = useRef(onPick)
 
   useEffect(() => { onPickRef.current = onPick }, [onPick])
 
-  // Inject Leaflet CSS once
-  useEffect(() => {
-    if (document.getElementById("leaflet-css")) return
-    const link = document.createElement("link")
-    link.id = "leaflet-css"
-    link.rel = "stylesheet"
-    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    document.head.appendChild(link)
-  }, [])
-
-  // Initialize map on mount
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    if (!apiKey) return
 
-    import("leaflet").then((L) => {
+    setOptions({ key: apiKey, v: "weekly" })
+    importLibrary("maps").then(({ Map }) => {
       if (!containerRef.current || mapRef.current) return
 
-      const pinIcon = L.divIcon({
-        className: "",
-        html: `<div style="
-          width:22px;height:22px;
-          background:#3b82f6;
-          border:3px solid white;
-          border-radius:50% 50% 50% 0;
-          transform:rotate(-45deg);
-          box-shadow:0 2px 6px rgba(0,0,0,.35);
-          cursor:grab
-        "></div>`,
-        iconSize: [22, 22],
-        iconAnchor: [11, 22],
+      const map = new Map(containerRef.current, {
+        center: { lat, lng },
+        zoom: 16,
+        disableDefaultUI: true,
+        zoomControl: true,
+        gestureHandling: "cooperative",
       })
 
-      const map = L.map(containerRef.current).setView([lat, lng], 16)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const marker = new (google.maps as any).Marker({
+        position: { lat, lng },
+        map,
+        draggable: true,
+        cursor: "grab",
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: "#3b82f6",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+          scale: 10,
+        },
+      })
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-        maxZoom: 19,
-      }).addTo(map)
-
-      const marker = L.marker([lat, lng], { icon: pinIcon, draggable: true }).addTo(map)
-
-      marker.on("dragend", () => {
-        const pos = marker.getLatLng()
-        onPickRef.current(pos.lat, pos.lng)
+      marker.addListener("dragend", () => {
+        const pos = marker.getPosition()
+        if (pos) onPickRef.current(pos.lat(), pos.lng())
       })
 
       mapRef.current = map
@@ -68,18 +60,19 @@ export function MapaPicker({ lat, lng, onPick }: MapaPickerProps) {
     })
 
     return () => {
-      mapRef.current?.remove()
-      mapRef.current = null
+      markerRef.current?.setMap(null)
       markerRef.current = null
+      mapRef.current = null
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sync marker when lat/lng props change (e.g. after city geocode)
+  // Sincroniza posição quando lat/lng mudam (ex: após geocodificação de CEP)
   useEffect(() => {
     if (!mapRef.current || !markerRef.current) return
-    markerRef.current.setLatLng([lat, lng])
-    mapRef.current.setView([lat, lng], mapRef.current.getZoom())
+    const pos = { lat, lng }
+    markerRef.current.setPosition(pos)
+    mapRef.current.setCenter(pos)
   }, [lat, lng])
 
   return <div ref={containerRef} className="h-64 w-full rounded-lg overflow-hidden border border-input" />
