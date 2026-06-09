@@ -218,11 +218,43 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 - Todas as cores do lightbox são `rgba()` inline — classes Tailwind de opacidade (`text-white/70`, `bg-black/40`) não funcionam em alguns browsers móveis.
 - `key={indice}` no componente `<Lightbox>` reseta zoom/pan ao trocar foto sem useEffect.
 
-### Mapa (Leaflet)
+### Mapa interativo (`/mapa`)
 
-Leaflet exige importação com `next/dynamic` + `ssr: false`. O padrão adotado é ter um wrapper `*-dynamic.tsx` (Client Component) que faz o dynamic import do componente real. Nunca importe componentes Leaflet diretamente em Server Components.
+Página full-screen em `src/app/mapa/` — fora do route group `(public)/` para não receber Footer nem BottomNav do layout (o BottomNav é renderizado diretamente dentro do `MapaClient`). Variável de ambiente obrigatória: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
 
-O CSS do Leaflet é importado localmente (`import "leaflet/dist/leaflet.css"` dentro do componente) — **não use CDN**, pois falha em redes locais. O popup do mapa exibe o logo do comércio (72×72px) quando disponível, ou o nome como fallback.
+**Dependências:** `@googlemaps/js-api-loader` (v2 — API funcional) + `@googlemaps/markerclusterer`.
+
+**Inicialização:** usar a API funcional do loader — `setOptions({ key, v: "weekly" })` seguido de `importLibrary("maps")`. **Nunca usar** `new Loader(...)` ou `Loader.load()` — deprecated na v2.
+
+**Markers:** usa `google.maps.Marker` (legacy, não `AdvancedMarkerElement`) — não requer Map ID. Comércios com logo renderizam ícone circular via canvas (`buildLogoIcon`); sem logo usam SVG circle (`circleIcon`); pontos turísticos usam SVG teardrop (`pinIcon`). O canvas usa `devicePixelRatio` para nitidez em telas Retina: `canvas.width = size * dpr; ctx.scale(dpr, dpr)` com `scaledSize: new google.maps.Size(size, size)`.
+
+**Clustering:** `MarkerClusterer` com renderer customizado usando `google.maps.SymbolPath.CIRCLE` — sem Map ID.
+
+**Animação de entrada:** DROP staggerado com `setTimeout(() => entries.forEach((e,i) => setTimeout(() => e.marker.setAnimation(DROP), Math.min(i*40,700))), 150)`.
+
+**Geolocalização — dois estados separados:**
+- `userLocation`: obtido silenciosamente no load (sem interação) — usado apenas para exibir distância no bottom sheet.
+- `geoFilterActive`: ativado explicitamente pelo botão "Perto de mim" — controla o círculo de raio no mapa e o filtro de pins por proximidade. `handlePertoDeMim` usa `applyGeoLocation()` que seta ambos; se `userLocation` já existe, pula o pedido de GPS. Clicar no botão quando ativo desliga o filtro (`setGeoFilterActive(false)`).
+
+**Estilo do mapa:** tons terrosos (cream `#f5ede0`, verde-sage para parques, azul-aço para água, dourado para estradas). Modo satélite (`setSatelliteMode`) chama `mapRef.current.setMapTypeId("satellite" | "roadmap")` — o estilo customizado não se aplica no modo satélite (comportamento esperado).
+
+**Filtros:** tipo (`todos` / `comercios` / `pontos`), categoria de comércio, `apertosApenas`, raio por proximidade (UI removida temporariamente, lógica preservada com `raioKm = 5`).
+
+**Busca:** filtra por nome em tempo real, exibe dropdown com até 4 comércios + 2 pontos. Selecionar centraliza e faz zoom no marker.
+
+**Clicar num pin:** `panTo` + `setZoom(16)` (só aplica zoom se zoom atual < 16) + abre bottom sheet.
+
+**Estrutura de arquivos:**
+```
+src/app/mapa/
+  page.tsx              — Server Component: queries Prisma, computa aberto/statusLabel
+  _types.ts             — ComercioMapa, PontoMapa, SelectedItem, HorarioItem
+  _components/
+    mapa-client.tsx     — Client Component principal com todo o estado e lógica do mapa
+    sheet-local.tsx     — Bottom sheet com portal para #portal-root
+```
+
+**Bottom sheet (`sheet-local.tsx`):** usa `createPortal` para `#portal-root` + iOS scroll lock (position fixed + scrollY). Comércio exibe: logo, galeria de fotos, horário de hoje, distância, botões (Ver mais / Chegar / WhatsApp). Ponto turístico exibe: nome, galeria de todas as fotos, descrição (3 linhas com clamp), badge de categoria, distância, metadados por categoria (trilha: dificuldade/distância/duração; mirante: altitude; cachoeira: piscina natural/guia; histórico: período), botões (Ver detalhes / Chegar / Compartilhar).
 
 ### Horários de funcionamento
 
@@ -439,10 +471,12 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 - ~~Página pública de listagem de comércios por categoria~~ — implementada
 - Página pública de eventos da cidade (`/eventos`)
 - ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)
+- ~~Mapa interativo da cidade~~ — implementado (`/mapa`)
 - Avaliações de visitantes
 - Analytics para comerciantes (visualizações, cliques) — feature flag já existe, falta implementar
 - QR Code do perfil para impressão — feature flag já existe, falta implementar
 - Produto simultâneo no cardápio e no catálogo (atualmente exclusivos)
+- Filtro por raio no mapa — UI removida temporariamente, lógica de `raioKm` preservada em `mapa-client.tsx`
 
 ### Landing page para comerciantes
 

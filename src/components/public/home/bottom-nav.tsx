@@ -8,7 +8,7 @@ export type NavId = "home" | "map" | "pt" | "me"
 
 const NAV_ITEMS = [
   { id: "home", label: "Início",           href: "/",                   Glyph: Home     },
-  { id: "map",  label: "Mapa",             href: "/",                   Glyph: Map      },
+  { id: "map",  label: "Mapa",             href: "/mapa",               Glyph: Map      },
   { id: "pt",   label: "Pontos Turísticos",href: "/pontos-turisticos",  Glyph: Mountain },
   { id: "me",   label: "Você",             href: "/",                   Glyph: User     },
 ]
@@ -19,6 +19,7 @@ export function BottomNav() {
   function isActive(_href: string, id: string): boolean {
     if (id === "pt") return pathname.startsWith("/pontos-turisticos")
     if (id === "home") return pathname === "/"
+    if (id === "map") return pathname.startsWith("/mapa")
     return false
   }
 
