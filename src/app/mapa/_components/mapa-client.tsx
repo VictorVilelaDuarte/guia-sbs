@@ -684,7 +684,7 @@ export function MapaClient({
                   background: "rgba(255,255,255,.95)",
                   boxShadow: "0 2px 10px rgba(0,0,0,.15)",
                   backdropFilter: "blur(12px)",
-                  fontSize: 13,
+                  fontSize: 16,
                   fontFamily: "inherit",
                   color: "#2C2416",
                   outline: "none",
