@@ -256,6 +256,14 @@ src/app/mapa/
 
 **Bottom sheet (`sheet-local.tsx`):** usa `createPortal` para `#portal-root` + iOS scroll lock (position fixed + scrollY). Comércio exibe: logo, galeria de fotos, horário de hoje, distância, botões (Ver mais / Chegar / WhatsApp). Ponto turístico exibe: nome, galeria de todas as fotos, descrição (3 linhas com clamp), badge de categoria, distância, metadados por categoria (trilha: dificuldade/distância/duração; mirante: altitude; cachoeira: piscina natural/guia; histórico: período), botões (Ver detalhes / Chegar / Compartilhar).
 
+### Componentes de mapa compartilhados
+
+Todos os mapas do projeto usam Google Maps via `@googlemaps/js-api-loader` (v2). O padrão de inicialização é sempre `setOptions({ key, v: "weekly" })` + `importLibrary("maps")` num `useEffect`. **Nunca importar Leaflet** — foi removido do projeto.
+
+**`src/components/public/mapa-view.tsx`** — exibe a localização de um comércio ou ponto turístico. Somente leitura (`gestureHandling: "none"`), sem controles de UI. Aplica o mesmo estilo terroso do `/mapa`. Mostra `InfoWindow` com logo (72×72px) ou nome como fallback. Exportado via wrapper dinâmico `mapa-view-dynamic.tsx` (fornece skeleton de loading; `ssr: false` não é mais necessário mas mantido pelo skeleton). Usado em `secao-localizacao.tsx` (vitrine) e `/pontos-turisticos/[slug]`.
+
+**`src/components/comerciante/mapa-picker.tsx`** — picker interativo para seleção de coordenadas em formulários de endereço. Marker draggável: `dragend` chama `onPick(lat, lng)`. Sincroniza posição via `useEffect([lat, lng])` quando o CEP é preenchido e o endereço é geocodificado. Controles de zoom habilitados, `gestureHandling: "cooperative"`. Sem estilo customizado (contexto de formulário). Carregado via `dynamic` em `endereco-input.tsx`.
+
 ### Horários de funcionamento
 
 Armazenados como JSON string no campo `horarios` do comércio. Estrutura esperada:
