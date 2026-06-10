@@ -29,13 +29,36 @@ export function BottomNav() {
       bottom: 24, zIndex: 40,
       width: "calc(100% - 28px)", maxWidth: 452,
     }}>
-      <div className="blur-bar shadow-pill" style={{
-        background: "rgba(44,36,22,.92)",
+      {/* Filtro de refração — distorce o que passa atrás do vidro.
+          Turbulência fractal suave → deslocamento sutil dos pixels.
+          Só tem efeito onde backdrop-filter: url() é suportado (Chrome/Android);
+          iOS Safari ignora e mantém o vidro base. */}
+      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden>
+        <filter id="liquid-refract" x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.011 0.016"
+            numOctaves={2}
+            seed={4}
+            result="noise"
+          />
+          <feGaussianBlur in="noise" stdDeviation="1.4" result="softNoise" />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="softNoise"
+            scale={9}
+            xChannelSelector="R"
+            yChannelSelector="G"
+          />
+        </filter>
+      </svg>
+
+      <div className="liquid-glass" style={{
         borderRadius: 999,
         padding: "8px 10px",
         display: "flex", justifyContent: "space-around", alignItems: "center",
-        border: "1px solid rgba(245,240,232,.08)",
       }}>
+        <span aria-hidden className="liquid-glass-refract" />
         {NAV_ITEMS.map(({ id, label, href, Glyph }) => {
           const active = isActive(href, id)
           return (
