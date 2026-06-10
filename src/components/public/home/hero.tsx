@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Sparkles } from "lucide-react";
 import { IconSearch } from "./icons";
 // import { HeroIllustration } from "./hero-illustration";
 import { HeroBottomCurve } from "./waves";
@@ -13,14 +15,19 @@ interface HeroProps {
   setFocused: (v: boolean) => void;
 }
 
+// Perguntas em linguagem natural — ensinam o visitante a "conversar" com a
+// busca, com sabor local (truta, pinhão, Pedra do Baú).
 const PLACEHOLDERS = [
-  "Buscar restaurantes, pousada, passeio…",
-  "Pedra do Baú, trilhas, mirantes…",
-  "Café da manhã, truta, pinhão…",
+  "onde comer uma truta fresca?",
+  "pousada com café da manhã?",
+  "o que fazer hoje à tarde?",
+  "onde tomar um café com pinhão?",
+  "restaurante com vista pra Pedra do Baú?",
 ];
 
 export function Hero({ query, setQuery, focused, setFocused }: HeroProps) {
   const [phIdx, setPhIdx] = useState(0);
+  const router = useRouter();
 
   useEffect(() => {
     const id = setInterval(
@@ -29,6 +36,12 @@ export function Hero({ query, setQuery, focused, setFocused }: HeroProps) {
     );
     return () => clearInterval(id);
   }, []);
+
+  function handleSearch(termo: string) {
+    const q = termo.trim();
+    if (!q) return;
+    router.push(`/busca?q=${encodeURIComponent(q)}`);
+  }
 
   return (
     <div
@@ -136,6 +149,23 @@ export function Hero({ query, setQuery, focused, setFocused }: HeroProps) {
       >
         <div
           style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            marginBottom: 9,
+            marginLeft: 2,
+            color: "#F8F2E6",
+            fontSize: 11.5,
+            fontWeight: 600,
+            letterSpacing: ".02em",
+            textShadow: "0 1px 6px rgba(20,12,5,.6)",
+          }}
+        >
+          <Sparkles size={12} style={{ color: "#F0D9B0" }} />
+          Busca com IA
+        </div>
+        <div
+          style={{
             background: focused
               ? "rgba(255,255,255,0.18)"
               : "rgba(255,255,255,0.11)",
@@ -173,6 +203,10 @@ export function Hero({ query, setQuery, focused, setFocused }: HeroProps) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSearch(query);
+            }}
+            enterKeyHint="search"
             placeholder={PLACEHOLDERS[phIdx]}
             style={{
               flex: 1,
@@ -188,6 +222,7 @@ export function Hero({ query, setQuery, focused, setFocused }: HeroProps) {
           {query && (
             <button
               onClick={() => setQuery("")}
+              aria-label="Limpar busca"
               style={{
                 border: "none",
                 background: "rgba(255,255,255,0.2)",
@@ -199,11 +234,31 @@ export function Hero({ query, setQuery, focused, setFocused }: HeroProps) {
                 fontSize: 14,
                 display: "grid",
                 placeItems: "center",
+                flexShrink: 0,
               }}
             >
               ×
             </button>
           )}
+          {/* Selo IA — mesma identidade da demo da landing (ai-demo.tsx) */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, #C4873A, #8B4513)",
+              borderRadius: 8,
+              padding: "4px 9px",
+              fontSize: 9.5,
+              fontWeight: 700,
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              flexShrink: 0,
+              letterSpacing: ".03em",
+            }}
+          >
+            <Sparkles size={9} />
+            IA
+          </div>
         </div>
       </div>
     </div>

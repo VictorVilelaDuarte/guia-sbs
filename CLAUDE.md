@@ -487,7 +487,14 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 
 ## Próximas features planejadas
 
-- Busca full-text (PostgreSQL `tsvector` com dicionário português)
+- **Busca inteligente por IA** — maior diferencial comercial do produto. Busca em linguagem
+  natural ("onde comer lanche?") com ranqueamento por relevância (nome, descrição, produtos,
+  palavras-chave) + boosts de premium/aberto-agora. Arquitetura híbrida (embeddings `pgvector` +
+  full-text `tsvector` + LLM opcional), a implementar em fases. **UI de entrada já implementada**
+  (selo ✨ + placeholders no hero, `SearchChips`, página provisória `/busca`); o motor (Fase 1)
+  está pausado até o sistema estar mais populado. **Plano de design completo e decisões fechadas
+  em [`docs/busca-inteligente.md`](docs/busca-inteligente.md)** — consultar antes de iniciar
+  qualquer fase.
 - ~~Página pública de listagem de comércios por categoria~~ — implementada
 - Página pública de eventos da cidade (`/eventos`)
 - ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)

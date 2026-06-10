@@ -8,6 +8,7 @@ import { OpenNow } from "@/components/public/home/open-now";
 import { Events } from "@/components/public/home/events";
 import { Featured } from "@/components/public/home/featured";
 import { PontosTuristicos } from "@/components/public/home/pontos-turisticos";
+import { SearchChips } from "@/components/public/home/search-chips";
 import { Wave } from "@/components/public/home/waves";
 import type { NavId } from "@/components/public/home/bottom-nav";
 import type { Categoria } from "@prisma/client";
@@ -81,6 +82,7 @@ export function HomeClient({
             focused={focused}
             setFocused={setFocused}
           />
+          <SearchChips />
           <Categories counts={categoryCounts} />
           <Wave from="var(--sand-1)" to="var(--sand-2)" />
           <Featured items={comerciosDestaque} />
