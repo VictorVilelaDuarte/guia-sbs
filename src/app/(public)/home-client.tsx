@@ -86,6 +86,7 @@ export function HomeClient({
           <Featured items={comerciosDestaque} />
           <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
           <OpenNow items={comerciosAbertos} />
+          {eventos.length > 0 && <Wave from="var(--sand-1)" to="var(--sand-2)" />}
           <Events eventos={eventos} />
           {pontos.length > 0 && eventos.length > 0 && (
             <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
