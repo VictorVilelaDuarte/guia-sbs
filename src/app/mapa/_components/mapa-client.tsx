@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import type { Categoria, CategoriaPonto } from "@prisma/client";
 import type { ComercioMapa, PontoMapa, SelectedItem } from "../_types";
@@ -316,9 +315,15 @@ export function MapaClient({
 
     let cancelled = false;
 
-    setOptions({ key: apiKey, v: "weekly" });
-
-    importLibrary("maps").then(() => {
+    // Import dinâmico: o @googlemaps/js-api-loader v2 acessa `window` na
+    // avaliação do módulo (window.trustedTypes), o que quebra o prerender SSR.
+    // Carregá-lo aqui dentro garante que só seja avaliado no cliente.
+    import("@googlemaps/js-api-loader")
+      .then(({ setOptions, importLibrary }) => {
+        setOptions({ key: apiKey, v: "weekly" });
+        return importLibrary("maps");
+      })
+      .then(() => {
       if (cancelled || !mapDivRef.current) return;
 
       const map = new google.maps.Map(mapDivRef.current, {
