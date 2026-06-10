@@ -5,7 +5,7 @@ export function Footer() {
   return (
     <div>
       <div style={{ marginBottom: -1 }}>
-        <FooterTopCurve from="var(--sand-1)" to="var(--ink)" />
+        <FooterTopCurve from="var(--footer-curve-from, var(--sand-1))" to="var(--ink)" />
       </div>
       <div
         className="home-px footer-body"

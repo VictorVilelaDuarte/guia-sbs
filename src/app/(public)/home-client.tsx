@@ -19,12 +19,40 @@ interface ComercioAberto {
   fechaLabel: string;
 }
 
+export interface ComercioDestaque {
+  slug: string;
+  nome: string;
+  categorias: string[];
+  logo: string | null;
+  foto: string | null;
+  bairro: string | null;
+  aberto: boolean;
+  statusLabel: string;
+}
+
+export interface EventoHome {
+  id: string;
+  titulo: string;
+  dataStr: string;
+  local: string | null;
+  imagem: string | null;
+  preco: number | null;
+  comercioSlug: string;
+}
+
 interface Props {
   categoryCounts: Partial<Record<Categoria, number>>;
   comerciosAbertos: ComercioAberto[];
+  comerciosDestaque: ComercioDestaque[];
+  eventos: EventoHome[];
 }
 
-export function HomeClient({ categoryCounts, comerciosAbertos }: Props) {
+export function HomeClient({
+  categoryCounts,
+  comerciosAbertos,
+  comerciosDestaque,
+  eventos,
+}: Props) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [tab, setTab] = useState<NavId>("home");
@@ -42,12 +70,10 @@ export function HomeClient({ categoryCounts, comerciosAbertos }: Props) {
           />
           <Categories counts={categoryCounts} />
           <Wave from="var(--sand-1)" to="var(--sand-2)" />
+          <Featured items={comerciosDestaque} />
+          <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
           <OpenNow items={comerciosAbertos} />
-          <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
-          <Events />
-          <Wave from="var(--sand-1)" to="var(--sand-2)" />
-          <Featured />
-          <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
+          <Events eventos={eventos} />
         </main>
       </div>
     </div>

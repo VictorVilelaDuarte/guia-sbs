@@ -168,19 +168,26 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 
 **`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` acende em qualquer rota `/pontos-turisticos/*`. Todos os itens são `<Link>`. Itens sem página dedicada ainda ("Mapa", "Você") apontam para `/` provisoriamente.
 
-**`Footer`** (`src/components/public/home/footer.tsx`) sempre renderiza a curva de transição com `from="var(--sand-1)"`. Qualquer página que termine em uma cor diferente deve adicionar um `<Wave>` ao final do próprio conteúdo para voltar ao `sand-1` antes do footer. A home faz isso com `<Wave from="var(--sand-2)" to="var(--sand-1)" flip />` após `<Featured />`. Nunca passe props ao Footer para mudar a cor — a solução fica no conteúdo da página.
+**`Footer`** (`src/components/public/home/footer.tsx`) renderiza a curva de transição com `from="var(--footer-curve-from, var(--sand-1))"`. O fallback é `sand-1`, que é o esperado por todas as páginas. A home page sobrescreve a variável via `<style>{`:root { --footer-curve-from: var(--sand-2); }`}</style>` no seu Server Component (`page.tsx`) — a tag `<style>` é removida automaticamente pelo Next.js na navegação para outras rotas, então o override afeta somente a home. Qualquer página que termine em cor diferente de `sand-1` deve ou usar esse padrão de CSS var ou adicionar um `<Wave>` ao final do conteúdo. Nunca passe props diretos ao `Footer` para mudar a cor.
 
 **Padrão de hero com foto + curva:** páginas com hero de foto de fundo (comércios, pontos-turisticos) usam `<HeroBottomCurve color="var(--sand-1)" />` posicionado **dentro** do container do hero (`position: absolute; bottom: -1` já embutido no componente). O container deve ter `padding-bottom` generoso (64px) para dar espaço à curva e **não deve ter `overflow: hidden`** — o `overflow: hidden` clipa o SVG na borda exata do container, anulando o `bottom: -1` que fecha a costura de 1px entre o hero e o conteúdo abaixo. O `<Image fill>` usa `inset: 0` e não precisa de `overflow: hidden` para ficar contido. **Não usar** `<Wave>` externa após o hero para este efeito — o wrapper da Wave tem `background: from` que aparece como uma faixa antes da curva. A curva interna faz a foto terminar organicamente na forma da onda.
 
 **Admin e comerciante** ficam fora do `(public)/` e não recebem BottomNav nem Footer.
 
-**Home page (`(public)/page.tsx`)** é um Server Component que faz duas queries e passa os dados para `<HomeClient>`:
+**Home page (`(public)/page.tsx`)** é um Server Component que faz três queries e passa os dados para `<HomeClient>`:
 1. Contadores de categoria via `$queryRaw` (`unnest(categorias)`) → `Categories`
-2. Comércios ATIVO com horários → filtra os abertos agora via `getDiaAtual` + `estaAbertoAgora` de `src/lib/horarios.ts` → `OpenNow`
+2. Comércios ATIVO → filtra abertos agora (`OpenNow`) e os com `destaque_busca` no plano (`Featured`). Uma única query busca todos os ativos com `plan.features`, `fotos[0]` e `horarios`; os dois filtros são aplicados em JS.
+3. Eventos futuros (`dataInicio >= now`) de comércios ATIVO, ordenados por data, máx. 6 → `Events`. A data é formatada no servidor via `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paulo"` (ex: "Sex 12 Jun").
+
+**Ordem das seções da home:** `Featured` (sand-2) → `OpenNow` (sand-1) → `Events` (sand-2) → Footer. `Events` não tem wave de fechamento; o footer usa `--footer-curve-from: var(--sand-2)` via CSS var override.
 
 **`Categories`** recebe `counts: Partial<Record<Categoria, number>>` e usa ícones Lucide (`Utensils`, `BedDouble`, `Compass`, `Wrench`, `ShoppingBag`, `Ticket`) sobre blobs SVG coloridos.
 
-**`OpenNow`** (`src/components/public/home/open-now.tsx`) recebe `items: ComercioAberto[]` e renderiza `null` quando não há nenhum aberto. Cada card é um `<Link href="/vitrine/[slug]">` com logo (`next/image`) ou `PhotoPH` com paleta determinística pelo slug. O container de scroll usa `margin: 0; paddingLeft: 20px; scrollPaddingInlineStart: 20px` — **não usa o padrão `home-px` wrapper + `h-scroll` margin: -20px** porque `scroll-snap-align: start` âncora o primeiro item em `scrollLeft: 0` ignorando o padding, e `scroll-padding-inline-start` corrige o ponto de snap. Sem isso, o primeiro card gruda na borda esquerda mesmo após arrasto manual.
+**`Featured`** (`src/components/public/home/featured.tsx`) recebe `items: ComercioDestaque[]`. Mostra comércios com `destaque_busca: true` no plano. Foto de capa: `fotos[0]` → `logo` → `PhotoPH`. Retorna `null` quando vazio. Card é `<Link>` para a vitrine.
+
+**`OpenNow`** (`src/components/public/home/open-now.tsx`) recebe `items: ComercioAberto[]`. Quando vazio, exibe estado vazio ("Nenhum comércio aberto neste momento · Ver todos →") em vez de retornar `null` — a seção permanece sempre visível. Cada card é um `<Link href="/vitrine/[slug]">` com logo (`next/image`) ou `PhotoPH` com paleta determinística pelo slug. O container de scroll usa `margin: 0; paddingLeft: 20px; scrollPaddingInlineStart: 20px` — **não usa o padrão `home-px` wrapper + `h-scroll` margin: -20px** porque `scroll-snap-align: start` âncora o primeiro item em `scrollLeft: 0` ignorando o padding, e `scroll-padding-inline-start` corrige o ponto de snap. Sem isso, o primeiro card gruda na borda esquerda mesmo após arrasto manual.
+
+**`Events`** (`src/components/public/home/events.tsx`) recebe `eventos: EventoHome[]`. Retorna `null` quando vazio (sem waves). Foto: `imagem` → `PhotoPH`. Badge de preço: "Gratuito" quando `preco === null`. Link para `/vitrine/[comercioSlug]`.
 
 **`src/lib/horarios.ts`** — funções de horário extraídas da vitrine para localização compartilhada: `HorarioDia`, `parseHorarios`, `getDiaAtual`, `estaAbertoAgora`, `formatHorario`, `formatPhone`, `formatPreco`, `formatDataEvento`. O `_utils.ts` da vitrine agora re-exporta dali.
 

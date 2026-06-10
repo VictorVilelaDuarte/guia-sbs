@@ -52,11 +52,9 @@ export function OpenNow({ items }: { items: ComercioAberto[] }) {
     return () => clearInterval(id);
   }, []);
 
-  if (items.length === 0) return null;
-
   return (
     <div
-      style={{ background: "var(--sand-2)", paddingTop: 10, paddingBottom: 22 }}
+      style={{ background: "var(--sand-1)", paddingTop: 10, paddingBottom: 22 }}
     >
       <div
         className="home-px"
@@ -91,6 +89,35 @@ export function OpenNow({ items }: { items: ComercioAberto[] }) {
         )}
       </div>
 
+      {items.length === 0 ? (
+        <div
+          className="home-px"
+          style={{
+            paddingTop: 4,
+            paddingBottom: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 13, color: "var(--muted)" }}>
+            Nenhum comércio aberto neste momento.
+          </span>
+          <a
+            href="/comercios"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--terra)",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Ver todos →
+          </a>
+        </div>
+      ) : (
       <div
         className="h-scroll no-scrollbar"
         style={{ margin: 0, paddingLeft: 20, paddingRight: 20, scrollPaddingInlineStart: 20 }}
@@ -198,6 +225,7 @@ export function OpenNow({ items }: { items: ComercioAberto[] }) {
             style={{ width: 4, flexShrink: 0 }}
           />
       </div>
+      )}
     </div>
   );
 }

@@ -1,65 +1,72 @@
-import { prisma } from "@/lib/prisma"
-import { notFound } from "next/navigation"
-import type { Metadata } from "next"
-import type { CategoriaPonto, Dificuldade } from "@prisma/client"
-import { MapPin, Route, Clock, Mountain, Lightbulb, Navigation } from "lucide-react"
-import { GaleriaFotos } from "@/components/public/galeria-fotos"
-import { MapaView } from "@/components/public/mapa-view-dynamic"
-import { Topbar } from "./_components/topbar"
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import type { CategoriaPonto, Dificuldade } from "@prisma/client";
+import {
+  MapPin,
+  Route,
+  Clock,
+  Mountain,
+  Lightbulb,
+  Navigation,
+} from "lucide-react";
+import { GaleriaFotos } from "@/components/public/galeria-fotos";
+import { MapaView } from "@/components/public/mapa-view-dynamic";
+import { Topbar } from "./_components/topbar";
 
 // ─── labels e cores ────────────────────────────────────────────
 
 const CATEGORIA_LABEL: Record<CategoriaPonto, string> = {
-  MIRANTE:   "Mirante",
-  TRILHA:    "Trilha",
+  MIRANTE: "Mirante",
+  TRILHA: "Trilha",
   HISTORICO: "Histórico/Cultural",
   CACHOEIRA: "Cachoeira",
-}
+};
 
 const CATEGORIA_COR: Record<CategoriaPonto, string> = {
-  MIRANTE:   "bg-sky-100 text-sky-700",
-  TRILHA:    "bg-green-100 text-green-700",
+  MIRANTE: "bg-sky-100 text-sky-700",
+  TRILHA: "bg-green-100 text-green-700",
   HISTORICO: "bg-amber-100 text-amber-700",
   CACHOEIRA: "bg-cyan-100 text-cyan-700",
-}
+};
 
 const DIFICULDADE_LABEL: Record<Dificuldade, string> = {
-  FACIL:    "Fácil",
+  FACIL: "Fácil",
   MODERADA: "Moderada",
-  DIFICIL:  "Difícil",
-}
+  DIFICIL: "Difícil",
+};
 
 const DIFICULDADE_COR: Record<Dificuldade, string> = {
-  FACIL:    "bg-green-100 text-green-700",
+  FACIL: "bg-green-100 text-green-700",
   MODERADA: "bg-yellow-100 text-yellow-700",
-  DIFICIL:  "bg-red-100 text-red-700",
-}
+  DIFICIL: "bg-red-100 text-red-700",
+};
 
 // ─── helpers ───────────────────────────────────────────────────
 
 function formatDuracao(min: number): string {
-  if (min < 60) return `${min} min`
-  const h = Math.floor(min / 60)
-  const m = min % 60
-  return m > 0 ? `${h}h ${m}min` : `${h}h`
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m > 0 ? `${h}h ${m}min` : `${h}h`;
 }
 
 function buildEndereco(p: {
-  cep: string | null
-  endereco: string | null
-  numero: string | null
-  bairro: string | null
-  cidade: string | null
-  estado: string | null
+  cep: string | null;
+  endereco: string | null;
+  numero: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  estado: string | null;
 }): string | null {
-  const partes: string[] = []
+  const partes: string[] = [];
   if (p.endereco) {
-    partes.push(p.numero ? `${p.endereco}, ${p.numero}` : p.endereco)
+    partes.push(p.numero ? `${p.endereco}, ${p.numero}` : p.endereco);
   }
-  if (p.bairro) partes.push(p.bairro)
-  if (p.cidade) partes.push(p.estado ? `${p.cidade}/${p.estado}` : p.cidade)
-  if (p.cep) partes.push(`CEP ${p.cep}`)
-  return partes.length > 0 ? partes.join(" — ") : null
+  if (p.bairro) partes.push(p.bairro);
+  if (p.cidade) partes.push(p.estado ? `${p.cidade}/${p.estado}` : p.cidade);
+  if (p.cep) partes.push(`CEP ${p.cep}`);
+  return partes.length > 0 ? partes.join(" — ") : null;
 }
 
 // ─── metadata ──────────────────────────────────────────────────
@@ -67,19 +74,19 @@ function buildEndereco(p: {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params
+  const { slug } = await params;
   const p = await prisma.pontoTuristico.findUnique({
     where: { slug },
     select: { nome: true, descricao: true, fotos: true },
-  })
-  if (!p) return {}
+  });
+  if (!p) return {};
   return {
     title: `${p.nome} | Guia SBS`,
     description: p.descricao ?? `Conheça ${p.nome}, em São Bento do Sapucaí.`,
     openGraph: p.fotos[0] ? { images: [{ url: p.fotos[0] }] } : undefined,
-  }
+  };
 }
 
 // ─── página ────────────────────────────────────────────────────
@@ -87,32 +94,34 @@ export async function generateMetadata({
 export default async function PontoTuristicoPage({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params
+  const { slug } = await params;
 
-  const ponto = await prisma.pontoTuristico.findUnique({ where: { slug } })
-  if (!ponto || !ponto.ativo) notFound()
+  const ponto = await prisma.pontoTuristico.findUnique({ where: { slug } });
+  if (!ponto || !ponto.ativo) notFound();
 
-  const enderecoCompleto = buildEndereco(ponto)
+  const enderecoCompleto = buildEndereco(ponto);
 
   // mapeia fotos (String[]) para o formato que GaleriaFotos espera
   const fotosParaGaleria = ponto.fotos.map((url, i) => ({
     id: String(i),
     url,
     alt: `${ponto.nome} — foto ${i + 1}`,
-  }))
+  }));
 
   const temMetadados =
-    (ponto.categoria === "TRILHA" && (ponto.dificuldade || ponto.distanciaKm || ponto.duracaoMin)) ||
+    (ponto.categoria === "TRILHA" &&
+      (ponto.dificuldade || ponto.distanciaKm || ponto.duracaoMin)) ||
     (ponto.categoria === "MIRANTE" && ponto.altitudeM) ||
-    (ponto.categoria === "CACHOEIRA" && (ponto.temPiscinaNatural != null || ponto.precisaGuia != null)) ||
-    (ponto.categoria === "HISTORICO" && ponto.periodo)
+    (ponto.categoria === "CACHOEIRA" &&
+      (ponto.temPiscinaNatural != null || ponto.precisaGuia != null)) ||
+    (ponto.categoria === "HISTORICO" && ponto.periodo);
 
   const googleMapsUrl =
     ponto.lat && ponto.lng
       ? `https://www.google.com/maps/dir/?api=1&destination=${ponto.lat},${ponto.lng}`
-      : null
+      : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,7 +134,6 @@ export default async function PontoTuristicoPage({
 
       {/* Conteúdo */}
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-
         {/* Identidade */}
         <div>
           <span
@@ -135,7 +143,9 @@ export default async function PontoTuristicoPage({
           </span>
           <h1 className="text-2xl font-bold leading-tight">{ponto.nome}</h1>
           {ponto.descricao && (
-            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">{ponto.descricao}</p>
+            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+              {ponto.descricao}
+            </p>
           )}
         </div>
 
@@ -145,7 +155,9 @@ export default async function PontoTuristicoPage({
             {ponto.categoria === "TRILHA" && (
               <>
                 {ponto.dificuldade && (
-                  <span className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full ${DIFICULDADE_COR[ponto.dificuldade]}`}>
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full ${DIFICULDADE_COR[ponto.dificuldade]}`}
+                  >
                     {DIFICULDADE_LABEL[ponto.dificuldade]}
                   </span>
                 )}
@@ -201,7 +213,9 @@ export default async function PontoTuristicoPage({
               <Lightbulb className="h-3.5 w-3.5" />
               Dicas
             </h2>
-            <p className="text-sm text-amber-900/80 leading-relaxed whitespace-pre-line">{ponto.dicas}</p>
+            <p className="text-sm text-amber-900/80 leading-relaxed whitespace-pre-line">
+              {ponto.dicas}
+            </p>
           </div>
         )}
 
@@ -213,10 +227,17 @@ export default async function PontoTuristicoPage({
               Localização
             </h2>
             {enderecoCompleto && (
-              <p className="text-sm text-muted-foreground mb-3">{enderecoCompleto}</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                {enderecoCompleto}
+              </p>
             )}
             {ponto.lat && ponto.lng && (
-              <MapaView lat={ponto.lat} lng={ponto.lng} nome={ponto.nome} logo={null} />
+              <MapaView
+                lat={ponto.lat}
+                lng={ponto.lng}
+                nome={ponto.nome}
+                logo={null}
+              />
             )}
             {googleMapsUrl && (
               <a
@@ -233,5 +254,5 @@ export default async function PontoTuristicoPage({
         )}
       </div>
     </div>
-  )
+  );
 }
