@@ -106,14 +106,48 @@ export default async function HomePage() {
     comercioSlug: e.comercio.slug,
   }));
 
+  const pontosRaw = await prisma.pontoTuristico.findMany({
+    where: { ativo: true },
+    select: {
+      slug: true,
+      nome: true,
+      categoria: true,
+      fotos: true,
+      dificuldade: true,
+      distanciaKm: true,
+      altitudeM: true,
+    },
+    take: 6,
+    orderBy: { nome: "asc" },
+  });
+
+  const pontos = pontosRaw.map((p) => ({
+    slug: p.slug,
+    nome: p.nome,
+    categoria: p.categoria as string,
+    foto: p.fotos[0] ?? null,
+    dificuldade: p.dificuldade as string | null,
+    distanciaKm: p.distanciaKm,
+    altitudeM: p.altitudeM,
+  }));
+
+  // A última seção determina a cor de entrada do footer
+  const footerFrom =
+    pontos.length > 0
+      ? "var(--sand-1)"
+      : eventos.length > 0
+        ? "var(--sand-2)"
+        : "var(--sand-1)";
+
   return (
     <>
-      <style>{`:root { --footer-curve-from: var(--sand-2); }`}</style>
+      <style>{`:root { --footer-curve-from: ${footerFrom}; }`}</style>
       <HomeClient
         categoryCounts={categoryCounts}
         comerciosAbertos={comerciosAbertos}
         comerciosDestaque={comerciosDestaque}
         eventos={eventos}
+        pontos={pontos}
       />
     </>
   );

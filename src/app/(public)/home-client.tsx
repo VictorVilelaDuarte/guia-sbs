@@ -7,6 +7,7 @@ import { Categories } from "@/components/public/home/categories";
 import { OpenNow } from "@/components/public/home/open-now";
 import { Events } from "@/components/public/home/events";
 import { Featured } from "@/components/public/home/featured";
+import { PontosTuristicos } from "@/components/public/home/pontos-turisticos";
 import { Wave } from "@/components/public/home/waves";
 import type { NavId } from "@/components/public/home/bottom-nav";
 import type { Categoria } from "@prisma/client";
@@ -40,11 +41,22 @@ export interface EventoHome {
   comercioSlug: string;
 }
 
+export interface PontoTuristicoHome {
+  slug: string;
+  nome: string;
+  categoria: string;
+  foto: string | null;
+  dificuldade: string | null;
+  distanciaKm: number | null;
+  altitudeM: number | null;
+}
+
 interface Props {
   categoryCounts: Partial<Record<Categoria, number>>;
   comerciosAbertos: ComercioAberto[];
   comerciosDestaque: ComercioDestaque[];
   eventos: EventoHome[];
+  pontos: PontoTuristicoHome[];
 }
 
 export function HomeClient({
@@ -52,6 +64,7 @@ export function HomeClient({
   comerciosAbertos,
   comerciosDestaque,
   eventos,
+  pontos,
 }: Props) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
@@ -74,6 +87,10 @@ export function HomeClient({
           <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
           <OpenNow items={comerciosAbertos} />
           <Events eventos={eventos} />
+          {pontos.length > 0 && eventos.length > 0 && (
+            <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
+          )}
+          <PontosTuristicos pontos={pontos} />
         </main>
       </div>
     </div>
