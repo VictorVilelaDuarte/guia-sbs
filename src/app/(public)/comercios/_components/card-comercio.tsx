@@ -28,7 +28,7 @@ export function CardComercio({ item: c, categoriaFiltro }: Props) {
 
   return (
     <Link
-      href={`/vitrine/${c.slug}`}
+      href={`/vitrine/${c.slug}?src=listagem`}
       className="group rounded-2xl overflow-hidden block shadow-soft hover:-translate-y-0.5 transition-transform"
       style={{ background: "#fff" }}
     >

@@ -13,6 +13,8 @@ import {
   EventosManager,
   type Evento,
 } from "@/components/comerciante/eventos-manager";
+import { AnalyticsPanel } from "@/components/comerciante/analytics-panel";
+import type { AnalyticsResumo } from "@/lib/analytics/types";
 import { cn } from "@/lib/utils";
 import { temFeature, LIMITES_FREE, type FeatureKey } from "@/lib/plan-features";
 import { Lock } from "lucide-react";
@@ -71,6 +73,8 @@ interface AbaConfig {
 
 const ABAS: AbaConfig[] = [
   { id: "informacoes", label: "Informações" },
+  // sem `feature`: a aba abre para todos — o plano FREE vê o teaser
+  { id: "analytics", label: "Analytics" },
   { id: "fotos", label: "Fotos" },
   { id: "cardapio", label: "Cardápio", feature: "cardapio" },
   { id: "produtos", label: "Produtos" },
@@ -82,9 +86,11 @@ const ABAS: AbaConfig[] = [
 export function DashboardTabs({
   comercio,
   subcategoriasDisponiveis,
+  analytics,
 }: {
   comercio: ComercioParaDashboard;
   subcategoriasDisponiveis: SubcategoriaBasica[];
+  analytics: AnalyticsResumo;
 }) {
   const [aba, setAba] = useState("informacoes");
   const features = comercio.plan.features;
@@ -133,6 +139,21 @@ export function DashboardTabs({
       </div>
 
       <div className="mt-6 space-y-6">
+        {aba === "analytics" && (
+          <AnalyticsPanel
+            data={analytics}
+            premium={temFeature(features, "analytics")}
+            perfil={{
+              fotos: comercio.fotos.length,
+              temDescricao: !!comercio.descricao,
+              produtos: comercio.produtos.length,
+              tags: comercio.tags.length,
+              temHorarios: !!comercio.horarios,
+              temLogo: !!comercio.logo,
+            }}
+          />
+        )}
+
         {aba === "informacoes" && (
           <>
             <Card>

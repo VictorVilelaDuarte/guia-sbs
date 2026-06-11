@@ -130,6 +130,7 @@ model Comercio {
   produtos           Produto[]
   cardapioCategorias CardapioCategoria[]
   subcategorias      Subcategoria[]
+  analyticsEvents    AnalyticsEvent[]
 
   @@map("comercios")
 }
@@ -251,6 +252,25 @@ model PontoTuristico {
   updatedAt         DateTime       @updatedAt
 
   @@map("pontos_turisticos")
+}
+
+// Eventos de analytics — brutos, anônimos (sem PII; visitorId é um UUID de
+// sessão). Na escala atual, agregação direto na query resolve; rollup diário
+// só se o volume um dia exigir.
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  comercioId String
+  tipo       String // view | click_whatsapp | click_ligar | click_instagram | click_site | click_rota | click_share | cardapio_view | catalogo_view | item_view | evento_view | galeria_view
+  origem     String? // home_destaque | home_abertos | home_eventos | listagem | mapa | busca | qr | google | direto
+  meta       Json?
+  visitorId  String?
+  createdAt  DateTime @default(now())
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@index([comercioId, createdAt])
+  @@index([comercioId, tipo, createdAt])
+  @@map("analytics_events")
 }
 
 model Evento {

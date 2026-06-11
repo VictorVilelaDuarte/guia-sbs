@@ -16,6 +16,7 @@ export function CtasRapidos({ whatsapp, instagram, lat, lng, website, telefone }
       {whatsapp && (
         <a
           href={`https://wa.me/55${whatsapp.replace(/\D/g, "")}`}
+          data-track="click_whatsapp"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 shrink-0 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-full transition-colors"
@@ -27,6 +28,7 @@ export function CtasRapidos({ whatsapp, instagram, lat, lng, website, telefone }
       {instagram && (
         <a
           href={`https://instagram.com/${instagram.replace("@", "")}`}
+          data-track="click_instagram"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 shrink-0 border border-muted-foreground hover:bg-muted/70 text-foreground text-sm font-medium px-4 py-2 rounded-full transition-colors"
@@ -38,6 +40,7 @@ export function CtasRapidos({ whatsapp, instagram, lat, lng, website, telefone }
       {lat && lng && (
         <a
           href={`https://maps.google.com/?q=${lat},${lng}`}
+          data-track="click_rota"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 shrink-0 border border-muted-foreground hover:bg-muted/70 text-foreground text-sm font-medium px-4 py-2 rounded-full transition-colors"
@@ -49,6 +52,7 @@ export function CtasRapidos({ whatsapp, instagram, lat, lng, website, telefone }
       {website && (
         <a
           href={website.startsWith("http") ? website : `https://${website}`}
+          data-track="click_site"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 shrink-0 border border-muted-foreground hover:bg-muted/70 text-foreground text-sm font-medium px-4 py-2 rounded-full transition-colors"
@@ -60,6 +64,7 @@ export function CtasRapidos({ whatsapp, instagram, lat, lng, website, telefone }
       {telefone && (
         <a
           href={`tel:${telefone.replace(/\D/g, "")}`}
+          data-track="click_ligar"
           className="flex items-center gap-2 shrink-0 border border-muted-foreground hover:bg-muted/70 text-foreground text-sm font-medium px-4 py-2 rounded-full transition-colors"
         >
           <Phone className="h-4 w-4" />

@@ -125,7 +125,7 @@ export function OpenNow({ items }: { items: ComercioAberto[] }) {
           {items.map((it) => (
             <Link
               key={it.slug}
-              href={`/vitrine/${it.slug}`}
+              href={`/vitrine/${it.slug}?src=home_abertos`}
               className="press shadow-card"
               style={{
                 width: 248,

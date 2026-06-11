@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { temFeature } from "@/lib/plan-features"
 import { CardapioView } from "@/components/public/cardapio-view"
+import { VitrineTracker } from "@/components/public/analytics/vitrine-tracker"
 
 export const viewport: Viewport = {
   userScalable: false,
@@ -105,6 +106,8 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
   const comercio = await prisma.comercio.findUnique({
     where: { slug },
     select: {
+      id: true,
+      status: true,
       nome: true,
       logo: true,
       slug: true,
@@ -141,6 +144,10 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
   const now = Date.now()
 
   return (
+    <>
+      {comercio.status === "ATIVO" && (
+        <VitrineTracker comercioId={comercio.id} pageTipo="cardapio_view" />
+      )}
     <CardapioView
       nome={comercio.nome}
       logo={comercio.logo}
@@ -169,5 +176,6 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
         })),
       }))}
     />
+    </>
   )
 }

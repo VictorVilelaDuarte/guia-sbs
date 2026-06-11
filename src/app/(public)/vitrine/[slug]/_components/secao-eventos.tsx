@@ -2,6 +2,7 @@ import Image from "next/image"
 import { Calendar, MapPin, Ticket, ExternalLink } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 import { isPast, isToday } from "date-fns"
+import { TrackImpression } from "@/components/public/analytics/track-impression"
 import { formatDataEvento, formatPreco } from "../_utils"
 
 interface Evento {
@@ -18,9 +19,12 @@ interface Evento {
 
 interface Props {
   eventos: Evento[]
+  // presente apenas quando o comércio está publicado — liga a impressão
+  // (evento_view) de cada card via IntersectionObserver
+  trackComercioId?: string
 }
 
-export function SecaoEventos({ eventos }: Props) {
+export function SecaoEventos({ eventos, trackComercioId }: Props) {
   const agora = new Date()
   const ativos = eventos.filter((e) => !e.dataFim || e.dataFim >= agora)
   const passados = eventos.filter((e) => e.dataFim && e.dataFim < agora)
@@ -37,7 +41,7 @@ export function SecaoEventos({ eventos }: Props) {
           {ordenados.map((evento) => {
             const encerrado = !!evento.dataFim && isPast(evento.dataFim)
             const hoje = isToday(evento.dataInicio)
-            return (
+            const card = (
               <div
                 key={evento.id}
                 className={`rounded-xl border border-border overflow-hidden ${encerrado ? "opacity-60" : ""}`}
@@ -108,6 +112,17 @@ export function SecaoEventos({ eventos }: Props) {
                   </div>
                 </div>
               </div>
+            )
+            if (!trackComercioId) return card
+            return (
+              <TrackImpression
+                key={evento.id}
+                comercioId={trackComercioId}
+                tipo="evento_view"
+                meta={{ eventoId: evento.id, titulo: evento.titulo }}
+              >
+                {card}
+              </TrackImpression>
             )
           })}
         </div>

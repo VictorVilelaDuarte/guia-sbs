@@ -428,6 +428,25 @@ model PontoTuristico {
 - `generateMetadata` com OpenGraph image na página de detalhe
 - Pontos com `ativo: false` retornam 404 na vitrine
 
+### Analytics para comerciantes
+
+Feature da flag `analytics` do plano — implementada. **Detalhes completos em
+[`docs/analytics.md`](docs/analytics.md).** Resumo operacional:
+
+- **Coleta:** `VitrineTracker` (client invisível) monta nas páginas públicas do comércio
+  (vitrine, cardápio, catálogo) **apenas quando `status === ATIVO`** — registra pageview com
+  origem (dedupe por sessão), seta o contexto p/ `trackCtx` e captura cliques em
+  `[data-track="<tipo>"]` por delegação. Eventos vão por `sendBeacon` para `POST /api/track`
+  (público, sempre 204, filtro de bots) → model `AnalyticsEvent` (anônimo, sem PII).
+- **Convenções ao desenvolver:** link interno novo para a vitrine deve levar `?src=<origem>`;
+  CTA server-side novo ganha `data-track`; client component compartilhado usa `trackCtx`
+  (no-op fora de páginas de comércio); impressões usam `<TrackImpression>`.
+- **Dashboard:** aba "Analytics" abre para todos — FREE vê visitas reais + teaser borrado com
+  cadeado; flag `analytics` libera gráfico diário (SVG puro), origem (donut), top itens, funil,
+  horário de ouro. O box de completude "Melhore seus números" é visível para todos.
+- **Agregação:** `getAnalyticsResumo` em `src/lib/analytics/queries.ts` (server). Tipos
+  compartilhados em `src/lib/analytics/types.ts` — o painel client importa só os tipos.
+
 ### Cardápio digital
 
 Feature controlada pelo plano (`key: "cardapio"`). Estrutura de dados:
@@ -512,8 +531,8 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 - ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)
 - ~~Mapa interativo da cidade~~ — implementado (`/mapa`)
 - Avaliações de visitantes
-- Analytics para comerciantes (visualizações, cliques) — feature flag já existe, falta implementar
-- QR Code do perfil para impressão — feature flag já existe, falta implementar
+- ~~Analytics para comerciantes~~ — implementado (ver seção Analytics e [`docs/analytics.md`](docs/analytics.md))
+- QR Code do perfil para impressão — feature flag já existe, falta implementar (gerar link com `?src=qr` para o analytics)
 - Produto simultâneo no cardápio e no catálogo (atualmente exclusivos)
 - Filtro por raio no mapa — UI removida temporariamente, lógica de `raioKm` preservada em `mapa-client.tsx`
 

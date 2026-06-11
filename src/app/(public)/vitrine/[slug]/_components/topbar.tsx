@@ -27,7 +27,9 @@ export function Topbar({ nome, isPublicado, status }: Props) {
               {nome}
             </p>
           </Link>
-          <ShareButton title={nome} />
+          <span data-track="click_share">
+            <ShareButton title={nome} />
+          </span>
         </div>
       </div>
     </>

@@ -270,7 +270,7 @@ function ComercioContent({ data, userLocation }: { data: ComercioMapa; userLocat
 
       {/* Botões */}
       <div style={{ display: "flex", gap: 8 }}>
-        <BtnAction href={`/vitrine/${data.slug}`} variant="primary">Ver mais</BtnAction>
+        <BtnAction href={`/vitrine/${data.slug}?src=mapa`} variant="primary">Ver mais</BtnAction>
         <BtnAction href={mapsUrl(data.lat, data.lng)} variant="ghost" external>
           <Navigation size={14} />
           Chegar

@@ -48,7 +48,7 @@ export function Featured({ items }: Props) {
           return (
             <Link
               key={it.slug}
-              href={`/vitrine/${it.slug}`}
+              href={`/vitrine/${it.slug}?src=home_destaque`}
               className="press shadow-card"
               style={{
                 background: "#FBF7EE",

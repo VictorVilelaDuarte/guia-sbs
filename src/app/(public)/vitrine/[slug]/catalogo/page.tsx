@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { temFeature } from "@/lib/plan-features"
 import { CatalogoView } from "@/components/public/catalogo-view"
+import { VitrineTracker } from "@/components/public/analytics/vitrine-tracker"
 
 export const viewport: Viewport = {
   userScalable: false,
@@ -24,6 +25,8 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
   const comercio = await prisma.comercio.findUnique({
     where: { slug },
     select: {
+      id: true,
+      status: true,
       nome: true,
       logo: true,
       slug: true,
@@ -47,6 +50,10 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
   if (produtos.length === 0 && servicos.length === 0) notFound()
 
   return (
+    <>
+      {comercio.status === "ATIVO" && (
+        <VitrineTracker comercioId={comercio.id} pageTipo="catalogo_view" />
+      )}
     <CatalogoView
       nome={comercio.nome}
       logo={comercio.logo}
@@ -79,5 +86,6 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
       }))}
       now={Date.now()}
     />
+    </>
   )
 }

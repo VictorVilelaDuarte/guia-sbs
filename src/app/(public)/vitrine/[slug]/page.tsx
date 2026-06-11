@@ -9,6 +9,8 @@ import { temFeature } from "@/lib/plan-features"
 import { Camera, ExternalLink, ShoppingBag, UtensilsCrossed, Wrench } from "lucide-react"
 import { parseHorarios, getDiaAtual, estaAbertoAgora } from "./_utils"
 import { Topbar } from "./_components/topbar"
+import { VitrineTracker } from "@/components/public/analytics/vitrine-tracker"
+import { TrackImpression } from "@/components/public/analytics/track-impression"
 import { Identidade } from "./_components/identidade"
 import { StatusAberto } from "./_components/status-aberto"
 import { CtasRapidos } from "./_components/ctas-rapidos"
@@ -133,6 +135,8 @@ export default async function PaginaComercio({
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Pré-visualização (status != ATIVO) não conta nas métricas */}
+      {isPublicado && <VitrineTracker comercioId={comercio.id} />}
       <Topbar nome={comercio.nome} isPublicado={isPublicado} status={comercio.status} />
 
       <div className="max-w-2xl mx-auto px-4">
@@ -233,7 +237,10 @@ export default async function PaginaComercio({
         )}
 
         {temEventos && comercio.eventos.length > 0 && (
-          <SecaoEventos eventos={comercio.eventos} />
+          <SecaoEventos
+            eventos={comercio.eventos}
+            trackComercioId={isPublicado ? comercio.id : undefined}
+          />
         )}
 
         {horarios && <SecaoHorarios horarios={horarios} diaAtual={diaAtual} />}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { trackCtx } from "@/lib/analytics/track";
 
 interface Foto {
   id: string;
@@ -52,7 +53,11 @@ export function GaleriaFotos({
           <button
             key={foto.id}
             type="button"
-            onClick={() => setIndice(i)}
+            onClick={() => {
+              setIndice(i);
+              // no-op fora de páginas de comércio (ex.: pontos turísticos)
+              trackCtx("galeria_view");
+            }}
             className="relative h-44 w-64 shrink-0 rounded-xl overflow-hidden snap-start bg-muted cursor-zoom-in"
           >
             <Image

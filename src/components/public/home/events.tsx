@@ -38,7 +38,7 @@ export function Events({ eventos }: Props) {
             {eventos.map((e) => (
               <Link
                 key={e.id}
-                href={`/vitrine/${e.comercioSlug}`}
+                href={`/vitrine/${e.comercioSlug}?src=home_eventos`}
                 className="press shadow-card"
                 style={{
                   width: 280,

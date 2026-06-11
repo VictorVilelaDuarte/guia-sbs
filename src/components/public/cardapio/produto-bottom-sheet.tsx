@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trackCtx } from "@/lib/analytics/track";
 
 const DIAMOND = "✦";
 
@@ -69,6 +70,8 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
     if (produto) {
       setDisplayed(produto);
       setCarouselIndex(0);
+      // no-op fora de páginas de comércio (contexto setado pelo VitrineTracker)
+      trackCtx("item_view", { meta: { itemId: produto.id, titulo: produto.titulo } });
       const raf = requestAnimationFrame(() => setIsVisible(true));
       return () => cancelAnimationFrame(raf);
     } else {

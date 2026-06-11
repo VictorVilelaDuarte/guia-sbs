@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DashboardTabs } from "@/components/comerciante/dashboard-tabs"
+import { getAnalyticsResumo } from "@/lib/analytics/queries"
 import { LogOut, MapPin, Store } from "lucide-react"
 
 const statusVariants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
@@ -61,6 +62,8 @@ export default async function ComercinateDashboard() {
       select: { id: true, nome: true, categoria: true },
     }),
   ])
+
+  const analytics = comercio ? await getAnalyticsResumo(comercio.id) : null
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -119,7 +122,11 @@ export default async function ComercinateDashboard() {
               </div>
             </div>
 
-            <DashboardTabs comercio={comercio} subcategoriasDisponiveis={subcategoriasDisponiveis} />
+            <DashboardTabs
+              comercio={comercio}
+              subcategoriasDisponiveis={subcategoriasDisponiveis}
+              analytics={analytics!}
+            />
           </div>
         )}
       </main>

@@ -24,6 +24,7 @@ export function SecaoContato({ telefone, whatsapp, email, website, instagram }: 
         {telefone && (
           <a
             href={`tel:${telefone.replace(/\D/g, "")}`}
+            data-track="click_ligar"
             className="flex items-center gap-3 text-sm hover:text-primary transition-colors"
           >
             <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -33,6 +34,7 @@ export function SecaoContato({ telefone, whatsapp, email, website, instagram }: 
         {whatsapp && (
           <a
             href={`https://wa.me/55${whatsapp.replace(/\D/g, "")}`}
+            data-track="click_whatsapp"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 text-sm hover:text-primary transition-colors"
@@ -53,6 +55,7 @@ export function SecaoContato({ telefone, whatsapp, email, website, instagram }: 
         {website && (
           <a
             href={website.startsWith("http") ? website : `https://${website}`}
+            data-track="click_site"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 text-sm hover:text-primary transition-colors"
@@ -64,6 +67,7 @@ export function SecaoContato({ telefone, whatsapp, email, website, instagram }: 
         {instagram && (
           <a
             href={`https://instagram.com/${instagram.replace("@", "")}`}
+            data-track="click_instagram"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 text-sm hover:text-primary transition-colors"
