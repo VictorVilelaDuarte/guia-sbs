@@ -167,7 +167,7 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 - **`Footer`** — rodapé com curva `FooterTopCurve from="var(--sand-1)"` fixa (neutro para qualquer fundo de página)
 - **`BottomNav`** — barra de navegação fixa no rodapé, estilo app mobile
 
-**`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` acende em qualquer rota `/pontos-turisticos/*`, `"map"` acende em `/mapa`. O item `"me"` (Você) ainda aponta para `/` provisoriamente — pendente de substituição por uma página real. Rotas listadas em `HIDDEN_PREFIXES` (hoje: `/para-comerciantes`) retornam `null` — o nav some sem tirar a página do route group (que ainda fornece o Footer).
+**`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` em `/pontos-turisticos/*`, `"map"` em `/mapa`, `"cidade"` em `/sao-bento-do-sapucai`. O item "Você" foi substituído por **"A cidade"** (2026-06-11) — quando favoritos/avaliações existirem, "Você" pode voltar como quinto item. O `Header` desktop da home espelha os mesmos itens (`IconLandmark` em `icons.tsx`). Rotas listadas em `HIDDEN_PREFIXES` (hoje: `/para-comerciantes`) retornam `null` — o nav some sem tirar a página do route group (que ainda fornece o Footer).
 
 **`Footer`** (`src/components/public/home/footer.tsx`) renderiza a curva de transição com `from="var(--footer-curve-from, var(--sand-1))"`. O fallback é `sand-1`, que é o esperado por todas as páginas. A home page computa `footerFrom` dinamicamente no servidor e sobrescreve via `<style>{`:root { --footer-curve-from: ${footerFrom}; }`}</style>` — a tag `<style>` é removida automaticamente pelo Next.js na navegação para outras rotas. A lógica: `pontos.length > 0 → sand-1` (última seção é Pontos), `eventos.length > 0 → sand-2` (última seção é Events), caso contrário `sand-1`. Qualquer página que termine em cor diferente de `sand-1` deve usar esse padrão de CSS var ou adicionar um `<Wave>` ao final do conteúdo. Nunca passe props diretos ao `Footer` para mudar a cor.
 
@@ -376,6 +376,17 @@ src/app/(public)/comercios/
 **Paginação:** `PAGE_SIZE = 12`. URL usa `?page=N` preservando `?categoria` e `?subcategoria`. A função `pageUrl()` monta a URL corretamente para todos os casos. A ordenação "abertos primeiro" é aplicada client-side dentro da página atual (não afeta a estabilidade da paginação pois o skip/take é feito por nome no DB).
 
 **Filtros:** sem categoria → chips de categoria. Com categoria → chips de subcategoria (buscados via Prisma filtrados por `categoriaFiltro`). Subcategoria inválida ou não pertencente à categoria é ignorada.
+
+### Página da cidade (`/sao-bento-do-sapucai`)
+
+Página "A cidade" do BottomNav — peça de topo de funil da Fase 3 do SEO (slug rico em keyword
+de propósito; o menu exibe "A cidade"). Server Component único em
+`(public)/sao-bento-do-sapucai/page.tsx`, `revalidate = 3600`. Seções: hero com foto, "A
+cidade" (história/Pedra do Baú), faixa de fotos (`h-scroll` com assets), "Como chegar"
+(distâncias), "Quando ir" (por estação), "O que fazer" (grid com até 6 pontos turísticos
+reais do banco + links pro mapa e listagem), "Sabores da serra" (CTA para
+`/comercios?categoria=ALIMENTACAO`). Emite JSON-LD `TouristDestination` (com
+`includesAttraction` dos pontos) + breadcrumb; está no sitemap com prioridade 0.9.
 
 ### Eventos da cidade (`/eventos`)
 

@@ -2,15 +2,15 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Mountain, Home, Map, User } from "lucide-react"
+import { Mountain, Home, Map, Landmark } from "lucide-react"
 
-export type NavId = "home" | "map" | "pt" | "me"
+export type NavId = "home" | "map" | "pt" | "cidade"
 
 const NAV_ITEMS = [
-  { id: "home", label: "Início",           href: "/",                   Glyph: Home     },
-  { id: "map",  label: "Mapa",             href: "/mapa",               Glyph: Map      },
-  { id: "pt",   label: "Pontos Turísticos",href: "/pontos-turisticos",  Glyph: Mountain },
-  { id: "me",   label: "Você",             href: "/",                   Glyph: User     },
+  { id: "home",   label: "Início",           href: "/",                      Glyph: Home     },
+  { id: "map",    label: "Mapa",             href: "/mapa",                  Glyph: Map      },
+  { id: "pt",     label: "Pontos Turísticos",href: "/pontos-turisticos",     Glyph: Mountain },
+  { id: "cidade", label: "A cidade",         href: "/sao-bento-do-sapucai",  Glyph: Landmark },
 ]
 
 // Rotas do (public) onde o nav flutuante não deve aparecer — a landing de venda
@@ -26,6 +26,7 @@ export function BottomNav() {
     if (id === "pt") return pathname.startsWith("/pontos-turisticos")
     if (id === "home") return pathname === "/"
     if (id === "map") return pathname.startsWith("/mapa")
+    if (id === "cidade") return pathname.startsWith("/sao-bento-do-sapucai")
     return false
   }
 

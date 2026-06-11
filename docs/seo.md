@@ -98,11 +98,11 @@ Fichas de comércio não rankeiam para "bate-volta de SP" — conteúdo editoria
   `/comercios/hospedagem`), cada uma com H1 próprio, parágrafo introdutório e a listagem.
   Query params rankeiam mal; rotas dedicadas com conteúdo rankeiam bem. As rotas entram
   no sitemap.
-- **Página "Sobre a cidade"** (`/sobre` ou `/sao-bento-do-sapucai`): história, como chegar
-  (distâncias de SP/Campinas/aeroportos), quando ir (clima por estação), principais
-  atrações (interlinkando os pontos turísticos), gastronomia local (truta, pinhão),
-  galeria. Captura o topo do funil — quem pesquisa a cidade antes de decidir a viagem —
-  e constrói autoridade temática do domínio inteiro.
+- **Página "Sobre a cidade"** — ✅ implementada (2026-06-11) em `/sao-bento-do-sapucai`
+  (slug rico em keyword) e promovida a item fixo do BottomNav ("A cidade") — link interno em
+  todas as páginas. História, como chegar, quando ir, atrações interlinkando os pontos
+  turísticos reais, gastronomia e galeria; JSON-LD `TouristDestination`. Revisar/expandir o
+  texto conforme o guia crescer.
 - **Seção editorial `/guia/[slug]`**: artigos como "Bate-volta de SP: roteiro de 1 dia",
   "O que fazer em São Bento do Sapucaí", "Onde ficar na Mantiqueira", "Guia da Pedra do
   Baú". Cada artigo interlinha vitrines e pontos do sistema (o conteúdo trabalha duplo:

@@ -59,6 +59,13 @@ export function IconUser(p: React.SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+export function IconLandmark(p: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2L3 7h18l-9-5z"/>
+    </svg>
+  )
+}
 export function IconPlate(p: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...p}>

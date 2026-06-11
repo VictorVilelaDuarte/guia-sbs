@@ -1,4 +1,4 @@
-import { IconPeak, IconSearch, IconHome, IconMap, IconHeart, IconUser } from "./icons"
+import { IconPeak, IconSearch, IconHome, IconMap, IconLandmark } from "./icons"
 import type { NavId } from "./bottom-nav"
 
 interface HeaderProps {
@@ -10,7 +10,7 @@ const NAV_ITEMS: { id: NavId; label: string; Glyph: (p: React.SVGProps<SVGSVGEle
   { id: "home", label: "Início", Glyph: IconHome },
   { id: "map",  label: "Mapa",   Glyph: IconMap },
   { id: "pt",   label: "Pontos Turísticos", Glyph: IconPeak },
-  { id: "me",   label: "Você",   Glyph: IconUser },
+  { id: "cidade", label: "A cidade", Glyph: IconLandmark },
 ]
 
 export function Header({ activeNav, onNavChange }: HeaderProps) {

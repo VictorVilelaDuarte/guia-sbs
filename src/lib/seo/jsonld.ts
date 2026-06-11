@@ -191,6 +191,31 @@ export function breadcrumbJsonLd(itens: { nome: string; url: string }[]) {
   }
 }
 
+// Página "A cidade" (/sao-bento-do-sapucai) — TouristDestination é o tipo
+// schema.org para destinos turísticos; inclui as atrações como referência.
+export function cidadeJsonLd(opts: {
+  imagens: string[]
+  atracoes: { nome: string; slug: string }[]
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "TouristDestination",
+    "@id": `${SITE_URL}/sao-bento-do-sapucai`,
+    name: CIDADE,
+    description:
+      "Cidade turística na Serra da Mantiqueira, interior de São Paulo — montanhas, trilhas, cachoeiras, gastronomia de serra e a Pedra do Baú.",
+    url: `${SITE_URL}/sao-bento-do-sapucai`,
+    image: opts.imagens.length > 0 ? opts.imagens : undefined,
+    geo: { "@type": "GeoCoordinates", latitude: -22.6989, longitude: -45.7281 },
+    address: { "@type": "PostalAddress", addressLocality: CIDADE, addressRegion: "SP", addressCountry: "BR" },
+    includesAttraction: opts.atracoes.map((a) => ({
+      "@type": "TouristAttraction",
+      name: a.nome,
+      url: `${SITE_URL}/pontos-turisticos/${a.slug}`,
+    })),
+  }
+}
+
 export function websiteJsonLd() {
   return {
     "@context": "https://schema.org",
