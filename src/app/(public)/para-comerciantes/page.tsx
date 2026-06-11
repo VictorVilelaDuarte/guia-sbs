@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import {
-  Sparkles, Camera, Clock, MapPin, UtensilsCrossed,
-  Calendar, ShoppingBag, Phone, Star, BarChart2,
-  QrCode, Check, ArrowRight, Globe, Zap, ScanText, BrainCircuit,
+  Sparkles, Star, Check, ArrowRight,
+  Zap, ScanText, BrainCircuit, Search, Compass,
 } from "lucide-react";
 import { Wave } from "@/components/public/home/waves";
 import { AiDemo } from "./_components/ai-demo";
 import { RotatingQuery } from "./_components/rotating-query";
+import { FeaturesList } from "./_components/features-list";
 
 export const metadata: Metadata = {
   title: "Para Comerciantes | Guia SBS",
-  description: "Cadastre seu negócio no principal guia digital de São Bento do Sapucaí e apareça para turistas com busca por inteligência artificial.",
+  description: "Vitrine completa, cardápio digital, eventos, mapa interativo e busca por IA — apareça no Google e seja encontrado pelos turistas de São Bento do Sapucaí.",
 };
 
 const DOT_GRID = "radial-gradient(rgba(245,240,232,.055) 1px, transparent 1px)";
@@ -29,21 +30,47 @@ const CAPABILITIES = [
   { icon: ScanText,     title: "Contexto inteligente",     desc: "Entende categoria, tipo de negócio e o que está aberto" },
 ];
 
-const FEATURES = [
-  { icon: Globe,           title: "URL própria",            desc: "Perfil em guiasbs.com.br/vitrine/seu-negocio" },
-  { icon: Camera,          title: "Galeria de fotos",       desc: "Mostre o ambiente, os pratos, os produtos" },
-  { icon: Clock,           title: "Horários em tempo real", desc: "O turista vê se você está aberto agora" },
-  { icon: UtensilsCrossed, title: "Cardápio digital",       desc: "Categorias, itens, fotos e variações de preço" },
-  { icon: ShoppingBag,     title: "Catálogo de produtos",   desc: "Produtos e serviços com foto e descrição" },
-  { icon: Calendar,        title: "Eventos",                desc: "Divulgue shows, promoções e eventos especiais" },
-  { icon: MapPin,          title: "Localização no mapa",    desc: "Endereço com mapa e botão Como chegar" },
-  { icon: Phone,           title: "Contato direto",         desc: "WhatsApp, Instagram, telefone e site" },
+// Os três canais de aquisição que o guia oferece ao comerciante — a narrativa
+// central da página: o cliente chega antes da viagem (Google), na dúvida
+// (busca por IA) e durante o passeio (guia + mapa).
+const CANAIS = [
+  {
+    icon: Search,
+    label: "ANTES DA VIAGEM",
+    title: "Encontrado no Google",
+    img: "/assets/home/sbs.jpg",
+    alt: "Vista de São Bento do Sapucaí",
+    desc: "O guia é construído para aparecer bem no Google. Quando alguém pesquisa “pousada na Serra da Mantiqueira” ou “onde comer em São Bento do Sapucaí”, encontra o guia — e, dentro dele, o seu negócio, com fotos, horários e endereço.",
+    impact: "Clientes chegam até você antes mesmo de decidirem a viagem — sem gastar um real em anúncio.",
+  },
+  {
+    icon: BrainCircuit,
+    label: "NA HORA DA DÚVIDA",
+    title: "Recomendado pela IA",
+    img: "/assets/categorias/alimentacao.jpg",
+    alt: "Gastronomia de São Bento do Sapucaí",
+    desc: "A busca por inteligência artificial entende a pergunta do turista — “onde comer uma truta?”, “o que fazer com chuva?” — e recomenda os negócios certos, considerando até quem está aberto naquele momento.",
+    impact: "Quanto mais completo o seu perfil, mais vezes a IA recomenda você.",
+  },
+  {
+    icon: Compass,
+    label: "DURANTE O PASSEIO",
+    title: "Na mão de quem já está na cidade",
+    img: "/assets/categorias/turismo.jpg",
+    alt: "Pedra do Baú e trilhas da região",
+    desc: "O turista vem pelo passeio — Pedra do Baú, trilhas, cachoeiras — e fica navegando no guia: página inicial com destaques e “abertos agora”, eventos, categorias e o mapa interativo com “perto de mim”.",
+    impact: "O guia atrai o público com o passeio — e entrega esse público para o seu negócio.",
+  },
 ];
+
+// Os recursos detalhados (com linhas de impacto, fotos e animação de reveal)
+// vivem em _components/features-list.tsx — ícones não são serializáveis como
+// props de Server → Client Component.
 
 const STEPS = [
   { n: "1", title: "Cadastre seu negócio",    desc: "Crie seu perfil em minutos. Grátis, sem compromisso." },
-  { n: "2", title: "Personalize sua vitrine", desc: "Adicione fotos, horários, cardápio e informações de contato." },
-  { n: "3", title: "Seja encontrado pela IA", desc: "Turistas e moradores encontram seu negócio em linguagem natural." },
+  { n: "2", title: "Personalize sua vitrine", desc: "Adicione fotos, horários, cardápio, eventos e palavras-chave." },
+  { n: "3", title: "Seja encontrado",         desc: "No Google, na busca por IA e no mapa — clientes chegam por todos os caminhos." },
 ];
 
 const FREE_FEATURES = [
@@ -52,6 +79,7 @@ const FREE_FEATURES = [
   "Horários de funcionamento",
   "Localização no mapa",
   "Contato (WhatsApp, Instagram, telefone)",
+  "Até 5 palavras-chave",
 ];
 
 const PREMIUM_FEATURES = [
@@ -60,6 +88,7 @@ const PREMIUM_FEATURES = [
   "Cardápio digital completo",
   "Catálogo de produtos e serviços",
   "Criação e divulgação de eventos",
+  "Destaque na página inicial do guia",
   "Destaque na busca por IA",
   "Analytics de visualizações e cliques",
   "QR Code personalizado do perfil",
@@ -287,10 +316,10 @@ export default function ParaComerciantesPage() {
       <Wave from="var(--ink)" to="var(--sand-1)" />
 
       {/* ══════════════════════════════════════
-          BANDA CLARA — Features + Planos
+          BANDA CLARA — Canais + Features + Planos
           ══════════════════════════════════════ */}
 
-      {/* ── FEATURES ── */}
+      {/* ── OS 3 CAMINHOS ATÉ O CLIENTE ── */}
       <section style={{ padding: "72px 24px", background: "var(--sand-1)" }}>
         <div style={{ maxWidth: 560, margin: "0 auto" }}>
           <h2 className="serif" style={{
@@ -298,67 +327,75 @@ export default function ParaComerciantesPage() {
             fontWeight: 700, color: "var(--ink)",
             letterSpacing: "-0.03em", margin: "0 0 8px",
           }}>
-            Tudo que seu negócio precisa
+            Três caminhos levam o cliente até você
           </h2>
           <p style={{ color: "var(--ink-2)", fontSize: 15, margin: "0 0 36px", lineHeight: 1.6 }}>
-            Um perfil completo que transforma visitantes em clientes.
+            Antes da viagem, na hora da dúvida e durante o passeio — o guia trabalha pelo seu negócio o tempo todo.
           </p>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
-            {FEATURES.map(({ icon: Icon, title, desc }) => (
-              <div key={title} style={{
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {CANAIS.map(({ icon: Icon, label, title, img, alt, desc, impact }) => (
+              <div key={title} className="shadow-soft" style={{
                 background: "var(--sand-2)",
-                borderRadius: 18, padding: "18px 16px",
+                borderRadius: 20,
                 border: "1px solid rgba(212,201,176,.5)",
+                overflow: "hidden",
               }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: 10,
-                  background: "rgba(196,135,58,.1)",
-                  display: "grid", placeItems: "center",
-                  marginBottom: 12, color: "var(--terra)",
-                }}>
-                  <Icon size={18} />
+                {/* Faixa de foto */}
+                <div style={{ position: "relative", height: 116 }}>
+                  <Image
+                    src={img}
+                    alt={alt}
+                    fill
+                    sizes="(max-width: 600px) 100vw, 560px"
+                    style={{ objectFit: "cover" }}
+                  />
+                  <div style={{
+                    position: "absolute", inset: 0,
+                    background: "linear-gradient(to top, rgba(26,13,4,.6), rgba(26,13,4,.05) 60%)",
+                  }} />
+                  <div style={{
+                    position: "absolute", left: 16, bottom: 12,
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    background: "rgba(26,13,4,.55)",
+                    backdropFilter: "blur(4px)",
+                    border: "1px solid rgba(245,240,232,.18)",
+                    borderRadius: 999, padding: "4px 11px",
+                  }}>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: "var(--amber-soft)", letterSpacing: ".09em" }}>
+                      {label}
+                    </span>
+                  </div>
                 </div>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink)", marginBottom: 4, lineHeight: 1.2 }}>
-                  {title}
-                </div>
-                <div style={{ fontSize: 12, color: "var(--ink-2)", lineHeight: 1.5 }}>
-                  {desc}
-                </div>
-              </div>
-            ))}
-          </div>
 
-          {/* Em breve */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginTop: 12 }}>
-            {[
-              { icon: BarChart2, title: "Analytics",  desc: "Visualizações e cliques do perfil" },
-              { icon: QrCode,    title: "QR Code",    desc: "QR personalizado para impressão" },
-            ].map(({ icon: Icon, title, desc }) => (
-              <div key={title} style={{
-                background: "var(--sand-2)",
-                borderRadius: 18, padding: "18px 16px",
-                border: "1px solid rgba(212,201,176,.4)",
-                opacity: 0.7, position: "relative",
-              }}>
-                <div style={{
-                  position: "absolute", top: 12, right: 12,
-                  background: "rgba(196,135,58,.12)", color: "var(--terra)",
-                  fontSize: 9, fontWeight: 700,
-                  padding: "2px 7px", borderRadius: 999, letterSpacing: ".05em",
-                }}>
-                  EM BREVE
+                <div style={{ padding: "16px 20px 20px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                    <div style={{
+                      width: 42, height: 42, borderRadius: 12,
+                      background: "var(--ink)",
+                      display: "grid", placeItems: "center",
+                      color: "var(--amber-soft)", flexShrink: 0,
+                    }}>
+                      <Icon size={20} />
+                    </div>
+                    <div style={{ fontSize: 16.5, fontWeight: 700, color: "var(--ink)", lineHeight: 1.2 }}>
+                      {title}
+                    </div>
+                  </div>
+                  <p style={{ fontSize: 13.5, color: "var(--ink-2)", lineHeight: 1.65, margin: 0 }}>
+                    {desc}
+                  </p>
+                  <div style={{
+                    display: "flex", gap: 8, alignItems: "flex-start",
+                    marginTop: 12, paddingTop: 12,
+                    borderTop: "1px dashed rgba(196,135,58,.4)",
+                  }}>
+                    <ArrowRight size={14} style={{ color: "var(--terra)", marginTop: 2, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12.5, color: "var(--terra)", fontWeight: 600, lineHeight: 1.5, fontStyle: "italic" }}>
+                      {impact}
+                    </span>
+                  </div>
                 </div>
-                <div style={{
-                  width: 38, height: 38, borderRadius: 10,
-                  background: "rgba(0,0,0,.04)",
-                  display: "grid", placeItems: "center",
-                  marginBottom: 12, color: "var(--muted)",
-                }}>
-                  <Icon size={18} />
-                </div>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--ink-2)", marginBottom: 4 }}>{title}</div>
-                <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.5 }}>{desc}</div>
               </div>
             ))}
           </div>
@@ -367,8 +404,28 @@ export default function ParaComerciantesPage() {
 
       <Wave from="var(--sand-1)" to="var(--sand-2)" />
 
-      {/* ── COMO FUNCIONA ── */}
+      {/* ── VITRINE COMPLETA (todos os recursos, sempre visíveis) ── */}
       <section style={{ padding: "72px 24px", background: "var(--sand-2)" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto" }}>
+          <h2 className="serif" style={{
+            fontSize: "clamp(1.5rem, 5vw, 2.2rem)",
+            fontWeight: 700, color: "var(--ink)",
+            letterSpacing: "-0.03em", margin: "0 0 8px",
+          }}>
+            Tudo que seu negócio precisa para vender mais
+          </h2>
+          <p style={{ color: "var(--ink-2)", fontSize: 15, margin: "0 0 36px", lineHeight: 1.6 }}>
+            Cada recurso existe por um motivo: transformar quem visita o guia em cliente na sua porta.
+          </p>
+
+          <FeaturesList />
+        </div>
+      </section>
+
+      <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
+
+      {/* ── COMO FUNCIONA ── */}
+      <section style={{ padding: "72px 24px", background: "var(--sand-1)" }}>
         <div style={{ maxWidth: 460, margin: "0 auto" }}>
           <h2 className="serif" style={{
             fontSize: "clamp(1.5rem, 5vw, 2.2rem)",
@@ -412,10 +469,10 @@ export default function ParaComerciantesPage() {
         </div>
       </section>
 
-      <Wave from="var(--sand-2)" to="var(--sand-1)" flip />
+      <Wave from="var(--sand-1)" to="var(--sand-2)" />
 
       {/* ── PLANOS ── */}
-      <section style={{ padding: "72px 24px", background: "var(--sand-1)" }}>
+      <section style={{ padding: "72px 24px", background: "var(--sand-2)" }}>
         <div style={{ maxWidth: 560, margin: "0 auto" }}>
           <h2 className="serif" style={{
             fontSize: "clamp(1.5rem, 5vw, 2.2rem)",
@@ -432,7 +489,7 @@ export default function ParaComerciantesPage() {
 
             {/* Grátis */}
             <div style={{
-              background: "var(--sand-2)",
+              background: "var(--sand-1)",
               borderRadius: 22, padding: "26px 22px",
               border: "1px solid rgba(212,201,176,.6)",
             }}>
@@ -515,7 +572,7 @@ export default function ParaComerciantesPage() {
         </div>
       </section>
 
-      <Wave from="var(--sand-1)" to="var(--ink)" />
+      <Wave from="var(--sand-2)" to="var(--ink)" />
 
       {/* ── CTA FINAL ── */}
       <section style={{

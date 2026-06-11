@@ -13,8 +13,14 @@ const NAV_ITEMS = [
   { id: "me",   label: "Você",             href: "/",                   Glyph: User     },
 ]
 
+// Rotas do (public) onde o nav flutuante não deve aparecer — a landing de venda
+// fala com o comerciante, não com o visitante do guia, e tem CTAs próprios.
+const HIDDEN_PREFIXES = ["/para-comerciantes"]
+
 export function BottomNav() {
   const pathname = usePathname()
+
+  if (HIDDEN_PREFIXES.some((p) => pathname.startsWith(p))) return null
 
   function isActive(_href: string, id: string): boolean {
     if (id === "pt") return pathname.startsWith("/pontos-turisticos")

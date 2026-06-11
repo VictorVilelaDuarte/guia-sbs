@@ -166,7 +166,7 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 - **`Footer`** — rodapé com curva `FooterTopCurve from="var(--sand-1)"` fixa (neutro para qualquer fundo de página)
 - **`BottomNav`** — barra de navegação fixa no rodapé, estilo app mobile
 
-**`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` acende em qualquer rota `/pontos-turisticos/*`, `"map"` acende em `/mapa`. O item `"me"` (Você) ainda aponta para `/` provisoriamente — pendente de substituição por uma página real.
+**`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` acende em qualquer rota `/pontos-turisticos/*`, `"map"` acende em `/mapa`. O item `"me"` (Você) ainda aponta para `/` provisoriamente — pendente de substituição por uma página real. Rotas listadas em `HIDDEN_PREFIXES` (hoje: `/para-comerciantes`) retornam `null` — o nav some sem tirar a página do route group (que ainda fornece o Footer).
 
 **`Footer`** (`src/components/public/home/footer.tsx`) renderiza a curva de transição com `from="var(--footer-curve-from, var(--sand-1))"`. O fallback é `sand-1`, que é o esperado por todas as páginas. A home page computa `footerFrom` dinamicamente no servidor e sobrescreve via `<style>{`:root { --footer-curve-from: ${footerFrom}; }`}</style>` — a tag `<style>` é removida automaticamente pelo Next.js na navegação para outras rotas. A lógica: `pontos.length > 0 → sand-1` (última seção é Pontos), `eventos.length > 0 → sand-2` (última seção é Events), caso contrário `sand-1`. Qualquer página que termine em cor diferente de `sand-1` deve usar esse padrão de CSS var ou adicionar um `<Wave>` ao final do conteúdo. Nunca passe props diretos ao `Footer` para mudar a cor.
 
@@ -495,6 +495,12 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
   está pausado até o sistema estar mais populado. **Plano de design completo e decisões fechadas
   em [`docs/busca-inteligente.md`](docs/busca-inteligente.md)** — consultar antes de iniciar
   qualquer fase.
+- **SEO eficiente** — canal de aquisição mais importante do guia: dominar o Google para
+  queries sobre a cidade ("restaurante em São Bento do Sapucaí") e de descoberta ("bate-volta
+  de SP", "pousada nas montanhas"). Fundação técnica (sitemap, robots, metadata na vitrine),
+  JSON-LD (`LocalBusiness`, `TouristAttraction`, `Event`), rotas estáticas de categoria,
+  página "Sobre a cidade" e seção editorial `/guia`. **Plano completo em
+  [`docs/seo.md`](docs/seo.md)** — consultar antes de iniciar qualquer fase.
 - ~~Página pública de listagem de comércios por categoria~~ — implementada
 - Página pública de eventos da cidade (`/eventos`)
 - ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)
@@ -513,16 +519,43 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 ```
 ink (hero + AI section — banda única contínua)
   Wave ink → sand-1
-sand-1 (features)
+sand-1 (canais — "três caminhos até o cliente": Google/SEO, IA, guia+mapa)
   Wave sand-1 → sand-2
-sand-2 (como funciona)
+sand-2 (vitrine completa — features detalhadas, cada uma com desc + linha de impacto)
   Wave sand-2 → sand-1 flip
-sand-1 (planos)
-  Wave sand-1 → ink
+sand-1 (como funciona)
+  Wave sand-1 → sand-2
+sand-2 (planos)
+  Wave sand-2 → ink
 ink (CTA final)
   Wave ink → sand-1
 Footer
 ```
+
+**Narrativa de venda:** a página vende os três canais de aquisição (`CANAIS` no `page.tsx`,
+cada card com faixa de foto de `/assets`: antes da viagem via Google, na dúvida via busca por
+IA, durante o passeio via guia/mapa) e depois detalha cada recurso (`FEATURES`) com uma linha
+de **impacto** — o argumento concreto para o comerciante ("Mudou o preço? Atualiza na hora, sem
+reimprimir nada"). Tudo é apresentado como recurso existente — sem selos "em breve": analytics
+e QR Code estarão prontos até o lançamento (decisão de 2026-06-11). Ao adicionar features novas
+ao produto, adicionar o item correspondente em `FEATURES` com sua linha de impacto.
+
+> **Decisão de design (2026-06-11):** a lista de recursos é **integralmente visível** — sem
+> carrosséis, auto-rotação ou mockup de celular. Versões com "feature explorer" rotativo e
+> phone mock foram testadas e rejeitadas: itens de venda não podem ficar escondidos atrás de
+> interação, e o `scrollIntoView` do auto-avanço fazia a página pular para a seção. Animação
+> permitida: só de **entrada** (scroll reveal), nunca escondendo conteúdo.
+
+- **`features-list.tsx`** — Client Component. Lista completa dos recursos com scroll-reveal por
+  IntersectionObserver (classes globais `.reveal`/`.reveal-in`, ícone com `icon-pop`, seta com
+  `arrow-nudge` — todas com fallback `prefers-reduced-motion`). Cards visuais têm `thumb` (foto
+  única rotacionada) ou `stack` (pilha de mini-fotos) de `/assets`; o card "Aberto agora" usa o
+  `pulse-dot` real do produto. **O array `FEATURES` vive aqui** — ícones não são serializáveis
+  de Server → Client Component. Ao adicionar features novas ao produto, adicionar o item neste
+  array com sua linha de impacto.
+- A classe global `.fade-up` (globals.css) anima entrada de painéis — utilitário disponível.
+- O ícone `Instagram` **não existe** no lucide-react do projeto (brand icons removidos) — usar
+  `IconInstagram` de `(public)/vitrine/[slug]/_components/icon-instagram.tsx`.
 
 **`DOT_GRID`** — constante de background (`radial-gradient` de pontos) aplicada em todas as seções escuras (hero, AI section, card Premium, CTA final) para textura futurista:
 ```ts
