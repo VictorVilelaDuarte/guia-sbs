@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  Sparkles, Star, Check, ArrowRight,
+  Sparkles, Check, ArrowRight,
   Zap, ScanText, BrainCircuit, Search, Compass,
+  Store, Mountain, Calendar, Map, Magnet,
 } from "lucide-react";
 import { Wave } from "@/components/public/home/waves";
 import { AiDemo } from "./_components/ai-demo";
@@ -11,8 +12,8 @@ import { RotatingQuery } from "./_components/rotating-query";
 import { FeaturesList } from "./_components/features-list";
 
 export const metadata: Metadata = {
-  title: "Para Comerciantes | Guia SBS",
-  description: "Vitrine completa, cardápio digital, eventos, mapa interativo e busca por IA — apareça no Google e seja encontrado pelos turistas de São Bento do Sapucaí.",
+  title: "Para Comerciantes | AIRotas — São Bento do Sapucaí",
+  description: "AIRotas: vitrine completa, cardápio digital, eventos, mapa interativo e busca por IA — apareça no Google e seja encontrado pelos turistas de São Bento do Sapucaí.",
 };
 
 const DOT_GRID = "radial-gradient(rgba(245,240,232,.055) 1px, transparent 1px)";
@@ -112,10 +113,10 @@ export default function ParaComerciantesPage() {
         overflow: "hidden",
       }}>
         {/* Glows */}
-        <div style={{
+        <div className="aurora-drift" style={{
           position: "absolute", top: -140, right: -100,
           width: 500, height: 500, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(196,135,58,.11) 0%, transparent 65%)",
+          background: "radial-gradient(circle, rgba(196,135,58,.13) 0%, transparent 65%)",
           pointerEvents: "none",
         }} />
         <div style={{
@@ -128,17 +129,28 @@ export default function ParaComerciantesPage() {
 
         <div style={{ maxWidth: 520, margin: "0 auto", position: "relative" }}>
 
-          {/* Badge */}
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: 7,
-            background: "rgba(196,135,58,.13)",
-            border: "1px solid rgba(196,135,58,.28)",
-            borderRadius: 999, padding: "5px 14px", marginBottom: 28,
-          }}>
-            <Star size={11} fill="currentColor" style={{ color: "var(--amber)" }} />
-            <span style={{ color: "var(--amber-soft)", fontSize: 12, fontWeight: 600, letterSpacing: ".05em" }}>
-              Guia SBS · São Bento do Sapucaí
-            </span>
+          {/* Marca */}
+          <div style={{ marginBottom: 30 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <Sparkles size={19} style={{ color: "var(--amber)" }} />
+              <span
+                className="serif text-shimmer"
+                style={{ fontSize: 31, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1 }}
+              >
+                AIRotas
+              </span>
+            </div>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8, marginTop: 8,
+            }}>
+              <div style={{ width: 26, height: 1, background: "rgba(196,135,58,.55)" }} />
+              <span style={{
+                color: "rgba(245,240,232,.55)",
+                fontSize: 10.5, fontWeight: 700, letterSpacing: ".22em",
+              }}>
+                SÃO BENTO DO SAPUCAÍ
+              </span>
+            </div>
           </div>
 
           {/* Headline */}
@@ -158,7 +170,7 @@ export default function ParaComerciantesPage() {
             color: "var(--sand-2)", fontSize: 16, lineHeight: 1.7,
             margin: "0 0 32px", maxWidth: 420,
           }}>
-            O Guia SBS usa inteligência artificial para conectar turistas aos melhores estabelecimentos de São Bento do Sapucaí — em linguagem natural, em tempo real.
+            O AIRotas usa inteligência artificial para conectar turistas aos melhores estabelecimentos de São Bento do Sapucaí — em linguagem natural, em tempo real.
           </p>
 
           {/* Rotating query */}
@@ -399,6 +411,95 @@ export default function ParaComerciantesPage() {
               </div>
             ))}
           </div>
+
+          {/* ── A CIDADE NA PALMA DA MÃO (ímã de turistas) ── */}
+          <div style={{ marginTop: 64 }}>
+            {/* Colagem de fotos */}
+            <div style={{
+              display: "flex", justifyContent: "center",
+              gap: 0, marginBottom: 28, padding: "8px 0",
+            }}>
+              {[
+                { src: "/assets/categorias/turismo.jpg",        alt: "Pedra do Baú",            rot: -6 },
+                { src: "/assets/categorias/alimentacao.jpg",    alt: "Gastronomia local",        rot: 4 },
+                { src: "/assets/categorias/hospedagem.jpg",     alt: "Hospedagem na serra",      rot: -3 },
+                { src: "/assets/categorias/entretenimento.jpg", alt: "Eventos e entretenimento", rot: 6 },
+              ].map(({ src, alt, rot }, i) => (
+                <div
+                  key={src}
+                  className="shadow-card"
+                  style={{
+                    position: "relative",
+                    width: 84, height: 102,
+                    borderRadius: 12, overflow: "hidden",
+                    border: "3px solid #fff",
+                    transform: `rotate(${rot}deg)`,
+                    marginLeft: i === 0 ? 0 : -14,
+                    zIndex: i % 2 === 0 ? 2 : 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  <Image src={src} alt={alt} fill sizes="84px" style={{ objectFit: "cover" }} />
+                </div>
+              ))}
+            </div>
+
+            <h3 className="serif" style={{
+              fontSize: "clamp(1.35rem, 4.5vw, 1.8rem)",
+              fontWeight: 700, color: "var(--ink)",
+              letterSpacing: "-0.03em", margin: "0 0 10px",
+              textAlign: "center",
+            }}>
+              A cidade inteira na palma da mão
+            </h3>
+            <p style={{
+              color: "var(--ink-2)", fontSize: 14.5, lineHeight: 1.7,
+              margin: "0 auto 20px", maxWidth: 480, textAlign: "center",
+            }}>
+              O AIRotas reúne tudo de São Bento num só lugar: comércios com cardápio e fotos,
+              eventos, mapa interativo e os pontos turísticos — Pedra do Baú, trilhas,
+              cachoeiras e mirantes.
+            </p>
+
+            {/* O que o guia reúne */}
+            <div style={{
+              display: "flex", flexWrap: "wrap", gap: 8,
+              justifyContent: "center", marginBottom: 22,
+            }}>
+              {[
+                { icon: Store,    label: "Comércios e cardápios" },
+                { icon: Mountain, label: "Pontos turísticos" },
+                { icon: Calendar, label: "Eventos" },
+                { icon: Map,      label: "Mapa interativo" },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  background: "var(--sand-2)",
+                  border: "1px solid rgba(212,201,176,.6)",
+                  borderRadius: 999, padding: "8px 14px",
+                  fontSize: 12, fontWeight: 700, color: "var(--ink-2)",
+                }}>
+                  <Icon size={13} style={{ color: "var(--terra)" }} />
+                  {label}
+                </div>
+              ))}
+            </div>
+
+            {/* O argumento do ímã */}
+            <div style={{
+              maxWidth: 480, margin: "0 auto",
+              background: "var(--sand-2)",
+              border: "1px dashed rgba(196,135,58,.45)",
+              borderRadius: 16, padding: "16px 18px",
+              display: "flex", gap: 10, alignItems: "flex-start",
+            }}>
+              <Magnet size={16} style={{ color: "var(--terra)", marginTop: 2, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: "var(--terra)", fontWeight: 600, lineHeight: 1.6, fontStyle: "italic" }}>
+                Um guia completo é um ímã de turistas: atrai mais gente para a cidade — e mais
+                gente na cidade significa mais clientes na sua porta.
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -597,12 +698,12 @@ export default function ParaComerciantesPage() {
             letterSpacing: "-0.03em", lineHeight: 1.1,
             margin: "0 0 16px",
           }}>
-            Pronto para aparecer no Guia SBS?
+            Pronto para aparecer no <span className="text-shimmer">AIRotas</span>?
           </h2>
           <p style={{ color: "var(--sand-2)", fontSize: 15, lineHeight: 1.7, margin: "0 0 40px" }}>
             Cadastre seu negócio grátis em minutos e comece a ser encontrado pelos turistas que visitam São Bento do Sapucaí.
           </p>
-          <Link href="/admin/login" style={{
+          <Link href="/admin/login" className="glow-pulse" style={{
             display: "inline-flex", alignItems: "center", gap: 8,
             background: "var(--amber)", color: "#fff",
             padding: "15px 30px", borderRadius: 14,

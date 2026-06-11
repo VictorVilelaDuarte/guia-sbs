@@ -14,6 +14,10 @@ subdomínio — `saobentodosapucai.airotas.com.br`, `guararema.airotas.com.br`, 
 raiz (`airotas.com.br`) vira site institucional/lista de cidades. São Bento do Sapucaí é o
 primeiro tenant e a V1 lança single-tenant.
 
+> **Nota (2026-06-11):** a LP `/para-comerciantes` já usa a marca "AIRotas — São Bento do
+> Sapucaí" (e cita `airotas.com.br/vitrine/...`). O restante do site segue "Guia SBS" até o
+> rebrand global da Fase 2.
+
 **Viabilidade (auditoria de 2026-06-11):** totalmente viável com a estrutura atual — nada na
 arquitetura bloqueia. Complexidade média: o trabalho é volumoso e mecânico, não rearquitetura.
 O que joga a favor: queries centralizadas nos Server Components, `Plan` configurável via DB,

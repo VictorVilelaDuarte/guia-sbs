@@ -519,7 +519,13 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 
 ### Landing page para comerciantes
 
-`/para-comerciantes` — página de venda do produto para lojistas, dentro do route group `(public)/`. Recebe Footer e BottomNav do layout automaticamente.
+`/para-comerciantes` — página de venda do produto para lojistas, dentro do route group `(public)/`. Recebe Footer do layout automaticamente (BottomNav oculto via `HIDDEN_PREFIXES`).
+
+**Marca na LP:** "AIRotas — São Bento do Sapucaí" (decisão de 2026-06-11) — a LP é a única
+superfície com a marca nova por ora; o restante do site segue "Guia SBS" até o rebrand global
+(ver `docs/multitenant.md`). O wordmark do hero usa a classe `text-shimmer` (gradiente animado);
+utilitários futuristas relacionados em globals.css: `text-shimmer`, `glow-pulse` (CTA final),
+`aurora-drift` (glow do hero) — todos com fallback `prefers-reduced-motion`.
 
 **Sequência de cores (Wave entre cada seção):**
 ```
@@ -540,8 +546,10 @@ Footer
 
 **Narrativa de venda:** a página vende os três canais de aquisição (`CANAIS` no `page.tsx`,
 cada card com faixa de foto de `/assets`: antes da viagem via Google, na dúvida via busca por
-IA, durante o passeio via guia/mapa) e depois detalha cada recurso (`FEATURES`) com uma linha
-de **impacto** — o argumento concreto para o comerciante ("Mudou o preço? Atualiza na hora, sem
+IA, durante o passeio via guia/mapa), fecha a banda com o bloco **"A cidade inteira na palma
+da mão"** (colagem de polaroids + chips do ecossistema + box do "ímã de turistas": guia
+completo com pontos turísticos atrai mais gente pra cidade → mais clientes pra todos) e depois
+detalha cada recurso (`FEATURES`) com uma linha de **impacto** — o argumento concreto para o comerciante ("Mudou o preço? Atualiza na hora, sem
 reimprimir nada"). Tudo é apresentado como recurso existente — sem selos "em breve": analytics
 e QR Code estarão prontos até o lançamento (decisão de 2026-06-11). Ao adicionar features novas
 ao produto, adicionar o item correspondente em `FEATURES` com sua linha de impacto.

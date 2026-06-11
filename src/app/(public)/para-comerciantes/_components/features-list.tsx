@@ -23,7 +23,7 @@ const FEATURES: {
   {
     icon: Globe,
     title: "Página própria na internet",
-    desc: "Seu perfil completo em guiasbs.com.br/vitrine/seu-negocio, com visual profissional e link fácil de compartilhar no seu Instagram, WhatsApp e onde mais você divulgar.",
+    desc: "Seu perfil completo em airotas.com.br/vitrine/seu-negocio, com visual profissional e link fácil de compartilhar no seu Instagram, WhatsApp e onde mais você divulgar.",
     impact: "É como ter um site próprio — sem pagar desenvolvedor nem mensalidade de hospedagem.",
     thumb: { src: "/assets/home/sbs.jpg", alt: "São Bento do Sapucaí" },
   },
