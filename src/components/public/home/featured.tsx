@@ -63,7 +63,7 @@ export function Featured({ items }: Props) {
               <div style={{ position: "relative" }}>
                 {coverUrl ? (
                   <div style={{ position: "relative", width: "100%", aspectRatio: "16/9", overflow: "hidden" }}>
-                    <Image src={coverUrl} alt={it.nome} fill className="object-cover" sizes="(max-width: 640px) 100vw, 560px" />
+                    <Image src={coverUrl} alt={`${it.nome} em São Bento do Sapucaí`} fill className="object-cover" sizes="(max-width: 640px) 100vw, 560px" />
                   </div>
                 ) : (
                   <PhotoPH palette={palette(it.slug)} label={it.slug} ratio="16/9" />

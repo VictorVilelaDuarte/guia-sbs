@@ -36,7 +36,7 @@ export function CardComercio({ item: c, categoriaFiltro }: Props) {
         {coverUrl ? (
           <Image
             src={coverUrl}
-            alt={c.nome}
+            alt={`${c.nome} em São Bento do Sapucaí`}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -45,7 +45,7 @@ export function CardComercio({ item: c, categoriaFiltro }: Props) {
           <div className="absolute inset-0 flex items-center justify-center bg-[#f5f0e8]">
             <Image
               src={c.logo}
-              alt={c.nome}
+              alt={`Logo de ${c.nome}`}
               fill
               className="object-contain p-4"
               sizes="(max-width: 640px) 50vw, 25vw"

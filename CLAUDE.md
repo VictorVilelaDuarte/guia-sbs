@@ -44,6 +44,7 @@ NEXT_PUBLIC_SUPABASE_URL="https://<ref>.supabase.co"
 SUPABASE_SERVICE_ROLE_KEY="..."
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="..."
+NEXT_PUBLIC_SITE_URL="http://localhost:3000"  # produção: domínio final (usado por metadataBase, sitemap, robots e JSON-LD)
 ```
 
 ## Stack
@@ -427,6 +428,22 @@ model PontoTuristico {
 - Topbar: volta para `/pontos-turisticos` + `ShareButton`
 - `generateMetadata` com OpenGraph image na página de detalhe
 - Pontos com `ativo: false` retornam 404 na vitrine
+
+### SEO técnico
+
+Fases 1 e 2 do plano implementadas — **detalhes em [`docs/seo.md`](docs/seo.md)**. Resumo:
+
+- `src/lib/seo/site.ts` — `SITE_URL` (env `NEXT_PUBLIC_SITE_URL`), nome do site e cidade.
+- `src/app/robots.ts` e `src/app/sitemap.ts` — o sitemap tem `revalidate = 3600` (sem isso
+  seria estático do build e comércios novos só entrariam no próximo deploy).
+- Vitrine tem `generateMetadata` (title com categoria + cidade, canonical, OG image,
+  `noindex` quando status ≠ ATIVO).
+- **JSON-LD**: builders em `src/lib/seo/jsonld.ts`, injetados via `<JsonLd>`
+  (`src/components/seo/json-ld.tsx` — escapa `<` contra XSS). Vitrine emite LocalBusiness
+  (subtipo pela categoria principal) + BreadcrumbList + Event por evento ativo; pontos
+  turísticos emitem TouristAttraction; o layout público emite WebSite.
+- **Convenção:** página pública nova deve ter `generateMetadata` (citando "São Bento do
+  Sapucaí"), entrar no `sitemap.ts` e, se for entidade, emitir JSON-LD via builders.
 
 ### Analytics para comerciantes
 

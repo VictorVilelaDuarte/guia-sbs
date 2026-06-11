@@ -1,7 +1,9 @@
 # SEO — Plano de Design e Implementação
 
-> **Status:** planejamento. Implementação em fases (ver seção [Faseamento](#faseamento)).
-> **Última atualização:** 2026-06-10
+> **Status:** **Fases 1 e 2 implementadas (2026-06-11)** — fundação técnica + JSON-LD.
+> Pendências operacionais: definir `NEXT_PUBLIC_SITE_URL` na Vercel quando o domínio de
+> produção for decidido, e submeter o sitemap no Google Search Console. Fases 3 e 4 a fazer.
+> **Última atualização:** 2026-06-11
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
 
 O objetivo é fazer do Guia SBS **o resultado dominante no Google para tudo relacionado a
@@ -34,7 +36,15 @@ servidor (Server Components), então o Google indexa HTML completo sem depender 
 
 ## Faseamento
 
-### Fase 1 — Fundação técnica (rápido, obrigatório)
+### Fase 1 — Fundação técnica — ✅ IMPLEMENTADA (2026-06-11)
+
+> O que foi construído: `src/lib/seo/site.ts` (SITE_URL via `NEXT_PUBLIC_SITE_URL`, fallback
+> localhost), `metadataBase` + OG defaults no root layout, `src/app/robots.ts` (bloqueia
+> `/admin`, `/comerciante`, `/api`, `/busca`), `src/app/sitemap.ts` (estáticas + 6 variações
+> de categoria + vitrines ATIVO + pontos ativos, com `revalidate = 3600` — sem isso o sitemap
+> seria estático do build), e `generateMetadata` na vitrine (title com categoria + cidade,
+> description truncada com fallback, OG image foto→logo, canonical, `noindex` para
+> status ≠ ATIVO). Verificado com servidor real: title/canonical/description/OG corretos.
 
 - **`metadataBase` + canonicals** no root layout. Requer definir `NEXT_PUBLIC_SITE_URL`
   no `.env` (produção: domínio final; dev: `http://localhost:3000`).
@@ -52,7 +62,16 @@ servidor (Server Components), então o Google indexa HTML completo sem depender 
 - Revisar titles/descriptions das páginas que já têm metadata (padrão consistente
   `"{página} | Guia SBS"`, sempre citando "São Bento do Sapucaí" — é a keyword âncora).
 
-### Fase 2 — Structured data (JSON-LD) — o maior diferencial para busca local
+### Fase 2 — Structured data (JSON-LD) — ✅ IMPLEMENTADA (2026-06-11)
+
+> O que foi construído: `src/lib/seo/jsonld.ts` (builders) + `src/components/seo/json-ld.tsx`
+> (injetor com escape de `<` contra XSS). Vitrine emite `Restaurant`/`LodgingBusiness`/`Store`/
+> `EntertainmentBusiness`/`LocalBusiness` pela categoria principal (com endereço, geo,
+> `openingHoursSpecification` parseado do JSON de horários — dias com pausa viram dois
+> intervalos —, telefone, fotos, `sameAs` Instagram e `hasMenu` quando Restaurant com
+> cardápio), + `BreadcrumbList` + um `Event` por evento ativo. Pré-visualização não emite
+> JSON-LD. Pontos turísticos emitem `TouristAttraction` + breadcrumb; o layout público emite
+> `WebSite`. Verificado com servidor real (4 blocos válidos na vitrine de teste).
 
 Todos os dados já existem estruturados no banco; é só mapear para schema.org.
 Criar helper centralizado `src/lib/seo/jsonld.ts` e injetar via
@@ -94,7 +113,11 @@ Fichas de comércio não rankeiam para "bate-volta de SP" — conteúdo editoria
   artigos relacionados. O Google entende o site como autoridade no tema "São Bento do
   Sapucaí".
 
-### Fase 4 — Performance e operação contínua
+### Fase 4 — Performance e operação contínua (itens de `alt` e OG image ✅ em 2026-06-11)
+
+> Já feitos: **OG image padrão** (`src/app/opengraph-image.jpg`, 1200×630 gerada da foto da
+> cidade + `opengraph-image.alt.txt` — fallback para toda página sem imagem própria) e
+> **`alt` descritivo com cidade** nos cards públicos (home, listagem, eventos, pontos).
 
 - **ISR** (`revalidate`) nas vitrines, listagens e pontos turísticos — páginas servidas
   estáticas melhoram Core Web Vitals (fator de ranking) e reduzem custo de DB.

@@ -115,7 +115,7 @@ export function PontosTuristicos({ pontos }: Props) {
                   <div style={{ position: "absolute", inset: 0 }}>
                     <Image
                       src={p.foto}
-                      alt={p.nome}
+                      alt={`${p.nome} — ponto turístico em São Bento do Sapucaí`}
                       fill
                       className="object-cover"
                       sizes="158px"

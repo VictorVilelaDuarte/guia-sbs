@@ -152,7 +152,7 @@ export function OpenNow({ items }: { items: ComercioAberto[] }) {
                   >
                     <Image
                       src={it.logo}
-                      alt={it.nome}
+                      alt={`${it.nome} em São Bento do Sapucaí`}
                       fill
                       className="object-cover"
                       sizes="248px"

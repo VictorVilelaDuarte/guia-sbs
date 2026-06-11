@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { GaleriaFotos } from "@/components/public/galeria-fotos";
 import { MapaView } from "@/components/public/mapa-view-dynamic";
+import { pontoTuristicoJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { JsonLd } from "@/components/seo/json-ld";
 import { Topbar } from "./_components/topbar";
 
 // ─── labels e cores ────────────────────────────────────────────
@@ -125,6 +127,14 @@ export default async function PontoTuristicoPage({
 
   return (
     <div className="min-h-screen bg-background">
+      <JsonLd data={pontoTuristicoJsonLd(ponto)} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { nome: "Início", url: "/" },
+          { nome: "Pontos Turísticos", url: "/pontos-turisticos" },
+          { nome: ponto.nome, url: `/pontos-turisticos/${ponto.slug}` },
+        ])}
+      />
       <Topbar nome={ponto.nome} />
 
       {/* Galeria de fotos */}

@@ -1,7 +1,11 @@
 /* eslint-disable react-hooks/purity */
+import type { Metadata } from "next"
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import { CATEGORIA_LABEL } from "../../comercios/_utils"
+import { comercioJsonLd, eventoJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld"
+import { JsonLd } from "@/components/seo/json-ld"
 import { Separator } from "@/components/ui/separator"
 import { GaleriaFotos } from "@/components/public/galeria-fotos"
 import { CardapioDestaquesVitrine } from "@/components/public/cardapio-destaques-vitrine"
@@ -57,6 +61,48 @@ function mapItemParaDestaque(
     imagens: p.imagens,
     variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
     categoriaNome,
+  }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const c = await prisma.comercio.findUnique({
+    where: { slug },
+    select: {
+      nome: true,
+      descricao: true,
+      status: true,
+      categorias: true,
+      logo: true,
+      fotos: { orderBy: { ordem: "asc" }, take: 1, select: { url: true } },
+    },
+  })
+  if (!c) return {}
+
+  const categoria = CATEGORIA_LABEL[c.categorias[0]] ?? "Comércio"
+  const title = `${c.nome} — ${categoria} em São Bento do Sapucaí | Guia SBS`
+  const description = c.descricao
+    ? c.descricao.length > 155
+      ? `${c.descricao.slice(0, 152)}…`
+      : c.descricao
+    : `${c.nome}: fotos, horários, contato e localização em São Bento do Sapucaí, na Serra da Mantiqueira.`
+  const ogImage = c.fotos[0]?.url ?? c.logo ?? undefined
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/vitrine/${slug}` },
+    openGraph: {
+      title,
+      description,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
+    // pré-visualização não deve ser indexada
+    ...(c.status !== "ATIVO" ? { robots: { index: false, follow: false } } : {}),
   }
 }
 
@@ -133,10 +179,31 @@ export default async function PaginaComercio({
     .filter(Boolean)
     .join(", ")
 
+  const agora = new Date()
+  const eventosAtivos = comercio.eventos.filter(
+    (e) => (e.dataFim ?? e.dataInicio) >= agora,
+  )
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Pré-visualização (status != ATIVO) não conta nas métricas */}
+      {/* Pré-visualização (status != ATIVO) não conta nas métricas nem emite JSON-LD */}
       {isPublicado && <VitrineTracker comercioId={comercio.id} />}
+      {isPublicado && (
+        <>
+          <JsonLd data={comercioJsonLd(comercio, { horarios, temCardapio })} />
+          <JsonLd
+            data={breadcrumbJsonLd([
+              { nome: "Início", url: "/" },
+              { nome: "Comércios", url: "/comercios" },
+              { nome: comercio.nome, url: `/vitrine/${comercio.slug}` },
+            ])}
+          />
+          {temEventos &&
+            eventosAtivos.map((e) => (
+              <JsonLd key={e.id} data={eventoJsonLd(e, comercio)} />
+            ))}
+        </>
+      )}
       <Topbar nome={comercio.nome} isPublicado={isPublicado} status={comercio.status} />
 
       <div className="max-w-2xl mx-auto px-4">

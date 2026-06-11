@@ -54,7 +54,7 @@ export function Events({ eventos }: Props) {
               >
                 {e.imagem ? (
                   <div style={{ position: "absolute", inset: 0 }}>
-                    <Image src={e.imagem} alt={e.titulo} fill className="object-cover" sizes="280px" />
+                    <Image src={e.imagem} alt={`${e.titulo} — evento em São Bento do Sapucaí`} fill className="object-cover" sizes="280px" />
                   </div>
                 ) : (
                   <div style={{ position: "absolute", inset: 0 }}>

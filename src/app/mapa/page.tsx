@@ -5,7 +5,7 @@ import { MapaClient } from "./_components/mapa-client";
 import type { ComercioMapa, PontoMapa } from "./_types";
 
 export const metadata: Metadata = {
-  title: "Mapa | Guia SBS",
+  title: "Mapa de São Bento do Sapucaí | Guia SBS",
   description:
     "Explore comércios e pontos turísticos de São Bento do Sapucaí no mapa interativo.",
 };
