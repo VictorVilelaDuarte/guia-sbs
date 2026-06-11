@@ -487,6 +487,12 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 
 ## Próximas features planejadas
 
+- **Multitenant (AIRotas)** — pós-V1: transformar o guia em plataforma multi-cidade por
+  subdomínio (`guararema.airotas.com.br`). **Não iniciar antes do lançamento da V1 em São
+  Bento.** Plano completo, auditoria e **regras vigentes desde já para a V1** (queries em
+  Server Components, copy centralizável, models "da cidade" já nascerem com `cityId`) em
+  [`docs/multitenant.md`](docs/multitenant.md).
+
 - **Busca inteligente por IA** — maior diferencial comercial do produto. Busca em linguagem
   natural ("onde comer lanche?") com ranqueamento por relevância (nome, descrição, produtos,
   palavras-chave) + boosts de premium/aberto-agora. Arquitetura híbrida (embeddings `pgvector` +
