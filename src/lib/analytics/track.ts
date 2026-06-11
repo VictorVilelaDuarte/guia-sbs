@@ -83,7 +83,7 @@ export function trackCtx(
 // referrer decide entre Google e direto/link.
 export function resolveOrigem(searchSrc: string | null): Origem {
   const validas: Origem[] = [
-    "home_destaque", "home_abertos", "home_eventos",
+    "home_destaque", "home_abertos", "home_eventos", "eventos",
     "listagem", "mapa", "busca", "qr",
   ]
   if (searchSrc && (validas as string[]).includes(searchSrc)) return searchSrc as Origem

@@ -32,6 +32,17 @@ export function Events({ eventos }: Props) {
           <h2 className="serif" style={{ margin: 0, fontSize: 21, fontWeight: 600, color: "var(--ink)", letterSpacing: "-0.02em" }}>
             Acontece em <em style={{ color: "var(--terra)" }}>SBS</em>
           </h2>
+          <Link
+            href="/eventos"
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--terra)",
+              textDecoration: "none",
+            }}
+          >
+            Ver todos →
+          </Link>
         </div>
         <div className="home-px">
           <div className="h-scroll no-scrollbar">

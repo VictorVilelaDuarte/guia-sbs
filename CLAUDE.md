@@ -377,7 +377,16 @@ src/app/(public)/comercios/
 
 **Filtros:** sem categoria → chips de categoria. Com categoria → chips de subcategoria (buscados via Prisma filtrados por `categoriaFiltro`). Subcategoria inválida ou não pertencente à categoria é ignorada.
 
-### Pontos Turísticos
+### Eventos da cidade (`/eventos`)
+
+Página pública no route group `(public)/` com a agenda completa: eventos não-encerrados
+(`dataFim >= agora`, ou sem `dataFim` com `dataInicio >=` início do dia local) de comércios
+ATIVO — mesmo critério da home, sem filtro por feature do plano. Server Component único em
+`(public)/eventos/page.tsx` com `revalidate = 1800` (ISR — sem isso a agenda congelaria no
+build). Agrupada por mês, cards com thumb (`imagem` → `PhotoPH`), badges "HOJE" / "EM
+ANDAMENTO", preço ("Gratuito" quando `null` ou `0`) e link para a vitrine com `?src=eventos`
+(origem própria no analytics). Reusa o `Hero` de `comercios/_components/hero.tsx` (componente
+genérico foto+overlay+curva). Emite JSON-LD `Event` por evento + breadcrumb; está no sitemap.
 
 Entidade independente gerenciada exclusivamente pelo admin — sem vínculo com comércios.
 
@@ -544,7 +553,7 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
   página "Sobre a cidade" e seção editorial `/guia`. **Plano completo em
   [`docs/seo.md`](docs/seo.md)** — consultar antes de iniciar qualquer fase.
 - ~~Página pública de listagem de comércios por categoria~~ — implementada
-- Página pública de eventos da cidade (`/eventos`)
+- ~~Página pública de eventos da cidade (`/eventos`)~~ — implementada (ver seção Eventos da cidade)
 - ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)
 - ~~Mapa interativo da cidade~~ — implementado (`/mapa`)
 - Avaliações de visitantes
