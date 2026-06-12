@@ -327,7 +327,7 @@ export default async function CidadePage() {
             ))}
           </ul>
           <Link
-            href="/comercios?categoria=ALIMENTACAO"
+            href="/gastronomia"
             className="press"
             style={{
               display: "inline-flex", alignItems: "center", gap: 7,

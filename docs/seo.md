@@ -93,22 +93,24 @@ direto na SERP — é o que diferencia o resultado do guia de um resultado de te
 
 Fichas de comércio não rankeiam para "bate-volta de SP" — conteúdo editorial sim.
 
-- **Rotas estáticas de categoria**: substituir/complementar `/comercios?categoria=X` por
-  rotas dedicadas com slug otimizado (ex.: `/pousadas-em-sao-bento-do-sapucai` ou
-  `/comercios/hospedagem`), cada uma com H1 próprio, parágrafo introdutório e a listagem.
-  Query params rankeiam mal; rotas dedicadas com conteúdo rankeiam bem. As rotas entram
-  no sitemap.
+- **Rotas estáticas de categoria** — ✅ implementadas (2026-06-11) como rotas top-level
+  com slug "guarda-chuva": `/gastronomia`, `/hospedagem`, `/turismo`, `/servicos`,
+  `/lojas`, `/entretenimento`. Cada uma com H1 keyword-rich, title/description próprios,
+  parágrafo introdutório, breadcrumb JSON-LD e canonical; entram no sitemap no lugar das
+  URLs com query param, que agora redirecionam (308). Slug sem a cidade embutida — o
+  domínio/subdomínio carrega a cidade (compatível com o multitenant futuro). A copy vive
+  centralizada em `src/lib/seo/categorias.ts`.
 - **Página "Sobre a cidade"** — ✅ implementada (2026-06-11) em `/sao-bento-do-sapucai`
   (slug rico em keyword) e promovida a item fixo do BottomNav ("A cidade") — link interno em
   todas as páginas. História, como chegar, quando ir, atrações interlinkando os pontos
   turísticos reais, gastronomia e galeria; JSON-LD `TouristDestination`. Revisar/expandir o
   texto conforme o guia crescer.
-- **Seção editorial `/guia/[slug]`**: artigos como "Bate-volta de SP: roteiro de 1 dia",
-  "O que fazer em São Bento do Sapucaí", "Onde ficar na Mantiqueira", "Guia da Pedra do
-  Baú". Cada artigo interlinha vitrines e pontos do sistema (o conteúdo trabalha duplo:
-  rankeia e direciona tráfego para os comércios — argumento de venda do plano pago).
-  Implementação: começar com MDX no repo (zero infra) e migrar para model `Artigo`
-  gerenciado pelo admin se a produção de conteúdo escalar.
+- ~~**Seção editorial `/guia/[slug]`**~~ — **fora do escopo da V1** (decisão de
+  2026-06-11). Artigos editoriais ("Bate-volta de SP", "Guia da Pedra do Baú") que
+  interlinkam vitrines e pontos não serão produzidos para o lançamento. As queries de
+  descoberta ficam cobertas apenas pela página da cidade (`/sao-bento-do-sapucai`).
+  Se voltar ao roadmap pós-V1: começar com MDX no repo (zero infra) e migrar para model
+  `Artigo` gerenciado pelo admin se a produção de conteúdo escalar.
 - **Interlinking sistemático**: vitrine → sua categoria → pontos turísticos próximos →
   artigos relacionados. O Google entende o site como autoridade no tema "São Bento do
   Sapucaí".
@@ -133,18 +135,19 @@ Fichas de comércio não rankeiam para "bate-volta de SP" — conteúdo editoria
 ## Decisões em aberto
 
 1. **Domínio de produção** — necessário para `metadataBase`, canonical e Search Console.
-2. **Formato das rotas de categoria** — slug "bonito" (`/pousadas-em-sao-bento-do-sapucai`)
-   vs. hierárquico (`/comercios/hospedagem`). O bonito rankeia melhor; o hierárquico é
-   mais simples de manter. Decidir antes da Fase 3.
-3. **Conteúdo editorial: quem escreve?** MDX no repo (Victor escreve) vs. model `Artigo`
-   no admin. Sugestão: começar com MDX.
+2. ~~**Formato das rotas de categoria**~~ — resolvida em 2026-06-11: rotas top-level com
+   slug guarda-chuva (`/gastronomia`, `/hospedagem`, `/lojas`, …), sem a cidade no slug
+   (multitenant-friendly). `COMERCIO → /lojas` evita colisão com `/comercios`.
+3. ~~**Conteúdo editorial: quem escreve?**~~ — resolvida em 2026-06-11: seção editorial
+   `/guia` está fora do escopo da V1 (ver Fase 3).
 
 ---
 
 ## Sinergias com o restante do roadmap
 
-- **Busca por IA** (`docs/busca-inteligente.md`): a Fase 3 de conteúdo popula o sistema —
-  exatamente o pré-requisito definido para retomar o motor de busca.
+- **Busca por IA** (`docs/busca-inteligente.md`): o pré-requisito para retomar o motor é
+  o sistema estar populado — com a `/guia` fora da V1, isso depende do cadastro de
+  comércios, produtos e pontos turísticos reais.
 - **Avaliações**: quando existirem, viram `aggregateRating` no JSON-LD (estrelas na SERP).
 - **Analytics para comerciantes**: "visitas vindas do Google" é métrica de valor direto
   para o comerciante — conecta o investimento em SEO ao argumento de venda do plano pago.

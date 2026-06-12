@@ -354,22 +354,39 @@ model Subcategoria {
 
 **Vitrine pública:** subcategorias não são exibidas na vitrine — são informação de gestão interna, visível apenas no painel admin.
 
-### Listagem pública de comércios
+### Listagem pública de comércios e rotas de categoria
 
-`/comercios` — listagem pública com filtro por categoria e subcategoria, paginação e ordenação "abertos primeiro". Faz parte do route group `(public)/`.
+`/comercios` — listagem pública geral. As listagens **por categoria** vivem em rotas
+top-level dedicadas (Fase 3 do SEO): `/gastronomia`, `/hospedagem`, `/turismo`,
+`/servicos`, `/lojas`, `/entretenimento` — slug "guarda-chuva" sem a cidade embutida
+(multitenant-friendly; `COMERCIO → /lojas` evita colisão com `/comercios`). URLs antigas
+`/comercios?categoria=X` redirecionam (308, `permanentRedirect`) para a rota dedicada
+preservando `subcategoria`/`page`. Paginação e ordenação "abertos primeiro" em ambas.
 
 **Estrutura de arquivos** (todos Server Components):
 ```
+src/lib/seo/categorias.ts — CATEGORIA_SLUG, SLUG_CATEGORIA, categoriaPath(),
+                             CATEGORIA_COPY (h1/title/description/intro centralizados)
+src/app/(public)/[categoria]/
+  page.tsx          — rota dinâmica de categoria: generateStaticParams (6 slugs) +
+                       dynamicParams = false (404 fora deles; rotas estáticas têm
+                       precedência), generateMetadata com canonical, breadcrumb JSON-LD,
+                       hero com H1 keyword-rich + parágrafo intro + ListagemComercios
 src/app/(public)/comercios/
-  page.tsx          — data fetching + composição
+  page.tsx          — redirect de ?categoria= + listagem geral
   _utils.ts         — CATEGORIAS, CATEGORIA_LABEL, CATEGORIAS_VALIDAS, CATEGORIA_IMAGE,
                        DEFAULT_IMAGE, palette(), pageUrl()
   _components/
+    listagem.tsx     — ListagemComercios: corpo compartilhado (query, filtros, grid,
+                       paginação) entre /comercios e as rotas de categoria
     hero.tsx         — foto de fundo por categoria + título + HeroBottomCurve
     filtros.tsx      — chips de categoria (sem filtro) ou subcategoria (com filtro)
     card-comercio.tsx — card individual: foto/logo/PhotoPH, badge aberto/fechado, info
     paginacao.tsx    — anterior/próxima com pageUrl()
 ```
+
+**Links internos para categoria** devem usar `categoriaPath(cat)` — nunca montar
+`/comercios?categoria=` manualmente.
 
 **Imagens do hero por categoria:** em `/public/assets/categorias/{categoria_lowercase}.jpg`. Para trocar a imagem de uma categoria basta substituir o arquivo — o mapeamento está em `CATEGORIA_IMAGE` no `_utils.ts`. A constante `DEFAULT_IMAGE` é usada quando nenhuma categoria está selecionada.
 
@@ -560,9 +577,11 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 - **SEO eficiente** — canal de aquisição mais importante do guia: dominar o Google para
   queries sobre a cidade ("restaurante em São Bento do Sapucaí") e de descoberta ("bate-volta
   de SP", "pousada nas montanhas"). Fundação técnica (sitemap, robots, metadata na vitrine),
-  JSON-LD (`LocalBusiness`, `TouristAttraction`, `Event`), rotas estáticas de categoria,
-  página "Sobre a cidade" e seção editorial `/guia`. **Plano completo em
-  [`docs/seo.md`](docs/seo.md)** — consultar antes de iniciar qualquer fase.
+  JSON-LD (`LocalBusiness`, `TouristAttraction`, `Event`), ~~rotas estáticas de
+  categoria~~ (✅ implementadas — ver seção Listagem pública) e página "Sobre a cidade"
+  (✅). A seção editorial `/guia` está **fora do escopo da V1** (decisão de 2026-06-11).
+  **Plano completo em [`docs/seo.md`](docs/seo.md)** — consultar antes de iniciar
+  qualquer fase.
 - ~~Página pública de listagem de comércios por categoria~~ — implementada
 - ~~Página pública de eventos da cidade (`/eventos`)~~ — implementada (ver seção Eventos da cidade)
 - ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)

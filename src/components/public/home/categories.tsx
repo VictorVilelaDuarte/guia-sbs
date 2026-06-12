@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { Categoria } from "@prisma/client";
+import { categoriaPath } from "@/lib/seo/categorias";
 
 const BLOBS = {
   terraLight: {
@@ -226,7 +227,7 @@ export function Categories({ counts }: CategoriesProps) {
             Glyph={c.Glyph}
             blobKey={c.blobKey}
             count={counts[c.categoria] ?? 0}
-            href={`/comercios?categoria=${c.categoria}`}
+            href={categoriaPath(c.categoria)}
           />
         ))}
       </div>

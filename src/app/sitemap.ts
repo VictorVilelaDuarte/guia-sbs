@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next"
 import { Categoria } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { SITE_URL } from "@/lib/seo/site"
+import { categoriaPath } from "@/lib/seo/categorias"
 
 // Sitemap dinâmico (suporte nativo do App Router — servido em /sitemap.xml).
 // Inclui só conteúdo público indexável: vitrines ATIVO e pontos ativos.
@@ -30,10 +31,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/para-comerciantes`, changeFrequency: "monthly", priority: 0.5 },
   ]
 
-  // Variações de categoria da listagem (rotas estáticas dedicadas são a
-  // Fase 3 do plano de SEO — até lá, indexar as versões com query param)
+  // Rotas dedicadas de categoria (/gastronomia, /hospedagem, …) — Fase 3
+  // do plano de SEO. As URLs antigas com query param redirecionam (308).
   const categorias: MetadataRoute.Sitemap = Object.values(Categoria).map((c) => ({
-    url: `${SITE_URL}/comercios?categoria=${c}`,
+    url: `${SITE_URL}${categoriaPath(c)}`,
     changeFrequency: "daily" as const,
     priority: 0.8,
   }))

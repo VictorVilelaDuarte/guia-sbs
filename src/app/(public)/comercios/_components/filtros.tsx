@@ -1,5 +1,6 @@
 import Link from "next/link"
 import type { Categoria } from "@prisma/client"
+import { categoriaPath } from "@/lib/seo/categorias"
 import { CATEGORIAS } from "../_utils"
 
 interface Props {
@@ -16,7 +17,7 @@ export function Filtros({ categoriaFiltro, subcategoriaFiltro, subcategorias }: 
     return (
       <div className="flex gap-2 flex-wrap mb-8">
         <Link
-          href={`/comercios?categoria=${categoriaFiltro}`}
+          href={categoriaPath(categoriaFiltro)}
           className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium"
           style={!subcategoriaFiltro ? ativo : inativo}
         >
@@ -25,7 +26,7 @@ export function Filtros({ categoriaFiltro, subcategoriaFiltro, subcategorias }: 
         {subcategorias.map((s) => (
           <Link
             key={s.id}
-            href={`/comercios?categoria=${categoriaFiltro}&subcategoria=${s.id}`}
+            href={`${categoriaPath(categoriaFiltro)}?subcategoria=${s.id}`}
             className="inline-flex items-center rounded-full px-4 py-1.5 text-sm font-medium"
             style={subcategoriaFiltro === s.id ? ativo : inativo}
           >
@@ -42,7 +43,7 @@ export function Filtros({ categoriaFiltro, subcategoriaFiltro, subcategorias }: 
         {CATEGORIAS.map(({ value, label }) => (
           <Link
             key={value}
-            href={`/comercios?categoria=${value}`}
+            href={categoriaPath(value)}
             className="inline-flex items-center rounded-full px-4 py-1.5 text-sm font-medium"
             style={inativo}
           >

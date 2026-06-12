@@ -1,4 +1,5 @@
 import type { Categoria } from "@prisma/client";
+import { categoriaPath } from "@/lib/seo/categorias";
 
 export const CATEGORIAS: { value: Categoria; label: string }[] = [
   { value: "ALIMENTACAO", label: "Alimentação" },
@@ -42,11 +43,12 @@ export function palette(slug: string): [string, string, string] {
   return PALETTES[hash % PALETTES.length];
 }
 
+// Com categoria, a base é a rota dedicada (/gastronomia, /hospedagem, …);
+// subcategoria e página seguem como query params em cima dela.
 export function pageUrl(p: number, cat: Categoria | null, sub: string | null) {
   const params = new URLSearchParams();
-  if (cat) params.set("categoria", cat);
   if (sub) params.set("subcategoria", sub);
   if (p > 1) params.set("page", String(p));
   const qs = params.toString();
-  return `/comercios${qs ? `?${qs}` : ""}`;
+  return `${cat ? categoriaPath(cat) : "/comercios"}${qs ? `?${qs}` : ""}`;
 }
