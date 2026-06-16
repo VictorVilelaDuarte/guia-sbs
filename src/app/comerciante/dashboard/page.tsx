@@ -39,8 +39,10 @@ export default async function ComercinateDashboard() {
           include: {
             variacoes: { orderBy: { ordem: "asc" } },
             categoriaCardapio: { select: { id: true, nome: true } },
+            categoriaCatalogo: { select: { id: true, nome: true } },
           },
         },
+        catalogoCategorias: { orderBy: [{ tipo: "asc" }, { ordem: "asc" }] },
         eventos:  { orderBy: { dataInicio: "asc" } },
         cardapioCategorias: {
           orderBy: { ordem: "asc" },
@@ -50,6 +52,7 @@ export default async function ComercinateDashboard() {
               include: {
                 variacoes: { orderBy: { ordem: "asc" } },
                 categoriaCardapio: { select: { id: true, nome: true } },
+                categoriaCatalogo: { select: { id: true, nome: true } },
               },
             },
           },

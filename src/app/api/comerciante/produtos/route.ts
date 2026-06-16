@@ -19,6 +19,7 @@ const createSchema = z.object({
   precoPromo: z.number().positive().optional().nullable(),
   promoFim: z.string().datetime({ offset: true }).optional().nullable(),
   categoriaCardapioId: z.string().optional().nullable(),
+  categoriaCatalogoId: z.string().optional().nullable(),
   variacoes: z.array(variacaoSchema).optional(),
 })
 
@@ -42,6 +43,7 @@ export async function GET() {
     include: {
       variacoes: { orderBy: { ordem: "asc" } },
       categoriaCardapio: { select: { id: true, nome: true } },
+      categoriaCatalogo: { select: { id: true, nome: true } },
     },
   })
 
@@ -66,6 +68,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (parsed.data.categoriaCatalogoId) {
+    const categoria = await prisma.catalogoCategoria.findUnique({
+      where: { id: parsed.data.categoriaCatalogoId },
+      select: { comercioId: true, tipo: true },
+    })
+    // A categoria do catálogo precisa ser do mesmo comércio e do mesmo tipo
+    // do item (categorias de produto não servem para serviços e vice-versa).
+    if (!categoria || categoria.comercioId !== ctx.comercioId || categoria.tipo !== (parsed.data.tipo ?? "PRODUTO")) {
+      return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
+    }
+  }
+
   const { variacoes, ...produtoData } = parsed.data
   const count = await prisma.produto.count({ where: { comercioId: ctx.comercioId } })
 
@@ -82,6 +96,7 @@ export async function POST(req: NextRequest) {
     include: {
       variacoes: { orderBy: { ordem: "asc" } },
       categoriaCardapio: { select: { id: true, nome: true } },
+      categoriaCatalogo: { select: { id: true, nome: true } },
     },
   })
 

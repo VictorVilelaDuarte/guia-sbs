@@ -23,7 +23,13 @@ interface Item {
   promoFim: string | null;
   destaque: boolean;
   imagens: string[];
+  categoriaCatalogoId: string | null;
   variacoes: Variacao[];
+}
+
+interface CategoriaRef {
+  id: string;
+  nome: string;
 }
 
 interface Props {
@@ -34,6 +40,8 @@ interface Props {
   telefone: string | null;
   produtos: Item[];
   servicos: Item[];
+  categoriasProdutos: CategoriaRef[];
+  categoriasServicos: CategoriaRef[];
   now: number;
 }
 
@@ -111,6 +119,20 @@ function ItemCard({ item, now, onClick }: { item: Item; now: number; onClick: ()
   );
 }
 
+// Agrupa itens nas seções de categoria (na ordem dada) + "Outros" no fim.
+// Só inclui seções com itens; "Outros" só aparece se houver itens soltos.
+function agrupar(itens: Item[], categorias: CategoriaRef[]) {
+  const grupos = categorias
+    .map((c) => ({ id: c.id, nome: c.nome, itens: itens.filter((i) => i.categoriaCatalogoId === c.id) }))
+    .filter((g) => g.itens.length > 0);
+  const catIds = new Set(categorias.map((c) => c.id));
+  const outros = itens.filter((i) => !i.categoriaCatalogoId || !catIds.has(i.categoriaCatalogoId));
+  if (outros.length > 0) {
+    grupos.push({ id: "__outros__", nome: grupos.length > 0 ? "Outros" : "", itens: outros });
+  }
+  return grupos;
+}
+
 export function CatalogoView({
   nome,
   logo,
@@ -119,6 +141,8 @@ export function CatalogoView({
   telefone,
   produtos,
   servicos,
+  categoriasProdutos,
+  categoriasServicos,
   now,
 }: Props) {
   const temProdutos = produtos.length > 0;
@@ -131,6 +155,7 @@ export function CatalogoView({
   const [selectedItem, setSelectedItem] = useState<ProdutoSheet | null>(null);
 
   const itensAtivos = aba === "produtos" ? produtos : servicos;
+  const categoriasAtivas = aba === "produtos" ? categoriasProdutos : categoriasServicos;
   const buscaAtiva = busca.trim().length > 0;
 
   const itensFiltrados = buscaAtiva
@@ -141,10 +166,14 @@ export function CatalogoView({
       )
     : itensAtivos;
 
+  const grupos = agrupar(itensAtivos, categoriasAtivas);
+
   function toSheet(item: Item): ProdutoSheet {
+    const cats = item.tipo === "SERVICO" ? categoriasServicos : categoriasProdutos;
+    const catNome = cats.find((c) => c.id === item.categoriaCatalogoId)?.nome;
     return {
       ...item,
-      categoriaNome: item.tipo === "SERVICO" ? "Serviço" : "Produto",
+      categoriaNome: catNome ?? (item.tipo === "SERVICO" ? "Serviço" : "Produto"),
     };
   }
 
@@ -296,24 +325,55 @@ export function CatalogoView({
           </p>
         )}
 
-        {itensFiltrados.length === 0 ? (
+        {buscaAtiva ? (
+          // Busca: grade plana com os resultados (ignora agrupamento)
+          itensFiltrados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-16 text-stone-400">
+              {aba === "servicos"
+                ? <Wrench className="h-10 w-10 opacity-40" />
+                : <PackageOpen className="h-10 w-10 opacity-40" />}
+              <p className="text-sm">Nenhum resultado para &quot;{busca}&quot;</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {itensFiltrados.map((item) => (
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  now={now}
+                  onClick={() => setSelectedItem(toSheet(item))}
+                />
+              ))}
+            </div>
+          )
+        ) : itensAtivos.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-stone-400">
             {aba === "servicos"
               ? <Wrench className="h-10 w-10 opacity-40" />
               : <PackageOpen className="h-10 w-10 opacity-40" />}
-            <p className="text-sm">
-              {buscaAtiva ? `Nenhum resultado para "${busca}"` : "Nenhum item disponível."}
-            </p>
+            <p className="text-sm">Nenhum item disponível.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {itensFiltrados.map((item) => (
-              <ItemCard
-                key={item.id}
-                item={item}
-                now={now}
-                onClick={() => setSelectedItem(toSheet(item))}
-              />
+          // Agrupado por categoria + "Outros" no fim
+          <div className="space-y-7">
+            {grupos.map((g) => (
+              <section key={g.id}>
+                {g.nome && (
+                  <h2 className="text-sm font-bold uppercase tracking-wide text-stone-500 mb-3 px-0.5">
+                    {g.nome}
+                  </h2>
+                )}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {g.itens.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      now={now}
+                      onClick={() => setSelectedItem(toSheet(item))}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}

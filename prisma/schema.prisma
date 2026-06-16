@@ -122,13 +122,14 @@ model Comercio {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  owner              User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  plan               Plan               @relation(fields: [planId], references: [id])
+  owner              User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  plan               Plan                @relation(fields: [planId], references: [id])
   tags               Tag[]
   fotos              Foto[]
   eventos            Evento[]
   produtos           Produto[]
   cardapioCategorias CardapioCategoria[]
+  catalogoCategorias CatalogoCategoria[]
   subcategorias      Subcategoria[]
   analyticsEvents    AnalyticsEvent[]
 
@@ -189,11 +190,13 @@ model Produto {
   ordem               Int                @default(0)
   comercioId          String
   categoriaCardapioId String?
+  categoriaCatalogoId String?
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
   comercio          Comercio            @relation(fields: [comercioId], references: [id], onDelete: Cascade)
   categoriaCardapio CardapioCategoria?  @relation(fields: [categoriaCardapioId], references: [id], onDelete: SetNull)
+  categoriaCatalogo CatalogoCategoria?  @relation(fields: [categoriaCatalogoId], references: [id], onDelete: SetNull)
   variacoes         CardapioVariacao[]
 
   @@map("produtos")
@@ -212,6 +215,25 @@ model CardapioCategoria {
   @@map("cardapio_categorias")
 }
 
+
+// Categorias do catálogo (produtos/serviços fora do cardápio). Espelha
+// CardapioCategoria, mas com `tipo` — uma categoria pertence a PRODUTO ou
+// SERVICO, nunca aos dois (as abas do catálogo são separadas). Atribuição é
+// opcional: itens sem categoria caem no bloco "Outros". onDelete: SetNull no
+// Produto faz o item voltar para "Outros" quando a categoria é excluída.
+model CatalogoCategoria {
+  id         String      @id @default(cuid())
+  nome       String
+  tipo       TipoProduto
+  ordem      Int         @default(0)
+  comercioId String
+  comercio   Comercio    @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  produtos   Produto[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@map("catalogo_categorias")
+}
 
 model CardapioVariacao {
   id        String   @id @default(cuid())

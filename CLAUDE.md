@@ -291,7 +291,7 @@ Array sempre com 7 elementos (Segunda a Domingo). O campo `temPausa`, `pausaInic
 
 ## Banco de Dados
 
-Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (1:1). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`, `Subcategoria[]` (N:M). `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. Todas as relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
+Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (1:1). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`, `CatalogoCategoria[]`, `Subcategoria[]` (N:M). `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. `Produto` → `CardapioCategoria?` (cardápio) e `CatalogoCategoria?` (catálogo), ambas opcionais com `onDelete: SetNull`. Demais relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
 
 **`Comercio.categorias: Categoria[]`** — array nativo PostgreSQL. Substitui o campo singular `categoria`. O **primeiro elemento é sempre a categoria principal**. Para filtrar: `{ categorias: { has: "ALIMENTACAO" } }`. Para contar por categoria na home page, usar raw query (o `groupBy` do Prisma não suporta arrays): `SELECT unnest(categorias) AS cat, COUNT(*) FROM comercios WHERE status = 'ATIVO' GROUP BY cat`. Migração original: `UPDATE comercios SET categorias = ARRAY[categoria]::"Categoria"[]`.
 
@@ -540,6 +540,8 @@ O orquestrador do cardápio completo é `src/components/public/cardapio-view.tsx
 
 Feature controlada pelo plano (`key: "catalogo"`). Produtos e serviços são instâncias do mesmo model `Produto`, diferenciados pelo campo `tipo: TipoProduto` (PRODUTO | SERVICO). Um produto pode estar no catálogo **ou** no cardápio — não nos dois ao mesmo tempo (por ora): `categoriaCardapioId != null` indica que pertence ao cardápio.
 
+**Categorias do catálogo (`CatalogoCategoria`):** itens do catálogo podem ser organizados em categorias, à semelhança do cardápio. O model `CatalogoCategoria` tem campo `tipo: TipoProduto` — **categorias são separadas por tipo** (uma categoria de PRODUTO não aparece para serviços e vice-versa; cada aba do catálogo tem sua própria sequência de `ordem`). O vínculo é **opcional**: `Produto.categoriaCatalogoId` pode ser `null`, e esses itens caem num bloco **"Outros"** no fim (sem cabeçalho quando não há nenhuma categoria criada). `onDelete: SetNull` — excluir a categoria não apaga os itens, eles voltam para "Outros". A validação nas rotas de produto confere que a categoria é do mesmo comércio **e do mesmo tipo** do item. Gestão (criar/renomear/excluir) é inline no `ProdutosManager`; APIs em `/api/comerciante/catalogo/categorias` (+ `[id]`), espelhando as do cardápio mas exigindo `tipo` no POST. O seletor de categoria está no `produto-dialog.tsx` (aparece para itens que ficam no catálogo — serviços sempre; produtos quando não vão para o cardápio). A página pública agrupa por categoria via `agrupar()` no `catalogo-view.tsx`.
+
 **Flag `destaque`:** campo independente no model `Produto`. Não requer cardápio vinculado. Produtos com `destaque: true` aparecem na vitrine do comércio no carrossel horizontal da seção correspondente (Cardápio, Produtos ou Serviços). Para o cardápio, a query filtra `destaque: true` nas `cardapioCategorias`; para o catálogo, filtra `destaque: true, categoriaCardapioId: null` nos `produtos`.
 
 **Página pública do catálogo:** `/vitrine/[slug]/catalogo` — grid 2 colunas (3 em telas maiores), tabs Produtos/Serviços, busca, reusa `ProdutoBottomSheet`. Retorna 404 se a feature não estiver habilitada ou se não houver itens disponíveis.
@@ -547,7 +549,7 @@ Feature controlada pelo plano (`key: "catalogo"`). Produtos e serviços são ins
 **Componentes:**
 - `src/components/public/catalogo-view.tsx` — grid público de produtos e serviços
 - `src/components/public/cardapio-destaques-vitrine.tsx` — carrossel de destaques para a vitrine (Client Component wrapper necessário pois a vitrine é Server Component)
-- `src/components/comerciante/produtos-manager.tsx` — lista de produtos/serviços do catálogo no painel, com prop `tipo` para filtrar
+- `src/components/comerciante/produtos-manager.tsx` — lista de produtos/serviços do catálogo no painel, com prop `tipo` para filtrar. Agrupa por `CatalogoCategoria` (+ bloco "Outros"), com gestão de categorias inline (criar/renomear/excluir). Recebe `categoriasCatalogoIniciais` já filtradas por tipo pelo `dashboard-tabs`. Durante a busca, exibe lista plana (ignora agrupamento).
 
 ## Fontes
 

@@ -20,6 +20,7 @@ const patchSchema = z.object({
   precoPromo: z.number().positive().optional().nullable(),
   promoFim: z.string().datetime({ offset: true }).optional().nullable(),
   categoriaCardapioId: z.string().optional().nullable(),
+  categoriaCatalogoId: z.string().optional().nullable(),
   variacoes: z.array(variacaoSchema).optional(),
 })
 
@@ -51,6 +52,17 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
 
+  if (parsed.data.categoriaCatalogoId) {
+    const tipoAlvo = parsed.data.tipo ?? produto.tipo
+    const categoria = await prisma.catalogoCategoria.findUnique({
+      where: { id: parsed.data.categoriaCatalogoId },
+      select: { comercioId: true, tipo: true },
+    })
+    if (!categoria || categoria.comercioId !== produto.comercioId || categoria.tipo !== tipoAlvo) {
+      return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
+    }
+  }
+
   const { variacoes, ...produtoData } = parsed.data
 
   let updated
@@ -68,6 +80,7 @@ export async function PATCH(
         include: {
           variacoes: { orderBy: { ordem: "asc" } },
           categoriaCardapio: { select: { id: true, nome: true } },
+          categoriaCatalogo: { select: { id: true, nome: true } },
         },
       })
     })
@@ -78,6 +91,7 @@ export async function PATCH(
       include: {
         variacoes: { orderBy: { ordem: "asc" } },
         categoriaCardapio: { select: { id: true, nome: true } },
+        categoriaCatalogo: { select: { id: true, nome: true } },
       },
     })
   }

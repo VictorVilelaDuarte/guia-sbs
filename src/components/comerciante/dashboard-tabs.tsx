@@ -7,7 +7,7 @@ import { LogoUploader } from "@/components/comerciante/logo-uploader";
 import { FotosUploader } from "@/components/comerciante/fotos-uploader";
 import { ProdutosManager } from "@/components/comerciante/produtos-manager";
 import { CardapioManager } from "@/components/comerciante/cardapio-manager";
-import type { Produto, CardapioCategoria } from "@/components/comerciante/cardapio/types";
+import type { Produto, CardapioCategoria, CatalogoCategoria } from "@/components/comerciante/cardapio/types";
 import { TagsEditor } from "@/components/comerciante/tags-editor";
 import {
   EventosManager,
@@ -63,6 +63,7 @@ export interface ComercioParaDashboard {
   produtos: Produto[];
   eventos: Evento[];
   cardapioCategorias: CardapioCategoria[];
+  catalogoCategorias: CatalogoCategoria[];
 }
 
 interface AbaConfig {
@@ -213,6 +214,7 @@ export function DashboardTabs({
               <ProdutosManager
                 produtosIniciais={comercio.produtos}
                 categoriasCardapio={comercio.cardapioCategorias}
+                categoriasCatalogoIniciais={comercio.catalogoCategorias.filter((c) => c.tipo === "PRODUTO")}
                 tipo="PRODUTO"
                 limite={produtoLimite}
               />
@@ -235,6 +237,7 @@ export function DashboardTabs({
               <ProdutosManager
                 produtosIniciais={comercio.produtos}
                 categoriasCardapio={comercio.cardapioCategorias}
+                categoriasCatalogoIniciais={comercio.catalogoCategorias.filter((c) => c.tipo === "SERVICO")}
                 tipo="SERVICO"
                 limite={produtoLimite}
               />

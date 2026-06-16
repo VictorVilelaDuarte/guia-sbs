@@ -25,7 +25,7 @@ import {
   Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Produto, CardapioCategoria, ProdutoFormState, TipoProduto } from "./types";
+import type { Produto, CardapioCategoria, CatalogoCategoria, ProdutoFormState, TipoProduto } from "./types";
 import { formatPreco, parsePreco } from "./utils";
 
 const MAX_IMAGENS = 3;
@@ -35,7 +35,9 @@ interface ProdutoDialogProps {
   produto: Produto | null;
   tipo?: TipoProduto;
   categorias: CardapioCategoria[];
+  categoriasCatalogo?: CatalogoCategoria[];
   defaultCategoriaId?: string;
+  defaultCategoriaCatalogoId?: string;
   onClose: () => void;
   onSaved: (produto: Produto) => void;
 }
@@ -45,7 +47,9 @@ export function ProdutoDialog({
   produto,
   tipo: tipoProp = "PRODUTO",
   categorias,
+  categoriasCatalogo = [],
   defaultCategoriaId,
+  defaultCategoriaCatalogoId,
   onClose,
   onSaved,
 }: ProdutoDialogProps) {
@@ -67,6 +71,7 @@ export function ProdutoDialog({
     variacoes: [],
     incluirNoCardapio: false,
     categoriaCardapioId: "",
+    categoriaCatalogoId: "",
   });
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -110,6 +115,7 @@ export function ProdutoDialog({
         incluirNoCardapio: !!produto.categoriaCardapioId,
         categoriaCardapioId:
           produto.categoriaCardapioId ?? categorias[0]?.id ?? "",
+        categoriaCatalogoId: produto.categoriaCatalogoId ?? "",
       });
     } else {
       const catId = defaultCategoriaId ?? categorias[0]?.id ?? "";
@@ -126,9 +132,10 @@ export function ProdutoDialog({
         variacoes: [],
         incluirNoCardapio: !!defaultCategoriaId,
         categoriaCardapioId: catId,
+        categoriaCatalogoId: defaultCategoriaCatalogoId ?? "",
       });
     }
-  }, [open, produto, defaultCategoriaId, categorias]);
+  }, [open, produto, defaultCategoriaId, defaultCategoriaCatalogoId, categorias]);
 
   function handleOpenChange(isOpen: boolean) {
     if (!isOpen) onClose();
@@ -293,6 +300,11 @@ export function ProdutoDialog({
           : null,
       categoriaCardapioId:
         !isServico && form.incluirNoCardapio ? form.categoriaCardapioId : null,
+      // Item no cardápio sai do catálogo, então não carrega categoria de catálogo.
+      categoriaCatalogoId:
+        !isServico && form.incluirNoCardapio
+          ? null
+          : form.categoriaCatalogoId || null,
       variacoes: form.variacoes.map((v) => ({
         nome: v.nome.trim(),
         preco: parsePreco(v.preco) ?? 0,
@@ -608,6 +620,32 @@ export function ProdutoDialog({
               />
             </div>
           </button>
+
+          {/* Categoria do catálogo — para itens que ficam no catálogo
+              (serviços sempre; produtos quando não vão para o cardápio) */}
+          {(isServico || !form.incluirNoCardapio) && categoriasCatalogo.length > 0 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="cat-catalogo-sel">
+                Categoria{" "}
+                <span className="text-muted-foreground font-normal">(opcional)</span>
+              </Label>
+              <select
+                id="cat-catalogo-sel"
+                value={form.categoriaCatalogoId}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, categoriaCatalogoId: e.target.value }))
+                }
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+              >
+                <option value="">Sem categoria (Outros)</option>
+                {categoriasCatalogo.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Incluir no cardápio — oculto para serviços */}
           {!isServico && categorias.length > 0 && (

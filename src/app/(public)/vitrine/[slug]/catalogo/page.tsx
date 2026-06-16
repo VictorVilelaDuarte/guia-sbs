@@ -38,6 +38,7 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
         orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
         include: { variacoes: { orderBy: { ordem: "asc" } } },
       },
+      catalogoCategorias: { orderBy: [{ tipo: "asc" }, { ordem: "asc" }] },
     },
   })
 
@@ -48,6 +49,13 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
   const servicos = comercio.produtos.filter((p) => p.tipo === "SERVICO")
 
   if (produtos.length === 0 && servicos.length === 0) notFound()
+
+  const categoriasProdutos = comercio.catalogoCategorias
+    .filter((c) => c.tipo === "PRODUTO")
+    .map((c) => ({ id: c.id, nome: c.nome }))
+  const categoriasServicos = comercio.catalogoCategorias
+    .filter((c) => c.tipo === "SERVICO")
+    .map((c) => ({ id: c.id, nome: c.nome }))
 
   return (
     <>
@@ -70,8 +78,11 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
         promoFim: p.promoFim ? p.promoFim.toISOString() : null,
         destaque: p.destaque,
         imagens: p.imagens,
+        categoriaCatalogoId: p.categoriaCatalogoId,
         variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
       }))}
+      categoriasProdutos={categoriasProdutos}
+      categoriasServicos={categoriasServicos}
       servicos={servicos.map((p) => ({
         id: p.id,
         tipo: p.tipo as "PRODUTO" | "SERVICO",
@@ -82,6 +93,7 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
         promoFim: p.promoFim ? p.promoFim.toISOString() : null,
         destaque: p.destaque,
         imagens: p.imagens,
+        categoriaCatalogoId: p.categoriaCatalogoId,
         variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
       }))}
       now={Date.now()}

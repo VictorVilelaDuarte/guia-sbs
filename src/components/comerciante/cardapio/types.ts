@@ -23,6 +23,8 @@ export interface Produto {
   comercioId: string
   categoriaCardapioId: string | null
   categoriaCardapio: { id: string; nome: string } | null
+  categoriaCatalogoId: string | null
+  categoriaCatalogo: { id: string; nome: string } | null
   variacoes: CardapioVariacao[]
   createdAt: Date | string
   updatedAt: Date | string
@@ -33,6 +35,14 @@ export interface CardapioCategoria {
   nome: string
   ordem: number
   produtos: Produto[]
+}
+
+// Categoria do catálogo — separada por tipo (PRODUTO/SERVICO).
+export interface CatalogoCategoria {
+  id: string
+  nome: string
+  tipo: TipoProduto
+  ordem: number
 }
 
 export interface ProdutoFormState {
@@ -48,4 +58,5 @@ export interface ProdutoFormState {
   variacoes: { nome: string; preco: string }[]
   incluirNoCardapio: boolean
   categoriaCardapioId: string
+  categoriaCatalogoId: string
 }
