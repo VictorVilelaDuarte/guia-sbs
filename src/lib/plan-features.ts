@@ -43,6 +43,7 @@ export const LIMITES_FREE = {
   fotos: 3,
   tags: 5,
   produtos: 3,
+  quartos: 2,
 } as const
 
 export function temFeature(features: unknown, key: FeatureKey): boolean {

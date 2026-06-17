@@ -1,5 +1,6 @@
 import type { Categoria } from "@prisma/client"
 import type { HorarioDia } from "@/lib/horarios"
+import { comodidadeLabel } from "@/lib/hospedagem"
 import { SITE_URL, SITE_NAME, CIDADE } from "./site"
 
 // Builders de structured data (schema.org). Todos os dados vêm do banco —
@@ -85,9 +86,60 @@ interface ComercioParaJsonLd {
   fotos: { url: string }[]
 }
 
+export interface HospedagemParaJsonLd {
+  comodidades: string[]
+  checkIn: string | null
+  checkOut: string | null
+  aceitaPets: boolean
+  quartos: {
+    nome: string
+    descricao: string | null
+    precoNoite: number | null
+    capacidade: number | null
+  }[]
+}
+
+// Campos extras de LodgingBusiness (amenityFeature, check-in/out, ofertas de
+// quarto via HotelRoom). Só faz sentido quando o subtipo é LodgingBusiness.
+function hospedagemFields(h: HospedagemParaJsonLd) {
+  const amenityFeature = h.comodidades.map((key) => ({
+    "@type": "LocationFeatureSpecification",
+    name: comodidadeLabel(key),
+    value: true,
+  }))
+  // Cada quarto com preço vira uma Offer de HotelRoom (diária em BRL).
+  const makesOffer = h.quartos
+    .filter((q) => q.precoNoite != null)
+    .map((q) => ({
+      "@type": "Offer",
+      name: q.nome,
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        price: q.precoNoite,
+        priceCurrency: "BRL",
+        unitCode: "DAY",
+      },
+      itemOffered: {
+        "@type": "HotelRoom",
+        name: q.nome,
+        description: q.descricao ?? undefined,
+        ...(q.capacidade != null
+          ? { occupancy: { "@type": "QuantitativeValue", maxValue: q.capacidade } }
+          : {}),
+      },
+    }))
+  return {
+    ...(amenityFeature.length > 0 ? { amenityFeature } : {}),
+    ...(h.checkIn ? { checkinTime: h.checkIn } : {}),
+    ...(h.checkOut ? { checkoutTime: h.checkOut } : {}),
+    petsAllowed: h.aceitaPets,
+    ...(makesOffer.length > 0 ? { makesOffer } : {}),
+  }
+}
+
 export function comercioJsonLd(
   c: ComercioParaJsonLd,
-  opts: { horarios: HorarioDia[] | null; temCardapio: boolean },
+  opts: { horarios: HorarioDia[] | null; temCardapio: boolean; hospedagem?: HospedagemParaJsonLd | null },
 ) {
   const tipo = TIPO_POR_CATEGORIA[c.categorias[0]] ?? "LocalBusiness"
   const imagens = [...c.fotos.map((f) => f.url), ...(c.logo ? [c.logo] : [])]
@@ -111,6 +163,9 @@ export function comercioJsonLd(
       : undefined,
     ...(opts.temCardapio && tipo === "Restaurant"
       ? { hasMenu: `${SITE_URL}/vitrine/${c.slug}/cardapio` }
+      : {}),
+    ...(tipo === "LodgingBusiness" && opts.hospedagem
+      ? hospedagemFields(opts.hospedagem)
       : {}),
   }
 }

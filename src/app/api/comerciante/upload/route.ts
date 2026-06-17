@@ -61,6 +61,8 @@ export async function POST(req: NextRequest) {
       ? `${userId}/eventos/${Date.now()}.${ext}`
       : tipo === "cardapio"
       ? `${userId}/cardapio/${Date.now()}.${ext}`
+      : tipo === "quarto"
+      ? `${userId}/quartos/${Date.now()}.${ext}`
       : `${userId}/fotos/${Date.now()}.${ext}`
 
   const url = await uploadFile(path, file)

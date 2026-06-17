@@ -16,6 +16,7 @@ export interface ComercioItem {
   subcategorias: { id: string; nome: string }[]
   fotos: { url: string }[]
   statusAgora: { aberto: boolean } | null
+  precoDesde?: number | null
 }
 
 interface Props {
@@ -94,6 +95,13 @@ export function CardComercio({ item: c, categoriaFiltro }: Props) {
           <p className="text-[10px] mt-2 flex items-center gap-1" style={{ color: "var(--muted)" }}>
             <MapPin className="h-2.5 w-2.5 shrink-0" />
             {c.cidade}{c.estado ? `/${c.estado}` : ""}
+          </p>
+        )}
+        {c.precoDesde != null && (
+          <p className="text-xs mt-2 font-semibold" style={{ color: "var(--ink)" }}>
+            <span className="font-normal" style={{ color: "var(--muted)" }}>a partir de </span>
+            {c.precoDesde.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            <span className="font-normal" style={{ color: "var(--muted)" }}>/noite</span>
           </p>
         )}
       </div>

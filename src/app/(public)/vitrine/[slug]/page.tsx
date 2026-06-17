@@ -22,6 +22,7 @@ import { SecaoEventos } from "./_components/secao-eventos"
 import { SecaoHorarios } from "./_components/secao-horarios"
 import { SecaoLocalizacao } from "./_components/secao-localizacao"
 import { SecaoContato } from "./_components/secao-contato"
+import { VitrineHospedagem } from "./_components/vitrine-hospedagem"
 
 type ItemDestaque = {
   id: string
@@ -125,6 +126,11 @@ export default async function PaginaComercio({
       },
       eventos: { orderBy: { dataInicio: "asc" } },
       plan: true,
+      hospedagemPerfil: true,
+      tiposQuarto: {
+        where: { ativo: true },
+        orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
+      },
       cardapioCategorias: {
         orderBy: { ordem: "asc" },
         include: {
@@ -141,6 +147,7 @@ export default async function PaginaComercio({
   if (!comercio) notFound()
 
   const isPublicado = comercio.status === "ATIVO"
+  const isHospedagem = comercio.categorias[0] === "HOSPEDAGEM"
   const temEventos = temFeature(comercio.plan.features, "eventos")
   const temCardapio = temFeature(comercio.plan.features, "cardapio")
   const temCatalogo = temFeature(comercio.plan.features, "catalogo")
@@ -190,7 +197,27 @@ export default async function PaginaComercio({
       {isPublicado && <VitrineTracker comercioId={comercio.id} />}
       {isPublicado && (
         <>
-          <JsonLd data={comercioJsonLd(comercio, { horarios, temCardapio })} />
+          <JsonLd
+            data={comercioJsonLd(comercio, {
+              horarios,
+              temCardapio,
+              hospedagem:
+                isHospedagem && comercio.hospedagemPerfil
+                  ? {
+                      comodidades: comercio.hospedagemPerfil.comodidades,
+                      checkIn: comercio.hospedagemPerfil.checkIn,
+                      checkOut: comercio.hospedagemPerfil.checkOut,
+                      aceitaPets: comercio.hospedagemPerfil.aceitaPets,
+                      quartos: comercio.tiposQuarto.map((q) => ({
+                        nome: q.nome,
+                        descricao: q.descricao,
+                        precoNoite: q.precoNoite,
+                        capacidade: q.capacidade,
+                      })),
+                    }
+                  : null,
+            })}
+          />
           <JsonLd
             data={breadcrumbJsonLd([
               { nome: "Início", url: "/" },
@@ -204,6 +231,19 @@ export default async function PaginaComercio({
             ))}
         </>
       )}
+
+      {isHospedagem ? (
+        <VitrineHospedagem
+          comercio={comercio}
+          perfil={comercio.hospedagemPerfil}
+          quartos={comercio.tiposQuarto}
+          horarios={horarios}
+          diaAtual={diaAtual}
+          enderecoCompleto={enderecoCompleto}
+          isPublicado={isPublicado}
+        />
+      ) : (
+      <>
       <Topbar nome={comercio.nome} isPublicado={isPublicado} status={comercio.status} />
 
       <div className="max-w-2xl mx-auto px-4">
@@ -330,6 +370,8 @@ export default async function PaginaComercio({
           instagram={comercio.instagram}
         />
       </div>
+      </>
+      )}
 
       <div className="border-t border-border py-6 text-center text-xs text-muted-foreground">
         <span className="font-medium text-foreground">Guia SBS</span> · São Bento do Sapucaí

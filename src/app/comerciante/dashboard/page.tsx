@@ -43,6 +43,8 @@ export default async function ComercinateDashboard() {
           },
         },
         catalogoCategorias: { orderBy: [{ tipo: "asc" }, { ordem: "asc" }] },
+        hospedagemPerfil: true,
+        tiposQuarto: { orderBy: [{ ordem: "asc" }, { createdAt: "asc" }] },
         eventos:  { orderBy: { dataInicio: "asc" } },
         cardapioCategorias: {
           orderBy: { ordem: "asc" },

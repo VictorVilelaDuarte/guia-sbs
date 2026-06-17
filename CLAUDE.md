@@ -160,6 +160,8 @@ O middleware roda no Edge runtime da Vercel (limite de 1 MB). Para não ultrapas
 
 **Nunca importe `@/lib/auth` no middleware** — isso puxa Prisma + bcryptjs e estoura o limite do Edge.
 
+`authConfig` define **`trustHost: true`** — obrigatório no Auth.js v5 fora de dev e da Vercel (em produção self-hosted/`next start` o login quebra com `UntrustedHost`, que vira a tela "problem with the server configuration"). Como o `authConfig` é compartilhado pelo middleware e pelas rotas, cobre tudo.
+
 ### Layout público e navegação global
 
 Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão agrupadas no route group `src/app/(public)/`. O grupo não afeta os URLs — serve apenas para compartilhar o `(public)/layout.tsx`, que injeta automaticamente:
@@ -175,7 +177,7 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 
 **Admin e comerciante** ficam fora do `(public)/` e não recebem BottomNav nem Footer.
 
-**Home page (`(public)/page.tsx`)** é um Server Component que faz quatro queries e passa os dados para `<HomeClient>`:
+**Home page (`(public)/page.tsx`)** é um Server Component com **`export const revalidate = 180`** (ISR de 3 min) — sem isso a página seria estática do build e congelaria as contagens por categoria, os comércios recém-aprovados e, sobretudo, a seção "Abertos agora" (que depende da hora atual). Faz quatro queries e passa os dados para `<HomeClient>`:
 1. Contadores de categoria via `$queryRaw` (`unnest(categorias)`) → `Categories`
 2. Comércios ATIVO → filtra abertos agora (`OpenNow`) e os com `destaque_busca` no plano (`Featured`). Uma única query busca todos os ativos com `plan.features`, `fotos[0]` e `horarios`; os dois filtros são aplicados em JS.
 3. Eventos futuros (`dataInicio >= now`) de comércios ATIVO, ordenados por data, máx. 6 → `Events`. A data é formatada no servidor via `Intl.DateTimeFormat` com `timeZone: "America/Sao_Paulo"` (ex: "Sex 12 Jun").
@@ -550,6 +552,56 @@ Feature controlada pelo plano (`key: "catalogo"`). Produtos e serviços são ins
 - `src/components/public/catalogo-view.tsx` — grid público de produtos e serviços
 - `src/components/public/cardapio-destaques-vitrine.tsx` — carrossel de destaques para a vitrine (Client Component wrapper necessário pois a vitrine é Server Component)
 - `src/components/comerciante/produtos-manager.tsx` — lista de produtos/serviços do catálogo no painel, com prop `tipo` para filtrar. Agrupa por `CatalogoCategoria` (+ bloco "Outros"), com gestão de categorias inline (criar/renomear/excluir). Recebe `categoriasCatalogoIniciais` já filtradas por tipo pelo `dashboard-tabs`. Durante a busca, exibe lista plana (ignora agrupamento).
+
+### Hospedagem (vitrine e gestão específicas)
+
+Negócios de **categoria HOSPEDAGEM** têm vitrine e painel próprios, no modelo Booking/Airbnb:
+tipos de quarto, comodidades e políticas. **Sem motor de reservas** — o CTA de cada quarto
+abre o WhatsApp com mensagem pré-preenchida ("Consultar disponibilidade"). O acesso é
+**intrínseco à categoria** (não é feature de plano paga); limites de quartos/fotos seguem o
+plano (`fotos_ilimitadas` → ilimitado; senão `LIMITES_FREE.quartos`).
+
+**Modelo de dados:** `HospedagemPerfil` (1:1 com `Comercio`, criado sob demanda — comodidades
+`String[]`, check-in/out, política de cancelamento, aceita pets/crianças, formas de pagamento,
+observações) e `TipoQuarto` (N:1 — nome, descrição, `precoNoite` opcional, capacidade, camas,
+`tamanhoM2`, comodidades `String[]`, fotos `String[]`, ordem, ativo). Ambos `onDelete: Cascade`.
+
+**Catálogo de comodidades:** `src/lib/hospedagem.ts` — `COMODIDADES` (agrupadas: geral, quarto,
+lazer, vista, acessibilidade), `FORMAS_PAGAMENTO`, helpers (`agruparComodidades`,
+`comodidadeLabel`, `formaPagamentoLabel`) e as keys validadas pelas APIs. Os **ícones** ficam
+em `src/components/comerciante/hospedagem/comodidade-icons.tsx` (`ComodidadeIcon`) — separados
+do catálogo porque ícones lucide não serializam Server→Client; o componente é usável nos dois
+lados (não tem `"use client"`). Reutilizado pelo painel e pela vitrine.
+
+**APIs do comerciante:** `PUT /api/comerciante/hospedagem` (upsert do perfil); `POST
+/api/comerciante/hospedagem/quartos` e `PATCH`/`DELETE .../quartos/[id]`. Fotos de quarto
+seguem o padrão do `produto-dialog` — upload via `/api/comerciante/upload` com `tipo: "quarto"`
+(path `{userId}/quartos/{ts}.{ext}`); o array `fotos` é salvo no payload do quarto. `comodidades`
+e `formasPagamento` validados contra as keys do catálogo.
+
+**Painel:** aba "Hospedagem" em `dashboard-tabs.tsx`, gated por **categoria** (campo `categoria?`
+em `AbaConfig` + filtro `abasVisiveis`), visível só quando `categorias.includes("HOSPEDAGEM")`.
+`hospedagem-manager.tsx` orquestra `hospedagem/quartos-manager.tsx` (+ `quarto-dialog.tsx`, com
+upload/HEIC) e `hospedagem/perfil-form.tsx` (comodidades + políticas). A query do dashboard
+inclui `hospedagemPerfil` e `tiposQuarto`.
+
+**Vitrine pública:** `/vitrine/[slug]/page.tsx` faz branch por categoria principal — se
+`categorias[0] === "HOSPEDAGEM"`, renderiza `_components/vitrine-hospedagem.tsx` (reusa Topbar,
+Identidade, CtasRapidos, GaleriaFotos, SecaoHorarios, SecaoLocalizacao, SecaoContato).
+Ordem: Sobre → Fotos → Comodidades (`comodidades-publicas.tsx`) → Acomodações
+(`quartos-vitrine.tsx`, cards client que abrem `quarto-bottom-sheet.tsx`) → Políticas →
+Horários → Localização → Contato. Preço por quarto: "a partir de R$ X/noite" ou "Consultar
+valores" (quando `precoNoite` é null). O CTA de WhatsApp (card e sheet) leva
+`data-track="click_reserva"` e mensagem pré-preenchida com nome do quarto + nome do comércio.
+`StatusAberto` é omitido; horários só aparecem se cadastrados.
+
+**SEO e analytics:** `comercioJsonLd` (em `seo/jsonld.ts`) recebe um opcional `hospedagem` e, quando
+o subtipo é `LodgingBusiness`, emite `amenityFeature` (das comodidades), `checkinTime`/`checkoutTime`,
+`petsAllowed` e `makesOffer` com `HotelRoom` + `UnitPriceSpecification` (diária em BRL) por quarto
+com preço. O evento `click_reserva` é somado ao WhatsApp no resumo de analytics
+(`analytics/queries.ts`) — consulta de quarto é conversão via WhatsApp. A listagem `/hospedagem`
+mostra "a partir de R$/noite" no card (menor diária dos quartos ativos, via `groupBy` em
+`listagem.tsx` quando `categoriaFiltro === "HOSPEDAGEM"`).
 
 ## Fontes
 

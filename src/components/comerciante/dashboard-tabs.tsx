@@ -7,7 +7,9 @@ import { LogoUploader } from "@/components/comerciante/logo-uploader";
 import { FotosUploader } from "@/components/comerciante/fotos-uploader";
 import { ProdutosManager } from "@/components/comerciante/produtos-manager";
 import { CardapioManager } from "@/components/comerciante/cardapio-manager";
+import { HospedagemManager } from "@/components/comerciante/hospedagem-manager";
 import type { Produto, CardapioCategoria, CatalogoCategoria } from "@/components/comerciante/cardapio/types";
+import type { HospedagemPerfilData, TipoQuartoData } from "@/components/comerciante/hospedagem/types";
 import { TagsEditor } from "@/components/comerciante/tags-editor";
 import {
   EventosManager,
@@ -64,12 +66,16 @@ export interface ComercioParaDashboard {
   eventos: Evento[];
   cardapioCategorias: CardapioCategoria[];
   catalogoCategorias: CatalogoCategoria[];
+  hospedagemPerfil: HospedagemPerfilData | null;
+  tiposQuarto: TipoQuartoData[];
 }
 
 interface AbaConfig {
   id: string;
   label: string;
   feature?: FeatureKey;
+  // Quando definido, a aba só aparece se o comércio tiver essa categoria.
+  categoria?: string;
 }
 
 const ABAS: AbaConfig[] = [
@@ -77,6 +83,7 @@ const ABAS: AbaConfig[] = [
   // sem `feature`: a aba abre para todos — o plano FREE vê o teaser
   { id: "analytics", label: "Analytics" },
   { id: "fotos", label: "Fotos" },
+  { id: "hospedagem", label: "Hospedagem", categoria: "HOSPEDAGEM" },
   { id: "cardapio", label: "Cardápio", feature: "cardapio" },
   { id: "produtos", label: "Produtos" },
   { id: "servicos", label: "Serviços" },
@@ -100,6 +107,12 @@ export function DashboardTabs({
   const fotoLimite = ilimitado ? undefined : LIMITES_FREE.fotos;
   const tagLimite = ilimitado ? undefined : LIMITES_FREE.tags;
   const produtoLimite = ilimitado ? undefined : LIMITES_FREE.produtos;
+  const quartoLimite = ilimitado ? undefined : LIMITES_FREE.quartos;
+
+  // Abas com `categoria` só aparecem para comércios daquela categoria.
+  const abasVisiveis = ABAS.filter(
+    (a) => !a.categoria || comercio.categorias.includes(a.categoria),
+  );
 
   function handleTabClick(tabConfig: AbaConfig) {
     if (tabConfig.feature && !temFeature(features, tabConfig.feature)) {
@@ -114,7 +127,7 @@ export function DashboardTabs({
   return (
     <div>
       <div className="flex border-b border-border overflow-x-auto scrollbar-none -mx-6 px-6">
-        {ABAS.map((a) => {
+        {abasVisiveis.map((a) => {
           const bloqueada = !!a.feature && !temFeature(features, a.feature);
           const ativa = aba === a.id && !bloqueada;
 
@@ -194,6 +207,25 @@ export function DashboardTabs({
               <FotosUploader
                 fotosIniciais={comercio.fotos}
                 limite={fotoLimite}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {aba === "hospedagem" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Hospedagem</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Tipos de quarto, comodidades e políticas exibidos na sua vitrine.
+                {quartoLimite ? ` Plano Gratuito: até ${quartoLimite} quartos.` : ""}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <HospedagemManager
+                perfilInicial={comercio.hospedagemPerfil}
+                quartosIniciais={comercio.tiposQuarto}
+                quartoLimite={quartoLimite}
               />
             </CardContent>
           </Card>

@@ -132,8 +132,56 @@ model Comercio {
   catalogoCategorias CatalogoCategoria[]
   subcategorias      Subcategoria[]
   analyticsEvents    AnalyticsEvent[]
+  hospedagemPerfil   HospedagemPerfil?
+  tiposQuarto        TipoQuarto[]
 
   @@map("comercios")
+}
+
+// Perfil de hospedagem (1:1 com Comercio) — criado sob demanda só para
+// negócios de categoria HOSPEDAGEM. Guarda comodidades (chaves do catálogo
+// em src/lib/hospedagem.ts) e políticas da casa. Quartos ficam em TipoQuarto.
+model HospedagemPerfil {
+  id                   String   @id @default(cuid())
+  comercioId           String   @unique
+  comodidades          String[]
+  checkIn              String?
+  checkOut             String?
+  politicaCancelamento String?  @db.Text
+  aceitaPets           Boolean  @default(false)
+  aceitaCriancas       Boolean  @default(true)
+  formasPagamento      String[]
+  observacoes          String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@map("hospedagem_perfis")
+}
+
+// Tipo de quarto/acomodação de um negócio de hospedagem (N:1 com Comercio).
+// precoNoite null → "Consultar valores" na vitrine. comodidades é um
+// subconjunto do catálogo, específicas do quarto. fotos: URLs no bucket comercios.
+model TipoQuarto {
+  id          String   @id @default(cuid())
+  comercioId  String
+  nome        String
+  descricao   String?  @db.Text
+  precoNoite  Float?
+  capacidade  Int?
+  camas       String?
+  tamanhoM2   Float?
+  comodidades String[]
+  fotos       String[]
+  ordem       Int      @default(0)
+  ativo       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@map("tipos_quarto")
 }
 
 model Subcategoria {

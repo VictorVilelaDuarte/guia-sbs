@@ -42,6 +42,7 @@ export async function ListagemComercios({ categoriaFiltro, subcategoriaParam, pa
     prisma.comercio.findMany({
       where,
       select: {
+        id: true,
         slug: true,
         nome: true,
         logo: true,
@@ -62,12 +63,30 @@ export async function ListagemComercios({ categoriaFiltro, subcategoriaParam, pa
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
+  // Em /hospedagem, mostra a menor diária por comércio ("a partir de R$/noite").
+  let precoDesdePorComercio: Map<string, number> | null = null
+  if (categoriaFiltro === "HOSPEDAGEM" && comercios.length > 0) {
+    const grupos = await prisma.tipoQuarto.groupBy({
+      by: ["comercioId"],
+      where: {
+        comercioId: { in: comercios.map((c) => c.id) },
+        ativo: true,
+        precoNoite: { not: null },
+      },
+      _min: { precoNoite: true },
+    })
+    precoDesdePorComercio = new Map(
+      grupos.flatMap((g) => (g._min.precoNoite != null ? [[g.comercioId, g._min.precoNoite] as const] : [])),
+    )
+  }
+
   const dia = getDiaAtual()
   const items = comercios.map((c) => {
     const horarios = parseHorarios(c.horarios)
     const hoje = horarios?.find((h) => h.dia === dia) ?? null
     const statusAgora = hoje && horarios ? estaAbertoAgora(hoje, horarios) : null
-    return { ...c, statusAgora }
+    const precoDesde = precoDesdePorComercio?.get(c.id) ?? null
+    return { ...c, statusAgora, precoDesde }
   })
 
   items.sort((a, b) => {

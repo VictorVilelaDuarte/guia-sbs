@@ -31,7 +31,7 @@ async function totaisJanela(
     where: {
       comercioId,
       createdAt: { gte, ...(lt ? { lt } : {}) },
-      tipo: { in: ["view", "click_whatsapp", "click_rota"] },
+      tipo: { in: ["view", "click_whatsapp", "click_reserva", "click_rota"] },
     },
     _count: { _all: true },
   })
@@ -39,7 +39,9 @@ async function totaisJanela(
     grupos.find((g) => g.tipo === tipo)?._count._all ?? 0
   return {
     views: get("view"),
-    whatsapp: get("click_whatsapp"),
+    // Consulta de disponibilidade de quarto (hospedagem) também abre o
+    // WhatsApp — conta como conversão de WhatsApp.
+    whatsapp: get("click_whatsapp") + get("click_reserva"),
     rotas: get("click_rota"),
   }
 }
@@ -105,7 +107,7 @@ export async function getAnalyticsResumo(comercioId: string): Promise<AnalyticsR
         by: ["tipo"],
         where: {
           comercioId,
-          tipo: { in: ["view", "cardapio_view", "click_whatsapp"] },
+          tipo: { in: ["view", "cardapio_view", "click_whatsapp", "click_reserva"] },
           createdAt: { gte: inicio30 },
         },
         _count: { _all: true },
@@ -161,7 +163,7 @@ export async function getAnalyticsResumo(comercioId: string): Promise<AnalyticsR
     funil: {
       views: getFunil("view"),
       cardapio: getFunil("cardapio_view"),
-      whatsapp: getFunil("click_whatsapp"),
+      whatsapp: getFunil("click_whatsapp") + getFunil("click_reserva"),
     },
     pico,
   }

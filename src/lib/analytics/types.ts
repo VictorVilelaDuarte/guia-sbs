@@ -10,6 +10,7 @@ export const TIPOS_EVENTO = [
   "click_site",
   "click_rota",
   "click_share",
+  "click_reserva",
   "cardapio_view",
   "catalogo_view",
   "item_view",
