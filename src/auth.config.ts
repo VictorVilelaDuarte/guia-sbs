@@ -1,6 +1,10 @@
 import type { NextAuthConfig } from "next-auth"
 
 export const authConfig = {
+  // Auth.js v5 só confia em hosts conhecidos automaticamente em dev e na
+  // Vercel. Em produção self-hosted (next start, VPS, Docker) é preciso
+  // declarar explicitamente, senão o login quebra com UntrustedHost.
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/admin/login" },
   callbacks: {

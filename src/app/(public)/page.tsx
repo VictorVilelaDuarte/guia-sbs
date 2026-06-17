@@ -3,6 +3,12 @@ import { parseHorarios, getDiaAtual, estaAbertoAgora } from "@/lib/horarios";
 import { temFeature } from "@/lib/plan-features";
 import { HomeClient } from "./home-client";
 
+// ISR de 3 min: a home depende de dados que mudam fora do build (contagem
+// por categoria, comércios recém-aprovados e a seção "Abertos agora"). Sem
+// revalidate ela seria estática e congelaria tudo no momento do build.
+// Trade-off aceito: "Abertos agora" pode ficar até ~3 min defasado.
+export const revalidate = 180;
+
 function formatEventDate(date: Date): string {
   const opts = { timeZone: "America/Sao_Paulo" } as const;
   const weekday = new Intl.DateTimeFormat("pt-BR", { ...opts, weekday: "short" })

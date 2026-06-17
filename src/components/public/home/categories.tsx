@@ -131,7 +131,7 @@ function CategoryCard({
         width: "100%",
         textDecoration: "none",
       }}
-      aria-label={`${label} — ${count} locais`}
+      aria-label={`${label} — ${count} ${count === 1 ? "local" : "locais"}`}
     >
       <div
         style={{
@@ -171,7 +171,7 @@ function CategoryCard({
       <div
         style={{ fontSize: 10, color: "var(--muted)", letterSpacing: ".02em" }}
       >
-        {count} locais
+        {count} {count === 1 ? "local" : "locais"}
       </div>
     </Link>
   );
