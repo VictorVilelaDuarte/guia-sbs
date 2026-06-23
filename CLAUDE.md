@@ -640,6 +640,10 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 - ~~Página pública de eventos da cidade (`/eventos`)~~ — implementada (ver seção Eventos da cidade)
 - ~~Página pública de pontos turísticos~~ — implementada (listagem + detalhe)
 - ~~Mapa interativo da cidade~~ — implementado (`/mapa`)
+- **Pedido online no cardápio** — carrinho + checkout + acompanhamento por token + aba Pedidos no
+  dashboard. Feature paga (`pedido_online`, depende de `cardapio`). **Plano completo e decisões
+  fechadas em [`docs/pedido-online.md`](docs/pedido-online.md)** — consultar antes de iniciar
+  qualquer fase. Ainda não implementado.
 - Avaliações de visitantes
 - ~~Analytics para comerciantes~~ — implementado (ver seção Analytics e [`docs/analytics.md`](docs/analytics.md))
 - QR Code do perfil para impressão — feature flag já existe, falta implementar (gerar link com `?src=qr` para o analytics)
