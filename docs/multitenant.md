@@ -34,6 +34,7 @@ slugs/storage/auth keyed por IDs globais, e a Vercel suporta wildcard domain
 | `Comercio.slug` | `@unique` **global** | vira `@@unique([slug, cityId])` |
 | `PontoTuristico.slug` | `@unique` **global** | vira `@@unique([slug, cityId])` |
 | `Subcategoria` | `@@unique([nome, categoria])` global | decidir: global ou por cidade |
+| `Bairro` (catálogo de entrega) | `@@unique([nome, cidade])` global | ganha `cityId` (tenant dono do catálogo) na Fase 0; `Bairro.cidade`/`uf` = onde a área fica (pode ser cidade vizinha) ≠ tenant. `ZonaEntrega` herda a cidade via `comercioId` |
 | Queries públicas/admin sem escopo | **~28 call sites** (`findMany`/`count`/`groupBy`/`$queryRaw` em home, /comercios, /mapa, /pontos-turisticos, vitrine, admin) | todas precisam de `where: { cityId }` |
 | Branding/copy hardcoded | **26 arquivos** citam "São Bento do Sapucaí"/"Guia SBS"/"SBS" | virar config do tenant |
 | Centro do mapa | `SBS_CENTER = { lat: -22.6989, lng: -45.7281 }` em `mapa-client.tsx` | vira `city.lat/lng` |

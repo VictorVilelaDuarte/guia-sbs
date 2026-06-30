@@ -4,9 +4,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trackCtx } from "@/lib/analytics/track";
+import type { AddCarrinho } from "@/lib/carrinho";
 
 const DIAMOND = "✦";
 
@@ -33,6 +34,10 @@ interface Props {
   produto: ProdutoSheet | null;
   now: number;
   onClose: () => void;
+  // Quando presente, ativa o "modo pedido": variações selecionáveis, seletor de
+  // quantidade, campo de observação e botão "Adicionar ao carrinho" no rodapé.
+  // Ausente = comportamento somente-leitura (catálogo / cardápio sem pedido).
+  onAddToCart?: (add: AddCarrinho) => void;
 }
 
 function formatBRL(v: number) {
@@ -49,12 +54,18 @@ function isPromoAtiva(
   return new Date(promoFim).getTime() > now;
 }
 
-export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
+export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props) {
   // Mantém o último produto em memória para renderizar durante o fechamento
   const [mounted, setMounted] = useState(false);
   const [displayed, setDisplayed] = useState<ProdutoSheet | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
+
+  // Modo pedido — seleção de variação, quantidade e observação
+  const modoPedido = !!onAddToCart;
+  const [variacaoSel, setVariacaoSel] = useState<string | null>(null);
+  const [quantidade, setQuantidade] = useState(1);
+  const [observacao, setObservacao] = useState("");
 
   // Arrastar para fechar
   const [dragOffset, setDragOffset] = useState(0);
@@ -70,6 +81,9 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
     if (produto) {
       setDisplayed(produto);
       setCarouselIndex(0);
+      setVariacaoSel(produto.variacoes[0]?.id ?? null);
+      setQuantidade(1);
+      setObservacao("");
       // no-op fora de páginas de comércio (contexto setado pelo VitrineTracker)
       trackCtx("item_view", { meta: { itemId: produto.id, titulo: produto.titulo } });
       const raf = requestAnimationFrame(() => setIsVisible(true));
@@ -168,6 +182,29 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
   const precoBase = preco ?? variacoes[0]?.preco ?? null;
   const precoFinal = promoAtiva ? precoPromo! : precoBase;
   const temMultiImagens = imagens.length > 1;
+
+  // Modo pedido: preço unitário da opção escolhida e total da linha
+  const precoUnitSel =
+    variacoes.length > 0
+      ? (variacoes.find((v) => v.id === variacaoSel)?.preco ?? null)
+      : precoFinal;
+  const totalLinha = precoUnitSel != null ? precoUnitSel * quantidade : null;
+
+  const handleAdd = () => {
+    if (!onAddToCart || precoUnitSel == null) return;
+    const variacao = variacoes.find((v) => v.id === variacaoSel) ?? null;
+    onAddToCart({
+      produtoId: displayed.id,
+      titulo,
+      imagem: imagens[0] ?? null,
+      variacaoId: variacoes.length > 0 ? (variacao?.id ?? null) : null,
+      variacaoNome: variacoes.length > 0 ? (variacao?.nome ?? null) : null,
+      precoUnit: precoUnitSel,
+      quantidade,
+      observacao: observacao.trim() || null,
+    });
+    onClose();
+  };
 
   return createPortal(
     /* Wrapper fixo cobre 100% do viewport — garante full-width mesmo com
@@ -362,22 +399,63 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
             </p>
           )}
 
-          {/* Preço */}
+          {/* Preço / variações */}
           <div className={cn(descricao ? "mt-4" : "mt-1")}>
             {variacoes.length > 0 ? (
-              <div className="flex flex-col divide-y divide-stone-100">
-                {variacoes.map((v) => (
-                  <div
-                    key={v.id}
-                    className="flex items-center justify-between py-2.5"
-                  >
-                    <span className="text-sm text-stone-600">{v.nome}</span>
-                    <span className="text-sm font-bold text-stone-900">
-                      {formatBRL(v.preco)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              modoPedido ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-stone-400 mb-0.5">
+                    Escolha uma opção
+                  </p>
+                  {variacoes.map((v) => {
+                    const sel = v.id === variacaoSel;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setVariacaoSel(v.id)}
+                        className={cn(
+                          "flex items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors",
+                          sel
+                            ? "border-stone-800 bg-stone-50"
+                            : "border-stone-200 hover:border-stone-300",
+                        )}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <span
+                            className={cn(
+                              "flex h-4 w-4 items-center justify-center rounded-full border-2",
+                              sel ? "border-stone-800" : "border-stone-300",
+                            )}
+                          >
+                            {sel && (
+                              <span className="h-2 w-2 rounded-full bg-stone-800" />
+                            )}
+                          </span>
+                          <span className="text-sm text-stone-700">{v.nome}</span>
+                        </span>
+                        <span className="text-sm font-bold text-stone-900">
+                          {formatBRL(v.preco)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col divide-y divide-stone-100">
+                  {variacoes.map((v) => (
+                    <div
+                      key={v.id}
+                      className="flex items-center justify-between py-2.5"
+                    >
+                      <span className="text-sm text-stone-600">{v.nome}</span>
+                      <span className="text-sm font-bold text-stone-900">
+                        {formatBRL(v.preco)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )
             ) : precoFinal != null ? (
               <div className="flex items-baseline gap-2">
                 <span className="text-xl font-bold text-stone-900">
@@ -393,7 +471,69 @@ export function ProdutoBottomSheet({ produto, now, onClose }: Props) {
               </div>
             ) : null}
           </div>
+
+          {/* Modo pedido: quantidade + observação */}
+          {modoPedido && (
+            <div className="mt-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-stone-700">
+                  Quantidade
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setQuantidade((q) => Math.max(1, q - 1))}
+                    disabled={quantidade <= 1}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 text-stone-700 disabled:opacity-40 active:bg-stone-100"
+                    aria-label="Diminuir"
+                  >
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="w-6 text-center text-base font-semibold tabular-nums">
+                    {quantidade}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setQuantidade((q) => Math.min(99, q + 1))}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 text-stone-700 active:bg-stone-100"
+                    aria-label="Aumentar"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-stone-700">
+                  Observação{" "}
+                  <span className="font-normal text-stone-400">(opcional)</span>
+                </label>
+                <textarea
+                  value={observacao}
+                  onChange={(e) => setObservacao(e.target.value)}
+                  rows={2}
+                  maxLength={280}
+                  placeholder="Ex: sem cebola, ponto da carne…"
+                  className="mt-1.5 w-full resize-none rounded-xl border border-stone-200 px-3 py-2 text-[16px] placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+                />
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Rodapé — botão adicionar (modo pedido) */}
+        {modoPedido && (
+          <div className="shrink-0 border-t border-stone-100 bg-white px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={precoUnitSel == null}
+              className="flex w-full items-center justify-between rounded-2xl bg-stone-900 px-5 py-3.5 font-semibold text-white transition-colors hover:bg-stone-800 active:bg-black disabled:opacity-50"
+            >
+              <span>Adicionar</span>
+              {totalLinha != null && <span>{formatBRL(totalLinha)}</span>}
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     portalRoot,

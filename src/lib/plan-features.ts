@@ -34,6 +34,11 @@ export const FEATURES_DISPONIVEIS = [
     label: "Catálogo",
     descricao: "Catálogo público de produtos e serviços no perfil do comércio",
   },
+  {
+    key: "pedido_online",
+    label: "Pedido online",
+    descricao: "Receber pedidos pelo cardápio com carrinho, checkout e painel de gestão (requer Cardápio)",
+  },
 ] as const
 
 export type FeatureKey = (typeof FEATURES_DISPONIVEIS)[number]["key"]

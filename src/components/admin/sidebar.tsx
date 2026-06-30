@@ -17,6 +17,7 @@ import {
   CreditCard,
   Tag,
   Mountain,
+  Map,
 } from "lucide-react"
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/admin/usuarios",            label: "Usuários",           icon: Users },
   { href: "/admin/comercios",           label: "Comércios",          icon: Store },
   { href: "/admin/subcategorias",       label: "Subcategorias",      icon: Tag },
+  { href: "/admin/bairros",             label: "Bairros",            icon: Map },
   { href: "/admin/eventos",             label: "Eventos",            icon: CalendarDays },
   { href: "/admin/pontos-turisticos",   label: "P. Turísticos",      icon: Mountain },
   { href: "/admin/planos",              label: "Planos",             icon: CreditCard },

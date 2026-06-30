@@ -115,6 +115,7 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
       telefone: true,
       horarios: true,
       plan: { select: { features: true } },
+      pedidoConfig: { select: { aceitaPedidos: true } },
       cardapioCategorias: {
         orderBy: { ordem: "asc" },
         include: {
@@ -143,6 +144,13 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now()
 
+  // Pedido online: feature do plano + comerciante aceitando. Só comércios ATIVO
+  // recebem pedidos (pré-visualização não deve permitir compra).
+  const pedidoAtivo =
+    comercio.status === "ATIVO" &&
+    temFeature(comercio.plan.features, "pedido_online") &&
+    !!comercio.pedidoConfig?.aceitaPedidos
+
   return (
     <>
       {comercio.status === "ATIVO" && (
@@ -156,6 +164,7 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
       telefone={comercio.telefone}
       statusAgora={statusAgora}
       now={now}
+      pedidoAtivo={pedidoAtivo}
       categorias={categoriasComProdutos.map((cat) => ({
         id: cat.id,
         nome: cat.nome,

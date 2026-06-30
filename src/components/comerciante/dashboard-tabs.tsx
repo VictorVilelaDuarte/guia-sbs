@@ -8,6 +8,10 @@ import { FotosUploader } from "@/components/comerciante/fotos-uploader";
 import { ProdutosManager } from "@/components/comerciante/produtos-manager";
 import { CardapioManager } from "@/components/comerciante/cardapio-manager";
 import { HospedagemManager } from "@/components/comerciante/hospedagem-manager";
+import { PedidosManager } from "@/components/comerciante/pedidos/pedidos-manager";
+import { PedidoConfigForm } from "@/components/comerciante/pedidos/pedido-config-form";
+import { ZonasEntregaManager } from "@/components/comerciante/pedidos/zonas-entrega-manager";
+import type { PedidoAdmin, PedidoConfigData, BairroCatalogo, ZonaEntregaData } from "@/components/comerciante/pedidos/types";
 import type { Produto, CardapioCategoria, CatalogoCategoria } from "@/components/comerciante/cardapio/types";
 import type { HospedagemPerfilData, TipoQuartoData } from "@/components/comerciante/hospedagem/types";
 import { TagsEditor } from "@/components/comerciante/tags-editor";
@@ -85,6 +89,7 @@ const ABAS: AbaConfig[] = [
   { id: "fotos", label: "Fotos" },
   { id: "hospedagem", label: "Hospedagem", categoria: "HOSPEDAGEM" },
   { id: "cardapio", label: "Cardápio", feature: "cardapio" },
+  { id: "pedidos", label: "Pedidos", feature: "pedido_online" },
   { id: "produtos", label: "Produtos" },
   { id: "servicos", label: "Serviços" },
   { id: "eventos", label: "Eventos", feature: "eventos" },
@@ -95,13 +100,34 @@ export function DashboardTabs({
   comercio,
   subcategoriasDisponiveis,
   analytics,
+  pedidos,
+  pedidoConfig,
+  bairrosCatalogo,
+  zonasEntrega,
+  abaInicial,
 }: {
   comercio: ComercioParaDashboard;
   subcategoriasDisponiveis: SubcategoriaBasica[];
   analytics: AnalyticsResumo;
+  pedidos: PedidoAdmin[];
+  pedidoConfig: PedidoConfigData | null;
+  bairrosCatalogo: BairroCatalogo[];
+  zonasEntrega: ZonaEntregaData[];
+  abaInicial?: string;
 }) {
-  const [aba, setAba] = useState("informacoes");
   const features = comercio.plan.features;
+
+  // Deep-link via ?tab= (ex.: clique na notificação de pedido). Valida que a
+  // aba existe, é da categoria do comércio e não está bloqueada por plano —
+  // determinístico (mesmo no SSR e client, sem hydration mismatch).
+  const [aba, setAba] = useState(() => {
+    if (!abaInicial) return "informacoes";
+    const cfg = ABAS.find((a) => a.id === abaInicial);
+    if (!cfg) return "informacoes";
+    if (cfg.categoria && !comercio.categorias.includes(cfg.categoria)) return "informacoes";
+    if (cfg.feature && !temFeature(features, cfg.feature)) return "informacoes";
+    return abaInicial;
+  });
 
   const ilimitado = temFeature(features, "fotos_ilimitadas");
   const fotoLimite = ilimitado ? undefined : LIMITES_FREE.fotos;
@@ -292,6 +318,52 @@ export function DashboardTabs({
               />
             </CardContent>
           </Card>
+        )}
+
+        {aba === "pedidos" && (
+          <>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Pedidos recebidos</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Atualiza sozinho a cada poucos segundos. Mantenha esta aba
+                  aberta durante o expediente para ser avisado de novos pedidos.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <PedidosManager pedidosIniciais={pedidos} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Configuração de pedidos</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Defina entrega, retirada, taxa e formas de pagamento. Ligue
+                  &ldquo;Aceitar pedidos&rdquo; para começar a receber.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <PedidoConfigForm configInicial={pedidoConfig} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Bairros de entrega</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Escolha os bairros que você atende e a taxa de cada um. A taxa
+                  do bairro escolhido pelo cliente é somada ao pedido.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <ZonasEntregaManager
+                  catalogo={bairrosCatalogo}
+                  zonasIniciais={zonasEntrega}
+                />
+              </CardContent>
+            </Card>
+          </>
         )}
 
         {aba === "eventos" && (
