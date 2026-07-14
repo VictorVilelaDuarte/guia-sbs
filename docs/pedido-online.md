@@ -207,10 +207,18 @@ CONCLUIDO / RECUSADO / CANCELADO = terminais
 1. **Revalidação no servidor (anti-tamper).** O `POST /api/pedidos` ignora preços enviados pelo
    cliente: recarrega cada `Produto`/variação do banco, recalcula `subtotal`/`total`, rejeita
    itens `disponivel: false` ou inexistentes.
-2. **Loja precisa estar aceitando.** Exige `PedidoConfig.aceitaPedidos === true`. (Bloqueio por
-   "fechada agora" é decisão de Fase 2 — agendamento.)
+2. **Loja precisa estar aceitando e aberta.** Exige `PedidoConfig.aceitaPedidos === true` **e**
+   que a loja esteja dentro do horário de funcionamento (`estaAbertoAgora` de `src/lib/horarios.ts`,
+   sobre o dia atual em `America/Sao_Paulo`). Validado no servidor (`POST /api/pedidos`, 400) e na
+   UI (banner + botão "Loja fechada" no checkout). **Fallback:** comércio sem horário cadastrado
+   não é bloqueado (não há como saber) — vale só o `aceitaPedidos`. Agendamento ("pedir para mais
+   tarde") fica para a Fase 2.
 3. **Pedido mínimo.** Bloqueia checkout de **entrega** abaixo de `pedidoMinimo`.
-4. **Taxa de entrega.** Fixa; soma no total apenas quando `tipoEntrega === ENTREGA`.
+4. **Taxa de entrega por bairro (zona).** O cliente escolhe um **bairro** no checkout; a taxa
+   vem da `ZonaEntrega` correspondente da loja, somada ao total só em `ENTREGA`. O servidor
+   recarrega a zona do banco (anti-tamper) — ignora qualquer taxa enviada pelo cliente. Bairro
+   não atendido → pedido recusado ("Não entregamos nessa região"). Detalhes na seção
+   **Taxa de entrega por bairro** abaixo.
 5. **Snapshot imutável.** Itens e preços ficam congelados no pedido; alterar o cardápio depois
    não afeta pedidos passados.
 6. **Troco.** Se `dinheiro`, perguntar "troco para quanto?" (opcional); se informado, validar
@@ -224,19 +232,45 @@ CONCLUIDO / RECUSADO / CANCELADO = terminais
 
 ---
 
-## Notificação do comerciante (MVP: polling)
+## Notificação do comerciante (implementado: polling + Web Push)
 
-Não há push/realtime/e-mail no projeto. No MVP:
+Duas camadas complementares, ambas sem custo recorrente:
 
-- O `pedidos-manager` faz **polling** em `GET /api/comerciante/pedidos` a cada ~15s enquanto a aba
-  está aberta.
-- Pedido novo dispara **som** + **contador** na aba + **título da janela piscando**.
-- Limitação aceita: depende do comerciante manter o painel aberto.
+**1. In-app (painel aberto) — polling.** O `pedidos-manager` faz **polling** em
+`GET /api/comerciante/pedidos` a cada ~15s enquanto a aba está aberta. Pedido novo dispara
+**som** + **contador** na aba + **título da janela piscando**. Mantém a lista visual em sincronia.
 
-**Fase 2 — Web Push** (service worker + VAPID) para notificar com o navegador fechado, tornando a
-feature plenamente utilizável num restaurante. **WhatsApp automático não é viável** sem API
-oficial; o máximo é um `wa.me` pré-preenchido que o **cliente** dispara como espelho — não
-substitui o painel como fonte de verdade.
+**2. Web Push (navegador fechado) — implementado.** Alerta do sistema operacional a cada novo
+pedido, mesmo com o navegador fechado (desktop e Android). É o que torna a feature usável de
+verdade num restaurante. Componentes:
+
+- **VAPID** — chaves em `.env` (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` exposta ao client;
+  `VAPID_PRIVATE_KEY` + `VAPID_SUBJECT` só no servidor). Gerar com
+  `node -e "console.log(require('web-push').generateVAPIDKeys())"`. **Em produção, setar as três
+  na Vercel.**
+- **`src/lib/push.ts`** — `enviarPush(comercioId, payload)` (best-effort, nunca lança; remove
+  inscrições 404/410) + `payloadNovoPedido(...)`. Dispara dentro do `POST /api/pedidos` após criar
+  o pedido, em `try/catch` (falha de push não invalida pedido).
+- **`public/sw-push.js`** — service worker **mínimo** (só `push` + `notificationclick` → foca/abre
+  o dashboard). **Não é PWA**: sem manifest, sem cache, sem fetch handler.
+- **`model PushSubscription`** (1:N com `Comercio`, `endpoint` único) — uma inscrição por aparelho.
+- **`POST/DELETE /api/comerciante/push`** — registra/remove a inscrição (guard `COMERCIANTE`).
+- **`pedidos/push-toggle.tsx`** — botão "Ativar notificações neste aparelho" no topo do
+  `pedidos-manager`: pede permissão, registra o SW, inscreve no `PushManager` e salva no servidor.
+
+> **Decisão (descartado o Supabase Realtime):** considerou-se trocar o polling por Supabase
+> Realtime, mas o projeto não usa o SDK Supabase (só REST com service role) nem expõe anon key, e
+> Realtime exigiria isso + RLS/publication. Como o Web Push já dá alerta instantâneo com a aba
+> aberta **ou** fechada, o ganho do Realtime sobre o polling seria marginal. Mantido o polling.
+
+> **Limitação iOS:** no iPhone o Web Push só funciona com o site instalado como PWA (restrição da
+> Apple). Como a instalação foi descartada por enquanto, no iPhone vale o polling + som (com a aba
+> aberta). O `push-toggle` detecta a ausência de suporte e orienta a manter a aba aberta.
+
+**Fase 2 — Cloud API (WhatsApp) para o CLIENTE.** Confirmação automática do pedido no WhatsApp do
+**comprador** via WhatsApp Business Cloud API (oficial, ~R$ 0,04/msg utility, número central da
+plataforma + templates aprovados) — vira argumento de venda. WhatsApp automático **não** é viável
+sem a API oficial. Opção grátis adicional: **Telegram bot** como canal extra de alerta da loja.
 
 ---
 
@@ -292,6 +326,42 @@ Só com ambos `true` o cardápio renderiza os botões "Adicionar" e a barra de c
 cardápio segue exatamente como hoje (somente leitura).
 
 ---
+
+## Taxa de entrega por bairro
+
+A taxa de entrega é **por bairro/área**, não fixa. Modelo de dados:
+
+- **`Bairro`** — catálogo canônico da cidade (e cidades vizinhas: `cidade`/`uf`, ex.: Gonçalves/MG),
+  populado por seed (`npm run db:seed:bairros`, base na lista real da Hot Stone Pizzaria) e
+  gerenciado pelo admin em **`/admin/bairros`**. `@@unique([nome, cidade])`.
+- **`ZonaEntrega`** — a área que UMA loja atende + a taxa dela. Aponta para o catálogo
+  (`bairroId`) ou é **custom privada da loja** (`bairroId` null). `nome`/`cidade`/`uf` são
+  **denormalizados** (snapshot) — o checkout e o pedido leem direto da zona, sem depender do
+  catálogo (que pode mudar/sumir; `onDelete: SetNull`).
+
+**Fluxos:**
+- **Admin** (`/admin/bairros`): CRUD do catálogo, agrupado por cidade.
+- **Comerciante** (aba Pedidos → "Bairros de entrega", `zonas-entrega-manager.tsx`): busca no
+  catálogo, marca os bairros que atende + taxa de cada, e adiciona áreas custom. Salva via
+  **`PUT /api/comerciante/zonas-entrega`** (substitui o conjunto; anti-tamper recarrega
+  nome/cidade/uf do catálogo).
+- **Cliente** (checkout): `select` de bairro agrupado por cidade (`optgroup`); a taxa entra no
+  resumo ao escolher. Bairro fora da lista → orientado a usar retirada.
+- **Servidor** (`POST /api/pedidos`): recebe `zonaId`, recarrega a `ZonaEntrega` da loja
+  (`ativo`), usa `zona.taxa` e grava `bairro = zona.nome` como snapshot. Zona inexistente/de
+  outra loja → "Não entregamos nessa região".
+
+> **Decisão (taxa fixa aposentada):** `PedidoConfig.taxaEntrega` e `bairrosAtendidos` foram
+> **removidos** — toda taxa de entrega passa pelas zonas. Loja com entrega ativa precisa cadastrar
+> ao menos um bairro; o checkout avisa quando não há zonas.
+
+> **Multitenant:** `Bairro` é "model da cidade" — ganha `cityId` na Fase 0 (ver
+> `docs/multitenant.md`), distinto de `Bairro.cidade` (onde a área fica fisicamente). `ZonaEntrega`
+> herda a cidade via `comercioId`.
+
+> **Granularidade:** o catálogo inclui trechos finos (ex.: "Paiol Grande — Km 2 ao 3") e pousadas,
+> espelhando como o delivery local realmente precifica por distância na serra. Evolução futura:
+> taxa por raio/distância (geocodificação), combinável com as zonas.
 
 ## Faseamento
 

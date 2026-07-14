@@ -643,7 +643,12 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
 - **Pedido online no cardápio** — carrinho + checkout + acompanhamento por token + aba Pedidos no
   dashboard. Feature paga (`pedido_online`, depende de `cardapio`). **Plano completo e decisões
   fechadas em [`docs/pedido-online.md`](docs/pedido-online.md)** — consultar antes de iniciar
-  qualquer fase. Ainda não implementado.
+  qualquer fase. **Fase 1 (MVP) implementada** na branch `feat/pedido-online`, incluindo:
+  notificação ao comerciante via **Web Push** (`src/lib/push.ts` + `public/sw-push.js` + VAPID;
+  em produção, setar `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` na Vercel),
+  bloqueio de pedido fora do horário, e **taxa de entrega por bairro** (models `Bairro`/`ZonaEntrega`,
+  catálogo em `/admin/bairros`, seed `npm run db:seed:bairros`). Fase 2 pendente: WhatsApp Cloud API
+  para o cliente, agendamento, taxa por raio. Detalhes em `docs/pedido-online.md`.
 - Avaliações de visitantes
 - ~~Analytics para comerciantes~~ — implementado (ver seção Analytics e [`docs/analytics.md`](docs/analytics.md))
 - QR Code do perfil para impressão — feature flag já existe, falta implementar (gerar link com `?src=qr` para o analytics)

@@ -12,6 +12,8 @@ import {
 import { type Categoria } from "./cardapio/types";
 import { DestaqueCard } from "./cardapio/destaque-card";
 import { ItemRow } from "./cardapio/item-row";
+import { CartBar } from "./cardapio/cart-bar";
+import { useCarrinho } from "@/lib/carrinho";
 
 const DIAMOND = "✦";
 const DESTAQUES_ID = "__destaques__";
@@ -25,6 +27,8 @@ interface Props {
   statusAgora: { aberto: boolean; label: string } | null;
   categorias: Categoria[];
   now: number;
+  // Pedido online ativo (feature do plano + comerciante aceitando pedidos).
+  pedidoAtivo?: boolean;
 }
 
 export function CardapioView({
@@ -36,7 +40,10 @@ export function CardapioView({
   statusAgora,
   categorias,
   now,
+  pedidoAtivo = false,
 }: Props) {
+  const carrinho = useCarrinho(slug);
+  const mostrarCarrinho = pedidoAtivo && carrinho.mounted && carrinho.contagem > 0;
   const produtosEmDestaque = categorias.flatMap((cat) =>
     cat.produtos
       .filter((p) => p.destaque)
@@ -270,10 +277,11 @@ export function CardapioView({
         produto={selectedProduto}
         now={now}
         onClose={() => setSelectedProduto(null)}
+        onAddToCart={pedidoAtivo ? carrinho.adicionar : undefined}
       />
 
       {/* Conteúdo */}
-      <div className="pb-16">
+      <div className={mostrarCarrinho ? "pb-28" : "pb-16"}>
         {buscaAtiva ? (
           <div>
             <p className="text-xs text-stone-400 px-4 py-3">
@@ -365,6 +373,14 @@ export function CardapioView({
           </>
         )}
       </div>
+
+      {mostrarCarrinho && (
+        <CartBar
+          slug={slug}
+          contagem={carrinho.contagem}
+          subtotal={carrinho.subtotal}
+        />
+      )}
     </div>
   );
 }

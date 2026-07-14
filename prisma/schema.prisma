@@ -50,6 +50,24 @@ enum Dificuldade {
   DIFICIL
 }
 
+// Status de um pedido online. Transições válidas vivem em src/lib/pedidos.ts
+// (TRANSICOES / podeTransicionar) — não deixar o status virar campo livre.
+enum PedidoStatus {
+  AGUARDANDO // recém-criado, comerciante ainda não agiu
+  ACEITO // confirmado pela loja
+  EM_PREPARO
+  PRONTO // retirada: pronto p/ buscar | entrega: pronto p/ sair
+  SAIU_ENTREGA // só entrega
+  CONCLUIDO // entregue / retirado (terminal)
+  RECUSADO // loja recusou (terminal)
+  CANCELADO // cliente ou loja cancelou (terminal)
+}
+
+enum TipoEntrega {
+  ENTREGA
+  RETIRADA
+}
+
 model Plan {
   id        String   @id @default(cuid())
   slug      String   @unique
@@ -96,31 +114,31 @@ model Session {
 }
 
 model Comercio {
-  id        String         @id @default(cuid())
-  slug      String         @unique
-  nome      String
+  id         String         @id @default(cuid())
+  slug       String         @unique
+  nome       String
   descricao  String?        @db.Text
   categorias Categoria[]
   status     ComercioStatus @default(PENDENTE)
   planId     String
   cep        String?
   endereco   String?
-  numero    String?
-  bairro    String?
-  cidade    String?
-  estado    String?
-  lat       Float?
-  lng       Float?
-  telefone  String?
-  whatsapp  String?
-  email     String?
-  website   String?
-  instagram String?
-  horarios  String?
-  logo      String?
-  ownerId   String         @unique
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  numero     String?
+  bairro     String?
+  cidade     String?
+  estado     String?
+  lat        Float?
+  lng        Float?
+  telefone   String?
+  whatsapp   String?
+  email      String?
+  website    String?
+  instagram  String?
+  horarios   String?
+  logo       String?
+  ownerId    String         @unique
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
   owner              User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   plan               Plan                @relation(fields: [planId], references: [id])
@@ -134,6 +152,10 @@ model Comercio {
   analyticsEvents    AnalyticsEvent[]
   hospedagemPerfil   HospedagemPerfil?
   tiposQuarto        TipoQuarto[]
+  pedidos            Pedido[]
+  pedidoConfig       PedidoConfig?
+  pushSubscriptions  PushSubscription[]
+  zonasEntrega       ZonaEntrega[]
 
   @@map("comercios")
 }
@@ -225,44 +247,43 @@ model Foto {
 }
 
 model Produto {
-  id                  String             @id @default(cuid())
-  tipo                TipoProduto        @default(PRODUTO)
+  id                  String      @id @default(cuid())
+  tipo                TipoProduto @default(PRODUTO)
   titulo              String
-  descricao           String?            @db.Text
+  descricao           String?     @db.Text
   preco               Float?
   imagens             String[]
-  disponivel          Boolean            @default(true)
-  destaque            Boolean            @default(false)
+  disponivel          Boolean     @default(true)
+  destaque            Boolean     @default(false)
   precoPromo          Float?
   promoFim            DateTime?
-  ordem               Int                @default(0)
+  ordem               Int         @default(0)
   comercioId          String
   categoriaCardapioId String?
   categoriaCatalogoId String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
-  comercio          Comercio            @relation(fields: [comercioId], references: [id], onDelete: Cascade)
-  categoriaCardapio CardapioCategoria?  @relation(fields: [categoriaCardapioId], references: [id], onDelete: SetNull)
-  categoriaCatalogo CatalogoCategoria?  @relation(fields: [categoriaCatalogoId], references: [id], onDelete: SetNull)
+  comercio          Comercio           @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  categoriaCardapio CardapioCategoria? @relation(fields: [categoriaCardapioId], references: [id], onDelete: SetNull)
+  categoriaCatalogo CatalogoCategoria? @relation(fields: [categoriaCatalogoId], references: [id], onDelete: SetNull)
   variacoes         CardapioVariacao[]
 
   @@map("produtos")
 }
 
 model CardapioCategoria {
-  id         String     @id @default(cuid())
+  id         String    @id @default(cuid())
   nome       String
-  ordem      Int        @default(0)
+  ordem      Int       @default(0)
   comercioId String
-  comercio   Comercio   @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  comercio   Comercio  @relation(fields: [comercioId], references: [id], onDelete: Cascade)
   produtos   Produto[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@map("cardapio_categorias")
 }
-
 
 // Categorias do catálogo (produtos/serviços fora do cardápio). Espelha
 // CardapioCategoria, mas com `tipo` — uma categoria pertence a PRODUTO ou
@@ -284,12 +305,12 @@ model CatalogoCategoria {
 }
 
 model CardapioVariacao {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   nome      String
   preco     Float
-  ordem     Int      @default(0)
+  ordem     Int     @default(0)
   produtoId String
-  produto   Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
 
   @@map("cardapio_variacoes")
 }
@@ -360,4 +381,143 @@ model Evento {
   comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
 
   @@map("eventos")
+}
+
+// Pedido online feito a partir do cardápio. Cliente não tem login — o acesso ao
+// acompanhamento é pelo `token` (cuid não-adivinhável) em /pedido/[token].
+// Itens são SNAPSHOT (ver PedidoItem): preço/título congelados na compra, sem
+// FK forte para Produto. `numero` é sequencial por comércio (via PedidoConfig).
+model Pedido {
+  id          String       @id @default(cuid())
+  token       String       @unique @default(cuid())
+  numero      Int
+  comercioId  String
+  status      PedidoStatus @default(AGUARDANDO)
+  tipoEntrega TipoEntrega
+
+  clienteNome  String
+  clienteWhats String
+
+  // endereço (só ENTREGA — snapshot textual; numeroEnd evita colidir com `numero`)
+  cep         String?
+  endereco    String?
+  numeroEnd   String?
+  bairro      String?
+  complemento String?
+  referencia  String?
+
+  formaPagamento String // key de FORMAS_PAGAMENTO (src/lib/hospedagem.ts)
+  trocoPara      Float? // só quando formaPagamento = "dinheiro"
+  observacoes    String? @db.Text
+
+  subtotal    Float // recalculado no servidor
+  taxaEntrega Float @default(0) // 0 em RETIRADA
+  total       Float
+
+  motivoCancelamento String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  comercio Comercio     @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  itens    PedidoItem[]
+
+  @@unique([comercioId, numero])
+  @@index([comercioId, status, createdAt])
+  @@map("pedidos")
+}
+
+model PedidoItem {
+  id           String  @id @default(cuid())
+  pedidoId     String
+  produtoId    String? // referência fraca (sem FK forte) — só rastreio
+  titulo       String // snapshot
+  variacaoNome String? // snapshot da variação escolhida
+  precoUnit    Float // snapshot do preço unitário
+  quantidade   Int
+  observacao   String?
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@map("pedido_itens")
+}
+
+// Config de pedidos do comércio (1:1, criado sob demanda — mesmo padrão de
+// HospedagemPerfil). aceitaPedidos liga/desliga independente de aberto/fechado.
+// proximoNumero é o contador de `numero`, incrementado em transação ao criar.
+model PedidoConfig {
+  id               String   @id @default(cuid())
+  comercioId       String   @unique
+  aceitaPedidos    Boolean  @default(false)
+  entregaAtiva     Boolean  @default(true)
+  retiradaAtiva    Boolean  @default(true)
+  pedidoMinimo     Float    @default(0)
+  tempoPreparoMin  Int?
+  formasPagamento  String[]
+  proximoNumero    Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@map("pedido_configs")
+}
+
+// Inscrição de Web Push de um dispositivo do comerciante (navegador). Um
+// comerciante pode ter vários aparelhos. endpoint é único (a chave da
+// inscrição no browser). Removida quando o push retorna 404/410 (expirada).
+model PushSubscription {
+  id         String   @id @default(cuid())
+  comercioId String
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  createdAt  DateTime @default(now())
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@index([comercioId])
+  @@map("push_subscriptions")
+}
+
+// Catálogo canônico de bairros/áreas de entrega da cidade (e cidades vizinhas).
+// Populado por seed e gerenciado pelo admin. `cidade`/`uf` permitem contemplar
+// cidades vizinhas (ex.: Gonçalves/MG). É a lista que o comerciante seleciona.
+// Futuro multitenant: ganha `cityId` na Fase 0 (ver docs/multitenant.md) — o
+// `cityId` será o TENANT dono do catálogo, distinto de `cidade` (onde a área fica).
+model Bairro {
+  id     String  @id @default(cuid())
+  nome   String
+  cidade String
+  uf     String
+  ativo  Boolean @default(true)
+  ordem  Int     @default(0)
+
+  zonas ZonaEntrega[]
+
+  @@unique([nome, cidade])
+  @@map("bairros")
+}
+
+// Área de entrega de UMA loja, com a taxa dela. Pode apontar para um Bairro do
+// catálogo (`bairroId`) ou ser uma área CUSTOM privada da loja (`bairroId` null).
+// `nome`/`cidade`/`uf` são denormalizados (copiados do catálogo ou digitados) —
+// o checkout e o snapshot do pedido leem direto daqui, sem depender do catálogo.
+model ZonaEntrega {
+  id         String  @id @default(cuid())
+  comercioId String
+  bairroId   String? // catálogo (rastreio); null = custom da loja
+  nome       String
+  cidade     String
+  uf         String
+  taxa       Float
+  ativo      Boolean @default(true)
+  ordem      Int     @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  bairro   Bairro?  @relation(fields: [bairroId], references: [id], onDelete: SetNull)
+
+  @@index([comercioId])
+  @@map("zonas_entrega")
 }
