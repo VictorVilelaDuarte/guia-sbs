@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 import { COMODIDADE_KEYS, FORMA_PAGAMENTO_KEYS } from "@/lib/hospedagem"
 
@@ -22,18 +22,8 @@ const perfilSchema = z.object({
   observacoes: z.string().max(2000).optional().nullable(),
 })
 
-async function getComerciante() {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
-  const comercio = await prisma.comercio.findUnique({
-    where: { ownerId: session.user.id },
-    select: { id: true },
-  })
-  return comercio ? { userId: session.user.id, comercioId: comercio.id } : null
-}
-
 export async function PUT(req: NextRequest) {
-  const ctx = await getComerciante()
+  const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const body = await req.json()

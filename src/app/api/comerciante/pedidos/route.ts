@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-
-async function getComerciante() {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
-  const comercio = await prisma.comercio.findUnique({
-    where: { ownerId: session.user.id },
-    select: { id: true },
-  })
-  return comercio ? { comercioId: comercio.id } : null
-}
+import { getComercioCtx } from "@/lib/comercio-ctx"
 
 // Lista de pedidos do comércio para o painel (consumida por polling).
 // Filtros opcionais: ?desde=ISO (só pedidos atualizados depois) para polling incremental.
 export async function GET(req: NextRequest) {
-  const ctx = await getComerciante()
+  const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const desdeParam = req.nextUrl.searchParams.get("desde")

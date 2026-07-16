@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 const schema = z.discriminatedUnion("tipo", [
@@ -8,18 +8,8 @@ const schema = z.discriminatedUnion("tipo", [
   z.object({ tipo: z.literal("item"), categoriaId: z.string(), ids: z.array(z.string()) }),
 ])
 
-async function getComerciante() {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
-  const comercio = await prisma.comercio.findUnique({
-    where: { ownerId: session.user.id },
-    select: { id: true },
-  })
-  return comercio ? { comercioId: comercio.id } : null
-}
-
 export async function PATCH(req: NextRequest) {
-  const ctx = await getComerciante()
+  const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const body = await req.json()

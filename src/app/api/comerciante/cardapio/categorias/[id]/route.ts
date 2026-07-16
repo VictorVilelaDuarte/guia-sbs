@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 const patchSchema = z.object({
@@ -8,15 +8,15 @@ const patchSchema = z.object({
 })
 
 async function ownerCheck(categoriaId: string) {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
+  const ctx = await getComercioCtx()
+  if (!ctx) return null
 
   const categoria = await prisma.cardapioCategoria.findUnique({
     where: { id: categoriaId },
     include: { comercio: { select: { ownerId: true } } },
   })
 
-  if (!categoria || categoria.comercio.ownerId !== session.user.id) return null
+  if (!categoria || categoria.comercio.ownerId !== ctx.ownerId) return null
   return categoria
 }
 

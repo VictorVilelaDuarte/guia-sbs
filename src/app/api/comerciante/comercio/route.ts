@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 const patchSchema = z.object({
@@ -23,13 +23,6 @@ const patchSchema = z.object({
   lat: z.number().optional().nullable(),
   lng: z.number().optional().nullable(),
 })
-
-async function requireComerciante() {
-  const session = await auth()
-  if (!session) return null
-  if (session.user.role !== "COMERCIANTE") return null
-  return session
-}
 
 async function geocode(query: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -55,11 +48,11 @@ async function geocode(query: string): Promise<{ lat: number; lng: number } | nu
 }
 
 export async function GET() {
-  const session = await requireComerciante()
-  if (!session) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const ctx = await getComercioCtx()
+  if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const comercio = await prisma.comercio.findUnique({
-    where: { ownerId: session.user.id },
+    where: { id: ctx.comercioId },
     include: { fotos: { orderBy: { ordem: "asc" } } },
   })
 
@@ -69,8 +62,8 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await requireComerciante()
-  if (!session) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const ctx = await getComercioCtx()
+  if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   try {
     const body = await req.json()
@@ -94,7 +87,7 @@ export async function PATCH(req: NextRequest) {
     const { lat: _lat, lng: _lng, subcategoriaIds, ...rest } = fields
 
     await prisma.comercio.update({
-      where: { ownerId: session.user.id },
+      where: { id: ctx.comercioId },
       data: {
         ...rest,
         ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
