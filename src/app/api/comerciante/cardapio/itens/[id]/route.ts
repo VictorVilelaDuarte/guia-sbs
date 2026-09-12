@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 import { deleteFile } from "@/lib/supabase-storage"
 
@@ -20,15 +20,15 @@ const patchSchema = z.object({
 })
 
 async function ownerCheck(produtoId: string) {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
+  const ctx = await getComercioCtx()
+  if (!ctx) return null
 
   const produto = await prisma.produto.findUnique({
     where: { id: produtoId },
     include: { comercio: { select: { ownerId: true } } },
   })
 
-  if (!produto || produto.comercio.ownerId !== session.user.id) return null
+  if (!produto || produto.comercio.ownerId !== ctx.ownerId) return null
   return produto
 }
 

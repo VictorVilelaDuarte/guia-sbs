@@ -133,13 +133,25 @@ A rota `/api/admin/comercios/[id]` (PATCH) aceita todos os campos do formulário
 
 **`LogoUploader` props adicionais:** `comercioId?: string` e `saveUrl?: string`. Quando `comercioId` está presente, ele é incluído no formData do upload para que a API resolva o `userId` correto (ver seção Upload).
 
-**`ComerciosActions`:** o dropdown da lista de comércios tem apenas: "Editar" (navega para `/admin/comercios/[id]`), Aprovar/Rejeitar e Tornar Premium/Remover Premium. Toda edição de dados do comércio — incluindo subcategorias — é feita na página de edição dedicada.
+**`ComerciosActions`:** o dropdown da lista de comércios tem: "Editar" (navega para `/admin/comercios/[id]`), "Gerenciar painel" (navega para `/admin/comercios/[id]/gerenciar`), Aprovar/Rejeitar e Tornar Premium/Remover Premium. Toda edição de dados do comércio — incluindo subcategorias — é feita na página de edição dedicada.
+
+### Painel completo do comércio pelo admin (`/admin/comercios/[id]/gerenciar`)
+
+O admin gerencia **tudo** de qualquer comércio (fotos, cardápio, produtos, eventos, tags, hospedagem, pedidos) reusando o `<DashboardTabs>` do comerciante — sem duplicar rotas nem componentes. Mecanismo:
+
+- **Cookie de contexto:** ao abrir `/admin/comercios/[id]/gerenciar`, o middleware grava o cookie httpOnly `admin_comercio_id` (nome em `src/lib/admin-comercio-cookie.ts` — módulo sem imports, compartilhado com o Edge; **nunca importar `@/lib/comercio-ctx` no middleware**, puxa Prisma).
+- **`getComercioCtx()`** (`src/lib/comercio-ctx.ts`) — helper único usado por **todas** as rotas `/api/comerciante/*`: sessão COMERCIANTE resolve o comércio por `ownerId`; sessão ADMIN/SUPER_ADMIN resolve pelo cookie. Retorna `{ comercioId, ownerId, isAdmin, features }`. O cookie é ignorado para não-admins (anti-forjamento, verificado). Rota nova em `/api/comerciante/*` **deve** usar este helper — não criar guard local.
+- **`getDashboardComercioData()`** (`src/lib/dashboard-comercio.ts`) — query + serializações do dashboard, compartilhada entre `/comerciante/dashboard` (where por `ownerId`) e a página gerenciar (where por `id`).
+- As abas seguem o plano do comércio normalmente (admin vê o mesmo gate de features que o comerciante).
+- **Limitação conhecida:** o cookie guarda um único comércio-alvo — gerenciar dois comércios em abas paralelas faz os fetches da aba antiga atingirem o comércio da aba mais recente (o banner da página avisa).
 
 ### Upload de imagens
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:
 
-**Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload, inclui `comercioId` no formData. A rota busca `ownerId` via `prisma.comercio.findUnique({ where: { id: comercioId }, select: { ownerId: true } })` para montar o path correto no storage (que é sempre keyed por `userId = ownerId`). Sem `comercioId`, usa `session.user.id` normalmente (fluxo do comerciante).
+**Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload, inclui `comercioId` no formData. A rota busca `ownerId` via `prisma.comercio.findUnique({ where: { id: comercioId }, select: { ownerId: true } })` para montar o path correto no storage (que é sempre keyed por `userId = ownerId`). Sem `comercioId`, resolve via `getComercioCtx()` — cobre tanto o comerciante no próprio painel quanto o admin no painel de gestão (cookie `admin_comercio_id`).
+
+**heic2any só com import dinâmico:** o módulo executa `window.__heic2any__worker = new Worker(...)` na carga — import estático num Client Component quebra o SSR do build de produção com `ReferenceError: window is not defined` (o `next dev` **não** acusa; só `next start`). Sempre `const { default: heic2any } = await import("heic2any")` dentro da função de conversão.
 
 **Upload de fotos de produtos (cardápio):** o componente `produto-dialog.tsx` suporta múltiplos arquivos simultâneos, drag-and-drop e conversão de HEIC/HEIF para JPEG antes do envio (via `heic2any`). A detecção de HEIC usa tanto o MIME type quanto a extensão do arquivo (iOS Safari às vezes omite o MIME type). A quantidade máxima de slots disponíveis (`MAX_IMAGENS - imagens.length`) limita dinamicamente tanto o seletor de arquivos (`multiple` é `false` quando só resta 1 slot) quanto o drop handler.
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 import { COMODIDADE_KEYS } from "@/lib/hospedagem"
 import { deleteFile } from "@/lib/supabase-storage"
@@ -20,13 +20,13 @@ const patchSchema = z.object({
 })
 
 async function ownerCheck(quartoId: string) {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
+  const ctx = await getComercioCtx()
+  if (!ctx) return null
   const quarto = await prisma.tipoQuarto.findUnique({
     where: { id: quartoId },
     include: { comercio: { select: { ownerId: true } } },
   })
-  if (!quarto || quarto.comercio.ownerId !== session.user.id) return null
+  if (!quarto || quarto.comercio.ownerId !== ctx.ownerId) return null
   return quarto
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 // Zonas de entrega da loja (bairro + taxa). PUT substitui o conjunto inteiro.
@@ -18,18 +18,8 @@ const zonaSchema = z.object({
 
 const putSchema = z.object({ zonas: z.array(zonaSchema).max(300) })
 
-async function getComerciante() {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
-  const comercio = await prisma.comercio.findUnique({
-    where: { ownerId: session.user.id },
-    select: { id: true },
-  })
-  return comercio ? { comercioId: comercio.id } : null
-}
-
 export async function GET() {
-  const ctx = await getComerciante()
+  const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const zonas = await prisma.zonaEntrega.findMany({
@@ -40,7 +30,7 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
-  const ctx = await getComerciante()
+  const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const parsed = putSchema.safeParse(await req.json())

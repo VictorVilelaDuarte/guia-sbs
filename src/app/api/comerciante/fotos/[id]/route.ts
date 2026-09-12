@@ -1,22 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { deleteFile } from "@/lib/supabase-storage"
-
-async function requireComerciante() {
-  const session = await auth()
-  if (!session) return null
-  const role = session.user.role
-  if (role !== "COMERCIANTE") return null
-  return session
-}
 
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await requireComerciante()
-  if (!session) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const ctx = await getComercioCtx()
+  if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const { id } = await params
   const foto = await prisma.foto.findUnique({
@@ -24,7 +16,7 @@ export async function DELETE(
     include: { comercio: { select: { ownerId: true } } },
   })
 
-  if (!foto || foto.comercio.ownerId !== session.user.id) {
+  if (!foto || foto.comercio.ownerId !== ctx.ownerId) {
     return NextResponse.json({ error: "Não encontrado." }, { status: 404 })
   }
 

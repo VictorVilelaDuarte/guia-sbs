@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import heic2any from "heic2any"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -90,6 +89,8 @@ export function QuartoDialog({
         file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif")
       if (isHeic) {
         try {
+          // import dinâmico: heic2any acessa window na carga do módulo e quebra o SSR
+          const { default: heic2any } = await import("heic2any")
           const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })
           const blob = Array.isArray(converted) ? converted[0] : converted
           file = new File([blob], file.name.replace(/\.hei[cf]$/i, ".jpg"), { type: "image/jpeg" })

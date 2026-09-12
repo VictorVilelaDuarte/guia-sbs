@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 import { PedidoStatus } from "@prisma/client"
 import { podeTransicionar, exigeMotivo } from "@/lib/pedidos"
@@ -11,8 +11,8 @@ const patchSchema = z.object({
 })
 
 async function ownerCheck(pedidoId: string) {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
+  const ctx = await getComercioCtx()
+  if (!ctx) return null
 
   const pedido = await prisma.pedido.findUnique({
     where: { id: pedidoId },
@@ -23,7 +23,7 @@ async function ownerCheck(pedidoId: string) {
       comercio: { select: { ownerId: true } },
     },
   })
-  if (!pedido || pedido.comercio.ownerId !== session.user.id) return null
+  if (!pedido || pedido.comercio.ownerId !== ctx.ownerId) return null
   return pedido
 }
 

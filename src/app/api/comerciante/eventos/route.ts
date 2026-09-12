@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 const createSchema = z.object({
@@ -14,18 +14,8 @@ const createSchema = z.object({
   linkExterno: z.string().url().optional().nullable(),
 })
 
-async function getComerciante() {
-  const session = await auth()
-  if (!session || session.user.role !== "COMERCIANTE") return null
-  const comercio = await prisma.comercio.findUnique({
-    where: { ownerId: session.user.id },
-    select: { id: true },
-  })
-  return comercio ? { comercioId: comercio.id } : null
-}
-
 export async function GET() {
-  const ctx = await getComerciante()
+  const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   const eventos = await prisma.evento.findMany({
@@ -37,7 +27,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const ctx = await getComerciante()
+  const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
 
   let body: unknown

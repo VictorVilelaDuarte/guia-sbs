@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, LayoutDashboard } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { EditarComercioForm } from "@/components/comerciante/editar-comercio-form"
@@ -62,6 +62,13 @@ export default async function EditarComercioAdminPage({
               {comercio.status}
             </Badge>
             <Badge variant="outline">{comercio.plan.nome}</Badge>
+            <Link
+              href={`/admin/comercios/${comercio.id}/gerenciar`}
+              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Painel completo
+            </Link>
           </div>
         </div>
       </div>

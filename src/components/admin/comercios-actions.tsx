@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
-import { MoreHorizontal, CheckCircle, XCircle, Star, StarOff, Pencil } from "lucide-react"
+import { MoreHorizontal, CheckCircle, XCircle, Star, StarOff, Pencil, LayoutDashboard } from "lucide-react"
 
 interface Comercio {
   id: string
@@ -48,6 +48,10 @@ export function ComerciosActions({ comercio }: { comercio: Comercio }) {
         <DropdownMenuItem onClick={() => router.push(`/admin/comercios/${comercio.id}`)}>
           <Pencil className="mr-2 h-4 w-4" />
           Editar
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push(`/admin/comercios/${comercio.id}/gerenciar`)}>
+          <LayoutDashboard className="mr-2 h-4 w-4" />
+          Gerenciar painel
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {comercio.status !== "ATIVO" && (

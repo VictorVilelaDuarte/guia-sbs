@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getComercioCtx } from "@/lib/comercio-ctx"
 import { uploadFile } from "@/lib/supabase-storage"
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
@@ -43,12 +44,10 @@ export async function POST(req: NextRequest) {
     if (!comercio) return NextResponse.json({ error: "Comércio não encontrado." }, { status: 404 })
     userId = comercio.ownerId
   } else {
-    const comercio = await prisma.comercio.findUnique({
-      where: { ownerId: session.user.id },
-      select: { ownerId: true },
-    })
-    if (!comercio) return NextResponse.json({ error: "Comércio não encontrado." }, { status: 404 })
-    userId = session.user.id
+    // comerciante no próprio painel, ou admin no painel de gestão (cookie)
+    const ctx = await getComercioCtx()
+    if (!ctx) return NextResponse.json({ error: "Comércio não encontrado." }, { status: 404 })
+    userId = ctx.ownerId
   }
 
   const ext = file.name.split(".").pop() ?? "jpg"
