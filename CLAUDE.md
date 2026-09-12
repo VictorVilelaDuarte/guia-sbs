@@ -632,6 +632,11 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
   Server Components, copy centralizável, models "da cidade" já nascerem com `cityId`) em
   [`docs/multitenant.md`](docs/multitenant.md).
 
+- **Módulo de Gestão** — separa o painel em "Minha vitrine" (Guia) e "Gestão" (operação) e
+  evolui a gestão para equipe com papéis, clientes (CRM leve), venda manual + relatórios e
+  estoque. Construído neste projeto — **sem ERP parceiro** (`docs/integracao-erp.md` está
+  arquivado); fiscal/financeiro/compras ficam no roadmap pós-v1. **Plano, fases e decisões fechadas em
+  [`docs/modulo-gestao.md`](docs/modulo-gestao.md)** — consultar antes de iniciar qualquer fase.
 - **Busca inteligente por IA** — maior diferencial comercial do produto. Busca em linguagem
   natural ("onde comer lanche?") com ranqueamento por relevância (nome, descrição, produtos,
   palavras-chave) + boosts de premium/aberto-agora. Arquitetura híbrida (embeddings `pgvector` +
