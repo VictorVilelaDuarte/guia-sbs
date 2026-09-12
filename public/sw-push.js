@@ -18,7 +18,7 @@ self.addEventListener("push", (event) => {
     renotify: !!data.tag,
     requireInteraction: true,
     vibrate: [200, 100, 200],
-    data: { url: data.url || "/comerciante/dashboard" },
+    data: { url: data.url || "/comerciante/gestao/pedidos" },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -28,15 +28,20 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url =
     (event.notification.data && event.notification.data.url) ||
-    "/comerciante/dashboard";
+    "/comerciante/gestao/pedidos";
 
   event.waitUntil(
     clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((list) => {
-        // Se o painel já está aberto numa aba, foca nela.
+        // Painel já aberto numa aba (qualquer tela): foca nela e pede a navegação
+        // por mensagem — o PedidosAlertaProvider do painel faz o router.push.
+        // client.navigate() não serve: só funciona em abas controladas por este
+        // SW, e ele não assume o controle das páginas.
         for (const client of list) {
-          if (client.url.includes("/comerciante/dashboard") && "focus" in client) {
+          const path = new URL(client.url).pathname;
+          if (path.startsWith("/comerciante") && "focus" in client) {
+            client.postMessage({ type: "navegar", url });
             return client.focus();
           }
         }

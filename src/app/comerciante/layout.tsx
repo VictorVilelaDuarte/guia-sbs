@@ -1,7 +1,37 @@
-import { auth } from "@/lib/auth"
+import Link from "next/link"
+import { auth, signOut } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { Toaster } from "@/components/ui/sonner"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { getPainelBase } from "@/lib/painel/queries"
+import { temFeature } from "@/lib/plan-features"
+import { PedidosAlertaProvider } from "@/components/comerciante/painel/pedidos-alerta"
+import {
+  AreaSwitch,
+  GestaoBottomNav,
+  GestaoTabs,
+} from "@/components/comerciante/painel/painel-nav"
+import { ChevronLeft, LogOut, MapPin, ShieldCheck, Store } from "lucide-react"
 
+const statusVariants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+  ATIVO: "default",
+  PENDENTE: "secondary",
+  INATIVO: "outline",
+  REJEITADO: "destructive",
+}
+
+const statusLabels: Record<string, string> = {
+  ATIVO: "Ativo",
+  PENDENTE: "Aguardando aprovação",
+  INATIVO: "Inativo",
+  REJEITADO: "Rejeitado",
+}
+
+// Shell do painel do comércio — áreas "Minha vitrine" (Guia) e "Gestão".
+// Serve o comerciante e o admin gerenciando qualquer comércio: ambos resolvidos
+// por getComercioCtx() (via getPainelBase), o mesmo helper das rotas de API.
 export default async function ComercianteLayout({
   children,
 }: {
@@ -11,14 +41,107 @@ export default async function ComercianteLayout({
   if (!session) redirect("/admin/login")
 
   const role = session.user.role
-  if (role !== "COMERCIANTE") {
-    redirect("/")
-  }
+  const isAdminRole = role === "ADMIN" || role === "SUPER_ADMIN"
+  if (!isAdminRole && role !== "COMERCIANTE") redirect("/")
+
+  const base = await getPainelBase()
+  // Admin só entra com um comércio-alvo válido no cookie (o middleware checa só
+  // a presença do cookie; aqui confere que o comércio existe).
+  if (!base && isAdminRole) redirect("/admin/comercios")
+
+  const comercio = base?.comercio
+  const isAdmin = base?.ctx.isAdmin ?? false
 
   return (
-    <>
-      {children}
+    <div className="min-h-screen bg-muted/30">
+      <header className="border-b bg-background px-6 py-4">
+        <div className="mx-auto max-w-3xl flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <MapPin className="h-4 w-4" />
+            </div>
+            <span className="font-semibold">Guia SBS</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline text-sm text-muted-foreground">{session.user.name}</span>
+            {isAdmin && comercio ? (
+              // Admin não ganha "Sair" aqui: deslogaria a sessão de admin.
+              <Link
+                href={`/admin/comercios/${comercio.id}`}
+                className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Voltar ao admin
+              </Link>
+            ) : (
+              <form
+                action={async () => {
+                  "use server"
+                  await signOut({ redirectTo: "/admin/login" })
+                }}
+              >
+                <Button type="submit" variant="ghost" size="sm">
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Sair
+                </Button>
+              </form>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-3xl px-6 py-8">
+        {!comercio ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+              <Store className="h-10 w-10 text-muted-foreground" />
+              <p className="font-medium">Nenhum comércio vinculado</p>
+              <p className="text-sm text-muted-foreground">
+                Entre em contato com o administrador para vincular seu comércio.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <PedidosAlertaProvider ativo={temFeature(comercio.plan.features, "pedido_online")}>
+            <div className="space-y-6">
+              {isAdmin && (
+                <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+                  <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0" />
+                  <p className="text-sm">
+                    Você está gerenciando este comércio como administrador — tudo que
+                    salvar aqui vale como se fosse o próprio comerciante. Evite gerenciar
+                    dois comércios em abas abertas ao mesmo tempo.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-bold truncate">{comercio.nome}</h1>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {isAdmin ? "Painel completo do comércio" : "Gerencie seu comércio"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap justify-end items-center gap-2 shrink-0">
+                  <Badge variant={statusVariants[comercio.status]}>
+                    {statusLabels[comercio.status] ?? comercio.status}
+                  </Badge>
+                  <Badge variant={comercio.plan.slug === "premium" ? "default" : "outline"}>
+                    {comercio.plan.nome}
+                  </Badge>
+                </div>
+              </div>
+
+              <AreaSwitch />
+              <GestaoTabs features={comercio.plan.features} categorias={comercio.categorias} />
+
+              <div>{children}</div>
+            </div>
+            <GestaoBottomNav features={comercio.plan.features} categorias={comercio.categorias} />
+          </PedidosAlertaProvider>
+        )}
+      </main>
       <Toaster richColors position="top-right" />
-    </>
+    </div>
   )
 }

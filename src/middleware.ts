@@ -2,6 +2,7 @@ import NextAuth from "next-auth"
 import { authConfig } from "@/auth.config"
 import { NextResponse } from "next/server"
 import { ADMIN_COMERCIO_COOKIE } from "@/lib/admin-comercio-cookie"
+import { rotaPainelLegada } from "@/lib/painel/rotas"
 
 const { auth } = NextAuth(authConfig)
 
@@ -19,7 +20,7 @@ export default auth((req) => {
 
   if (pathname === "/admin/login" && isLoggedIn) {
     if (isAdmin) return NextResponse.redirect(new URL("/admin/dashboard", req.url))
-    if (isComerciante) return NextResponse.redirect(new URL("/comerciante/dashboard", req.url))
+    if (isComerciante) return NextResponse.redirect(new URL("/comerciante", req.url))
     return NextResponse.next()
   }
 
@@ -27,22 +28,37 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/admin/login", req.url))
   }
   if (isAdminRoute && !isAdmin) {
-    return NextResponse.redirect(new URL(isComerciante ? "/comerciante/dashboard" : "/", req.url))
+    return NextResponse.redirect(new URL(isComerciante ? "/comerciante" : "/", req.url))
   }
 
   if (isComercianteRoute && !isLoggedIn) {
     return NextResponse.redirect(new URL("/admin/login", req.url))
   }
   if (isComercianteRoute && !isComerciante) {
-    return NextResponse.redirect(new URL("/", req.url))
+    // Admin gerenciando um comércio usa as mesmas páginas do comerciante. Aqui só
+    // se confere a presença do cookie (checagem otimista); a validação real — o
+    // comércio existe e a sessão é admin — é do getComercioCtx() no layout e nas APIs.
+    if (isAdmin && req.cookies.get(ADMIN_COMERCIO_COOKIE)?.value) {
+      return NextResponse.next()
+    }
+    return NextResponse.redirect(new URL(isAdmin ? "/admin/comercios" : "/", req.url))
   }
 
-  // Admin abrindo o painel de gestão de um comércio: grava o comércio-alvo num
-  // cookie httpOnly. As rotas /api/comerciante/* usam esse cookie (via
-  // getComercioCtx) para resolver o comércio quando a sessão é de admin.
+  // Antigo painel de abas: /comerciante/dashboard?tab=X → rota equivalente da
+  // Vitrine ou da Gestão. Permanente — links salvos e o service worker de push
+  // antigo (que abre ?tab=pedidos) seguem funcionando.
+  if (pathname === "/comerciante/dashboard") {
+    const tab = req.nextUrl.searchParams.get("tab")
+    return NextResponse.redirect(new URL(rotaPainelLegada(tab), req.url), 308)
+  }
+
+  // Admin abrindo o painel de um comércio: grava o comércio-alvo num cookie
+  // httpOnly e redireciona para o painel do comerciante. Páginas e rotas
+  // /api/comerciante/* resolvem o comércio por esse cookie (getComercioCtx).
   const gerenciar = pathname.match(GERENCIAR_RE)
   if (gerenciar && isAdmin) {
-    const res = NextResponse.next()
+    const destino = new URL(rotaPainelLegada(req.nextUrl.searchParams.get("tab")), req.url)
+    const res = NextResponse.redirect(destino)
     res.cookies.set(ADMIN_COMERCIO_COOKIE, gerenciar[1], {
       httpOnly: true,
       sameSite: "lax",

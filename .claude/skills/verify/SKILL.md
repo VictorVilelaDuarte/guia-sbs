@@ -47,9 +47,16 @@ com `Authorization: Bearer {SERVICE_ROLE_KEY}`.
 
 ## Fluxos que valem dirigir
 
-- Página gerenciar do admin: `GET /admin/comercios/{id}/gerenciar` (seta cookie
-  `admin_comercio_id`; as APIs `/api/comerciante/*` resolvem o comércio por ele).
+- Painel do admin: `GET /admin/comercios/{id}/gerenciar` seta o cookie
+  `admin_comercio_id` e redireciona (307) para `/comerciante` (ou a rota do `?tab=`); páginas e APIs
+  `/comerciante/*` resolvem o comércio por ele. Usar `curl -b jar -c jar` sem `-L` para
+  ver o redirect e o `Set-Cookie`.
 - APIs do comerciante com os dois perfis (admin+cookie e comerciante) — conferir que
   cada um enxerga o comércio certo via `GET /api/comerciante/comercio` (campo `nome`).
+- Painel: `/comerciante` (entrada), `/comerciante/vitrine?tab=`, `/comerciante/gestao[/cardapio|produtos|pedidos|acomodacoes]`.
+  Testar com um plano sem `cardapio`/`pedido_online` (cadeado, não 404) e com um comércio
+  HOSPEDAGEM. `GET /api/comerciante/pedidos/resumo?desde=` é o polling do alerta.
+- Porta ocupada: `pkill -f "next start"` nem sempre mata o processo — conferir com
+  `lsof -ti tcp:3000` e matar pelo PID antes de subir o build novo.
 - Erros de SSR só aparecem no build de produção (`next start`), não no dev — módulos
   que tocam `window` na carga (ex.: heic2any) passam batido no `next dev`.

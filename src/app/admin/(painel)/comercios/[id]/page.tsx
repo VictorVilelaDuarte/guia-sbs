@@ -64,6 +64,9 @@ export default async function EditarComercioAdminPage({
             <Badge variant="outline">{comercio.plan.nome}</Badge>
             <Link
               href={`/admin/comercios/${comercio.id}/gerenciar`}
+              // Sem prefetch: a rota grava o cookie de comércio-alvo no middleware —
+              // o prefetch trocaria o comércio gerenciado só por abrir esta página.
+              prefetch={false}
               className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
             >
               <LayoutDashboard className="h-4 w-4" />

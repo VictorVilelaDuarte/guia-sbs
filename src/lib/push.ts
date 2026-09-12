@@ -69,7 +69,7 @@ export function payloadNovoPedido(args: {
   return {
     title: `🔔 Novo pedido #${args.numero}`,
     body: `${tipo} · ${totalBRL}`,
-    url: "/comerciante/dashboard?tab=pedidos",
+    url: "/comerciante/gestao/pedidos",
     tag: `pedido-${args.numero}`,
   }
 }

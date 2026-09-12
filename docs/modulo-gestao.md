@@ -196,10 +196,14 @@ argumento mais concreto possível para o upgrade.
 
 Cada fase entrega valor sozinha e tem critério de pronto verificável.
 
-### Fase 0 — Reorganização do painel (sem feature nova)
+### Fase 0 — Reorganização do painel (sem feature nova) ✅ implementada (branch `feat/gestao-fase-0`)
 
 > Plano de execução detalhado (PRs, arquivos e verificação) no **§10**. O resumo abaixo é o
-> escopo.
+> escopo. **Desvios do plano na implementação:** (1) o redirect de `/comerciante/dashboard` ficou no
+> middleware, não numa página — evita renderizar o layout e consultar o banco só para redirecionar;
+> (2) o alerta de pedidos cobre o **painel inteiro** (inclusive Minha vitrine), não só a Gestão;
+> (3) a nav mobile não tem "Mais" — com no máximo 5 itens hoje, todos cabem; (4) "Informações"
+> (dados do Núcleo) ficou em Minha vitrine até existir uma área própria de Empresa.
 
 - Layout `/comerciante` com switch Vitrine | Gestão.
 - Mover Cardápio, Produtos, Serviços, Pedidos e Tipos de quarto para `/comerciante/gestao/*`.
@@ -618,7 +622,7 @@ sem mudar comportamento só gera diff para revisar.
 Levantamento feito no código em 2026-09-12. Ordem pensada para que cada PR seja pequeno,
 verificável sozinho e não quebre o painel em uso.
 
-### 10.0 Pré-requisito — consolidar a `main`
+### 10.0 Pré-requisito — consolidar a `main` ✅ (2026-09-12)
 
 A `main` está em `bbd5410`. Três entregas **ainda não entraram** e vivem empilhadas na branch
 `feat/admin-edita-comercio`:
@@ -633,12 +637,12 @@ A Fase 0 reescreve justamente `dashboard-tabs.tsx`, a página `gerenciar`, o mid
 os arquivos que essas branches introduziram. Começar a Fase 0 em cima delas sem mergear gera uma
 pilha de 4 branches dependentes e conflito garantido.
 
-- [ ] Mergear `feat/admin-edita-comercio` na `main` (leva junto o pedido online e o fix do heic2any)
-- [ ] Commitar os docs: `docs/modulo-gestao.md`, `docs/integracao-erp.md` (arquivado),
+- [x] Mergear `feat/admin-edita-comercio` na `main` (leva junto o pedido online e o fix do heic2any)
+- [x] Commitar os docs: `docs/modulo-gestao.md`, `docs/integracao-erp.md` (arquivado),
       `docs/panorama-projeto.md`, `CLAUDE.md`
-- [ ] Criar `feat/gestao-fase-0` a partir da `main` atualizada
+- [x] Criar `feat/gestao-fase-0` a partir da `main` atualizada
 
-### 10.1 PR 1 — Admin usa as mesmas páginas do comerciante
+### 10.1 PR 1 — Admin usa as mesmas páginas do comerciante ✅ implementado (branch `feat/gestao-fase-0`)
 
 **Objetivo:** eliminar a segunda árvore de páginas **antes** de dividir o painel. Se a divisão
 viesse primeiro, cada página nova de gestão precisaria de uma cópia em `/admin/.../gerenciar`.
@@ -659,7 +663,7 @@ Sem mudança visual para o comerciante.
 - Comerciante com cookie `admin_comercio_id` forjado continua vendo **só** o próprio comércio.
 - Admin sem cookie acessando `/comerciante/dashboard` ⇒ redirect para `/admin/comercios`.
 
-### 10.2 PR 2 — Divisão em "Minha vitrine" e "Gestão"
+### 10.2 PR 2 — Divisão em "Minha vitrine" e "Gestão" ✅ implementado
 
 **Objetivo:** mover as seções para as duas áreas, reusando os managers sem alterá-los. Os
 managers guardam estado local e chamam as mesmas rotas de API (nenhum usa `router.refresh`
@@ -711,7 +715,7 @@ nem `revalidatePath` do dashboard), então trocar a página que os renderiza é 
 - Comércio não-HOSPEDAGEM: sem "Acomodações" e sem "Comodidades e políticas".
 - `npm run build` + `next start` sem erro de SSR.
 
-### 10.3 PR 3 — Resumo do dia e navegação mobile
+### 10.3 PR 3 — Resumo do dia e navegação mobile ✅ implementado
 
 - `/comerciante/gestao/page.tsx`: pedidos por grupo (`grupoDoStatus`), faturamento de hoje
   (pedidos `CONCLUIDO`, dia no fuso `America/Sao_Paulo`), atalhos. Sem `pedido_online`: atalhos

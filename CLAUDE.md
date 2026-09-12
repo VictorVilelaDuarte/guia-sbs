@@ -70,7 +70,7 @@ NEXT_PUBLIC_SITE_URL="http://localhost:3000"  # produção: domínio final (usad
 
 ### Roles e controle de acesso
 
-Três roles: `SUPER_ADMIN`, `ADMIN`, `COMERCIANTE`. O JWT armazena `id` e `role` (ver `src/lib/auth.ts` e `src/types/next-auth.d.ts`). O middleware (`src/middleware.ts`) protege `/admin/*` (requer ADMIN/SUPER_ADMIN) e `/comerciante/*` (requer COMERCIANTE). O único ponto de login é `/admin/login` para todos os roles.
+Três roles: `SUPER_ADMIN`, `ADMIN`, `COMERCIANTE`. O JWT armazena `id` e `role` (ver `src/lib/auth.ts` e `src/types/next-auth.d.ts`). O middleware (`src/middleware.ts`) protege `/admin/*` (requer ADMIN/SUPER_ADMIN) e `/comerciante/*` (requer COMERCIANTE, ou ADMIN/SUPER_ADMIN com o cookie `admin_comercio_id` — ver painel do admin). O único ponto de login é `/admin/login` para todos os roles.
 
 Hierarquia de permissões relevante nas APIs:
 - Apenas `SUPER_ADMIN` pode criar/editar/excluir usuários ADMIN e SUPER_ADMIN.
@@ -91,11 +91,29 @@ const session = await auth()
 if (!session || session.user.role !== "COMERCIANTE") return 401
 ```
 
-### Dashboard do comerciante
+### Painel do comerciante (`/comerciante`)
 
-`/comerciante/dashboard/page.tsx` é um Server Component que busca o comércio completo (com fotos, tags, produtos, eventos, cardápio) e passa para `<DashboardTabs>` (Client Component). As abas são: Informações, Fotos, Cardápio, **Produtos**, **Serviços**, Eventos, Palavras-chave. Abas controladas por feature flags do plano são ocultadas quando a feature não está disponível.
+Dividido em duas áreas (Fase 0 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md)): **Minha vitrine** (o que existe para o comércio ser encontrado no guia) e **Gestão** (operação). Rotas reais em vez de abas para a Gestão — estado na URL e cada página buscando só o que exibe.
 
-As abas Produtos e Serviços são instâncias separadas de `<ProdutosManager>` com `tipo="PRODUTO"` e `tipo="SERVICO"` respectivamente. O manager filtra `p.tipo === tipo && !p.categoriaCardapioId` para mostrar apenas itens do catálogo (não vinculados ao cardápio).
+```
+src/app/comerciante/
+  layout.tsx              — shell: header, banner de admin, AreaSwitch, GestaoTabs (desktop),
+                            GestaoBottomNav (mobile), PedidosAlertaProvider, estado "sem comércio"
+  page.tsx                — entrada: pedido_online ativo → /gestao; senão → /vitrine
+  vitrine/page.tsx        — <VitrineTabs> (?tab=): Informações, Analytics, Fotos,
+                            Comodidades e políticas (só HOSPEDAGEM), Eventos, Palavras-chave
+  gestao/page.tsx         — resumo do dia (pedidos por grupo, faturamento de hoje no fuso SP, atalhos)
+  gestao/cardapio         — CardapioManager (feature cardapio; sem ela, <RecursoBloqueado>)
+  gestao/produtos         — ProdutosManager com ?tipo=servico (key={tipo} — reseta estado ao trocar)
+  gestao/pedidos          — PedidosManager + PedidoConfigForm + ZonasEntregaManager (feature pedido_online)
+  gestao/acomodacoes      — QuartosManager (categoria HOSPEDAGEM; fora dela, 404)
+```
+
+- **Loaders:** `src/lib/painel/queries.ts` — um por página (`getVitrineData`, `getCardapioData`, `getCatalogoData`, `getPedidosData`, `getQuartosData`, `getResumoData`) + `getPainelBase()` (ctx + dados mínimos do comércio, com `React.cache` para deduplicar layout e página). Toda página resolve o comércio por `getPainelBase()` → `getComercioCtx()`, nunca por `session.user.id`.
+- **Gates:** item de feature bloqueada continua no menu com cadeado e a página mostra `<RecursoBloqueado>` (não 404); item de categoria só aparece para a categoria.
+- **Alerta de pedidos** (`src/components/comerciante/painel/pedidos-alerta.tsx`): vive no layout — som, título piscando e badge (switch "Gestão", item Pedidos) valem em **qualquer tela** do painel. Faz polling leve em `GET /api/comerciante/pedidos/resumo?desde=` (devolve `aguardando`, `novos` e `agora` do servidor, reenviado como `desde` — janelas contíguas, sem depender do relógio do navegador). O `PedidosManager` só faz polling da lista e chama `usePedidosAlerta()?.refresh()` ao mudar status; **não** toca som (evita aviso duplicado).
+- **Links antigos:** `/comerciante/dashboard?tab=X` não tem página — o middleware redireciona (308) via `rotaPainelLegada()` (`src/lib/painel/rotas.ts`, sem imports, Edge-safe). Necessário porque o service worker de push antigo abre `?tab=pedidos` até o navegador atualizá-lo.
+- **Push:** a notificação aponta para `/comerciante/gestao/pedidos`. Com o painel já aberto, o `sw-push.js` foca a aba e manda `postMessage({ type: "navegar", url })`; o `PedidosAlertaProvider` faz o `router.push`. `client.navigate()` não serve — o SW não controla as páginas.
 
 ### Vitrine pública
 
@@ -137,11 +155,12 @@ A rota `/api/admin/comercios/[id]` (PATCH) aceita todos os campos do formulário
 
 ### Painel completo do comércio pelo admin (`/admin/comercios/[id]/gerenciar`)
 
-O admin gerencia **tudo** de qualquer comércio (fotos, cardápio, produtos, eventos, tags, hospedagem, pedidos) reusando o `<DashboardTabs>` do comerciante — sem duplicar rotas nem componentes. Mecanismo:
+O admin gerencia **tudo** de qualquer comércio (fotos, cardápio, produtos, eventos, tags, hospedagem, pedidos) usando **as mesmas páginas** do comerciante (`/comerciante/*`) — não existe árvore de páginas separada no admin. Mecanismo:
 
-- **Cookie de contexto:** ao abrir `/admin/comercios/[id]/gerenciar`, o middleware grava o cookie httpOnly `admin_comercio_id` (nome em `src/lib/admin-comercio-cookie.ts` — módulo sem imports, compartilhado com o Edge; **nunca importar `@/lib/comercio-ctx` no middleware**, puxa Prisma).
-- **`getComercioCtx()`** (`src/lib/comercio-ctx.ts`) — helper único usado por **todas** as rotas `/api/comerciante/*`: sessão COMERCIANTE resolve o comércio por `ownerId`; sessão ADMIN/SUPER_ADMIN resolve pelo cookie. Retorna `{ comercioId, ownerId, isAdmin, features }`. O cookie é ignorado para não-admins (anti-forjamento, verificado). Rota nova em `/api/comerciante/*` **deve** usar este helper — não criar guard local.
-- **`getDashboardComercioData()`** (`src/lib/dashboard-comercio.ts`) — query + serializações do dashboard, compartilhada entre `/comerciante/dashboard` (where por `ownerId`) e a página gerenciar (where por `id`).
+- **Cookie de contexto:** `/admin/comercios/[id]/gerenciar` não tem `page.tsx` — o middleware grava o cookie httpOnly `admin_comercio_id` e **redireciona** para `/comerciante` (ou, com `?tab=`, para a rota equivalente via `rotaPainelLegada`). Nome do cookie em `src/lib/admin-comercio-cookie.ts` — módulo sem imports, compartilhado com o Edge; **nunca importar `@/lib/comercio-ctx` no middleware**, puxa Prisma. Links para essa rota usam `prefetch={false}` (o prefetch gravaria o cookie).
+- **Acesso de admin a `/comerciante/*`:** o middleware libera ADMIN/SUPER_ADMIN só com o cookie presente (checagem otimista); o `comerciante/layout.tsx` valida via `getComercioCtx()` e manda para `/admin/comercios` se o comércio não existir. A página mostra banner âmbar e "Voltar ao admin" no lugar de "Sair" (que deslogaria o admin).
+- **`getComercioCtx()`** (`src/lib/comercio-ctx.ts`) — helper único usado por **todas** as rotas `/api/comerciante/*` **e pelas páginas** de `/comerciante/*`: sessão COMERCIANTE resolve o comércio por `ownerId`; sessão ADMIN/SUPER_ADMIN resolve pelo cookie. Retorna `{ comercioId, ownerId, isAdmin, features }`. O cookie é ignorado para não-admins (anti-forjamento, verificado). Rota ou página nova em `/comerciante` **deve** usar este helper — não criar guard local nem resolver por `session.user.id`.
+- **Shell:** o banner âmbar e o "Voltar ao admin" ficam no `comerciante/layout.tsx` e aparecem em todas as páginas do painel.
 - As abas seguem o plano do comércio normalmente (admin vê o mesmo gate de features que o comerciante).
 - **Limitação conhecida:** o cookie guarda um único comércio-alvo — gerenciar dois comércios em abas paralelas faz os fetches da aba antiga atingirem o comércio da aba mais recente (o banner da página avisa).
 
@@ -563,7 +582,7 @@ Feature controlada pelo plano (`key: "catalogo"`). Produtos e serviços são ins
 **Componentes:**
 - `src/components/public/catalogo-view.tsx` — grid público de produtos e serviços
 - `src/components/public/cardapio-destaques-vitrine.tsx` — carrossel de destaques para a vitrine (Client Component wrapper necessário pois a vitrine é Server Component)
-- `src/components/comerciante/produtos-manager.tsx` — lista de produtos/serviços do catálogo no painel, com prop `tipo` para filtrar. Agrupa por `CatalogoCategoria` (+ bloco "Outros"), com gestão de categorias inline (criar/renomear/excluir). Recebe `categoriasCatalogoIniciais` já filtradas por tipo pelo `dashboard-tabs`. Durante a busca, exibe lista plana (ignora agrupamento).
+- `src/components/comerciante/produtos-manager.tsx` — lista de produtos/serviços do catálogo no painel, com prop `tipo` para filtrar. Agrupa por `CatalogoCategoria` (+ bloco "Outros"), com gestão de categorias inline (criar/renomear/excluir). Recebe `categoriasCatalogoIniciais` já filtradas por tipo pela página `/comerciante/gestao/produtos`. Durante a busca, exibe lista plana (ignora agrupamento).
 
 ### Hospedagem (vitrine e gestão específicas)
 
@@ -591,11 +610,11 @@ seguem o padrão do `produto-dialog` — upload via `/api/comerciante/upload` co
 (path `{userId}/quartos/{ts}.{ext}`); o array `fotos` é salvo no payload do quarto. `comodidades`
 e `formasPagamento` validados contra as keys do catálogo.
 
-**Painel:** aba "Hospedagem" em `dashboard-tabs.tsx`, gated por **categoria** (campo `categoria?`
-em `AbaConfig` + filtro `abasVisiveis`), visível só quando `categorias.includes("HOSPEDAGEM")`.
-`hospedagem-manager.tsx` orquestra `hospedagem/quartos-manager.tsx` (+ `quarto-dialog.tsx`, com
-upload/HEIC) e `hospedagem/perfil-form.tsx` (comodidades + políticas). A query do dashboard
-inclui `hospedagemPerfil` e `tiposQuarto`.
+**Painel:** dividido entre as duas áreas — tipos de quarto em **Gestão → Acomodações**
+(`/comerciante/gestao/acomodacoes`, `hospedagem/quartos-manager.tsx` + `quarto-dialog.tsx`, com
+upload/HEIC) e comodidades/políticas em **Minha vitrine → Comodidades e políticas**
+(`hospedagem/perfil-form.tsx`, aba com `categoria: "HOSPEDAGEM"` no `vitrine-tabs.tsx`). Ambos só
+aparecem quando `categorias.includes("HOSPEDAGEM")`.
 
 **Vitrine pública:** `/vitrine/[slug]/page.tsx` faz branch por categoria principal — se
 `categorias[0] === "HOSPEDAGEM"`, renderiza `_components/vitrine-hospedagem.tsx` (reusa Topbar,
