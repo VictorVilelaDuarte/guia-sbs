@@ -60,7 +60,10 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* Quase preto (padrão shadcn era 0.556, cinza médio). O fundo bg-muted é o
+     bege da paleta do guia (--muted: #a0907a, redefinido mais abaixo) — texto
+     cinza sobre ele não tinha contraste em switches, abas, chips e ícones. */
+  --muted-foreground: oklch(0.205 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
