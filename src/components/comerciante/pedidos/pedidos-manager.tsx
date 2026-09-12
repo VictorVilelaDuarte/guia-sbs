@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Bike, Store, MessageCircle, Clock } from "lucide-react"
@@ -18,6 +18,7 @@ import {
 import type { PedidoStatus } from "@prisma/client"
 import type { PedidoAdmin } from "./types"
 import { PushToggle } from "./push-toggle"
+import { usePedidosAlerta } from "@/components/comerciante/painel/pedidos-alerta"
 
 const POLL_MS = 15000
 
@@ -59,32 +60,6 @@ function hora(iso: string) {
   }).format(new Date(iso))
 }
 
-// Beep curto via Web Audio (sem asset). Só soa após interação do usuário.
-function beep() {
-  try {
-    const Ctx =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext
-    if (!Ctx) return
-    const ctx = new Ctx()
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.type = "sine"
-    osc.frequency.value = 880
-    gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02)
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4)
-    osc.start()
-    osc.stop(ctx.currentTime + 0.4)
-    osc.onended = () => ctx.close()
-  } catch {
-    // sem áudio disponível — segue sem som
-  }
-}
-
 export function PedidosManager({
   pedidosIniciais,
 }: {
@@ -92,52 +67,24 @@ export function PedidosManager({
 }) {
   const [pedidos, setPedidos] = useState<PedidoAdmin[]>(pedidosIniciais)
   const [filtro, setFiltro] = useState<GrupoPedido>("novos")
-  const [novos, setNovos] = useState(0)
-  const idsRef = useRef<Set<string>>(new Set(pedidosIniciais.map((p) => p.id)))
+  const alerta = usePedidosAlerta()
 
-  // Polling — busca a lista e detecta novos pedidos AGUARDANDO.
+  // Polling da lista (status e pedidos novos). Som, título piscando e badge de
+  // pedido novo são do PedidosAlertaProvider no layout — valem em qualquer tela
+  // do painel, e aqui não duplicam o aviso.
   useEffect(() => {
     const id = setInterval(async () => {
       try {
         const res = await fetch("/api/comerciante/pedidos", { cache: "no-store" })
         if (!res.ok) return
         const data: PedidoAdmin[] = await res.json()
-        let novosCount = 0
-        for (const p of data) {
-          if (!idsRef.current.has(p.id)) {
-            idsRef.current.add(p.id)
-            if (p.status === "AGUARDANDO") novosCount++
-          }
-        }
         setPedidos(data)
-        if (novosCount > 0) {
-          beep()
-          setNovos((n) => n + novosCount)
-        }
       } catch {
         // mantém o estado atual; tenta de novo no próximo tick
       }
     }, POLL_MS)
     return () => clearInterval(id)
   }, [])
-
-  // Pisca o título da janela enquanto houver novos não vistos.
-  useEffect(() => {
-    if (novos <= 0) return
-    const original = document.title
-    let on = false
-    const id = setInterval(() => {
-      on = !on
-      document.title = on ? `🔔 ${novos} novo(s) pedido(s)` : original
-    }, 1000)
-    const limpar = () => setNovos(0)
-    window.addEventListener("focus", limpar)
-    return () => {
-      clearInterval(id)
-      document.title = original
-      window.removeEventListener("focus", limpar)
-    }
-  }, [novos])
 
   async function mudarStatus(pedido: PedidoAdmin, novoStatus: PedidoStatus) {
     let motivo: string | undefined
@@ -169,6 +116,7 @@ export function PedidosManager({
             : p,
         ),
       )
+      alerta?.refresh() // atualiza o badge de "aguardando" sem esperar o próximo tick
     } catch {
       toast.error("Falha de conexão.")
     }

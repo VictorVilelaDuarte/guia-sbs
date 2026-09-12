@@ -5,15 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EditarComercioForm } from "@/components/comerciante/editar-comercio-form";
 import { LogoUploader } from "@/components/comerciante/logo-uploader";
 import { FotosUploader } from "@/components/comerciante/fotos-uploader";
-import { ProdutosManager } from "@/components/comerciante/produtos-manager";
-import { CardapioManager } from "@/components/comerciante/cardapio-manager";
-import { HospedagemManager } from "@/components/comerciante/hospedagem-manager";
-import { PedidosManager } from "@/components/comerciante/pedidos/pedidos-manager";
-import { PedidoConfigForm } from "@/components/comerciante/pedidos/pedido-config-form";
-import { ZonasEntregaManager } from "@/components/comerciante/pedidos/zonas-entrega-manager";
-import type { PedidoAdmin, PedidoConfigData, BairroCatalogo, ZonaEntregaData } from "@/components/comerciante/pedidos/types";
-import type { Produto, CardapioCategoria, CatalogoCategoria } from "@/components/comerciante/cardapio/types";
-import type { HospedagemPerfilData, TipoQuartoData } from "@/components/comerciante/hospedagem/types";
+import { PerfilForm } from "@/components/comerciante/hospedagem/perfil-form";
+import type { HospedagemPerfilData } from "@/components/comerciante/hospedagem/types";
 import { TagsEditor } from "@/components/comerciante/tags-editor";
 import {
   EventosManager,
@@ -25,6 +18,10 @@ import { cn } from "@/lib/utils";
 import { temFeature, LIMITES_FREE, type FeatureKey } from "@/lib/plan-features";
 import { Lock } from "lucide-react";
 import { toast } from "sonner";
+
+// Área "Minha vitrine" do painel: tudo que existe para o comércio ser
+// encontrado no guia. Cardápio, catálogo, pedidos e quartos ficam na área
+// Gestão (/comerciante/gestao/*) — ver docs/modulo-gestao.md.
 
 interface Foto {
   id: string;
@@ -42,7 +39,7 @@ export interface SubcategoriaBasica {
   categoria: string;
 }
 
-export interface ComercioParaDashboard {
+export interface ComercioParaVitrine {
   id: string;
   nome: string;
   descricao: string | null;
@@ -66,12 +63,8 @@ export interface ComercioParaDashboard {
   fotos: Foto[];
   tags: Tag[];
   subcategorias: SubcategoriaBasica[];
-  produtos: Produto[];
   eventos: Evento[];
-  cardapioCategorias: CardapioCategoria[];
-  catalogoCategorias: CatalogoCategoria[];
   hospedagemPerfil: HospedagemPerfilData | null;
-  tiposQuarto: TipoQuartoData[];
 }
 
 interface AbaConfig {
@@ -87,39 +80,28 @@ const ABAS: AbaConfig[] = [
   // sem `feature`: a aba abre para todos — o plano FREE vê o teaser
   { id: "analytics", label: "Analytics" },
   { id: "fotos", label: "Fotos" },
-  { id: "hospedagem", label: "Hospedagem", categoria: "HOSPEDAGEM" },
-  { id: "cardapio", label: "Cardápio", feature: "cardapio" },
-  { id: "pedidos", label: "Pedidos", feature: "pedido_online" },
-  { id: "produtos", label: "Produtos" },
-  { id: "servicos", label: "Serviços" },
+  { id: "hospedagem", label: "Comodidades e políticas", categoria: "HOSPEDAGEM" },
   { id: "eventos", label: "Eventos", feature: "eventos" },
   { id: "tags", label: "Palavras-chave" },
 ];
 
-export function DashboardTabs({
+export function VitrineTabs({
   comercio,
   subcategoriasDisponiveis,
   analytics,
-  pedidos,
-  pedidoConfig,
-  bairrosCatalogo,
-  zonasEntrega,
+  produtosCount,
   abaInicial,
 }: {
-  comercio: ComercioParaDashboard;
+  comercio: ComercioParaVitrine;
   subcategoriasDisponiveis: SubcategoriaBasica[];
   analytics: AnalyticsResumo;
-  pedidos: PedidoAdmin[];
-  pedidoConfig: PedidoConfigData | null;
-  bairrosCatalogo: BairroCatalogo[];
-  zonasEntrega: ZonaEntregaData[];
+  produtosCount: number;
   abaInicial?: string;
 }) {
   const features = comercio.plan.features;
 
-  // Deep-link via ?tab= (ex.: clique na notificação de pedido). Valida que a
-  // aba existe, é da categoria do comércio e não está bloqueada por plano —
-  // determinístico (mesmo no SSR e client, sem hydration mismatch).
+  // Deep-link via ?tab=. Valida que a aba existe, é da categoria do comércio e
+  // não está bloqueada por plano — determinístico (mesmo no SSR e client).
   const [aba, setAba] = useState(() => {
     if (!abaInicial) return "informacoes";
     const cfg = ABAS.find((a) => a.id === abaInicial);
@@ -132,10 +114,7 @@ export function DashboardTabs({
   const ilimitado = temFeature(features, "fotos_ilimitadas");
   const fotoLimite = ilimitado ? undefined : LIMITES_FREE.fotos;
   const tagLimite = ilimitado ? undefined : LIMITES_FREE.tags;
-  const produtoLimite = ilimitado ? undefined : LIMITES_FREE.produtos;
-  const quartoLimite = ilimitado ? undefined : LIMITES_FREE.quartos;
 
-  // Abas com `categoria` só aparecem para comércios daquela categoria.
   const abasVisiveis = ABAS.filter(
     (a) => !a.categoria || comercio.categorias.includes(a.categoria),
   );
@@ -186,7 +165,7 @@ export function DashboardTabs({
             perfil={{
               fotos: comercio.fotos.length,
               temDescricao: !!comercio.descricao,
-              produtos: comercio.produtos.length,
+              produtos: produtosCount,
               tags: comercio.tags.length,
               temHorarios: !!comercio.horarios,
               temLogo: !!comercio.logo,
@@ -241,129 +220,15 @@ export function DashboardTabs({
         {aba === "hospedagem" && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Hospedagem</CardTitle>
+              <CardTitle className="text-base">Comodidades e políticas</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Tipos de quarto, comodidades e políticas exibidos na sua vitrine.
-                {quartoLimite ? ` Plano Gratuito: até ${quartoLimite} quartos.` : ""}
+                Exibidas na sua vitrine. Os tipos de quarto ficam em Gestão → Acomodações.
               </p>
             </CardHeader>
             <CardContent>
-              <HospedagemManager
-                perfilInicial={comercio.hospedagemPerfil}
-                quartosIniciais={comercio.tiposQuarto}
-                quartoLimite={quartoLimite}
-              />
+              <PerfilForm perfilInicial={comercio.hospedagemPerfil} />
             </CardContent>
           </Card>
-        )}
-
-        {aba === "produtos" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Catálogo de produtos</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Produtos físicos ou digitais exibidos no perfil público.
-                {produtoLimite
-                  ? ` Plano Gratuito: até ${produtoLimite} itens por aba.`
-                  : ""}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <ProdutosManager
-                produtosIniciais={comercio.produtos}
-                categoriasCardapio={comercio.cardapioCategorias}
-                categoriasCatalogoIniciais={comercio.catalogoCategorias.filter((c) => c.tipo === "PRODUTO")}
-                tipo="PRODUTO"
-                limite={produtoLimite}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {aba === "servicos" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Catálogo de serviços</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Serviços oferecidos exibidos no perfil público.
-                {produtoLimite
-                  ? ` Plano Gratuito: até ${produtoLimite} itens por aba.`
-                  : ""}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <ProdutosManager
-                produtosIniciais={comercio.produtos}
-                categoriasCardapio={comercio.cardapioCategorias}
-                categoriasCatalogoIniciais={comercio.catalogoCategorias.filter((c) => c.tipo === "SERVICO")}
-                tipo="SERVICO"
-                limite={produtoLimite}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {aba === "cardapio" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Cardápio</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Organize itens por categoria e defina a ordem de exibição no
-                perfil.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <CardapioManager
-                categoriasIniciais={comercio.cardapioCategorias}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {aba === "pedidos" && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Pedidos recebidos</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Atualiza sozinho a cada poucos segundos. Mantenha esta aba
-                  aberta durante o expediente para ser avisado de novos pedidos.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <PedidosManager pedidosIniciais={pedidos} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Configuração de pedidos</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Defina entrega, retirada, taxa e formas de pagamento. Ligue
-                  &ldquo;Aceitar pedidos&rdquo; para começar a receber.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <PedidoConfigForm configInicial={pedidoConfig} />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Bairros de entrega</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Escolha os bairros que você atende e a taxa de cada um. A taxa
-                  do bairro escolhido pelo cliente é somada ao pedido.
-                </p>
-              </CardHeader>
-              <CardContent>
-                <ZonasEntregaManager
-                  catalogo={bairrosCatalogo}
-                  zonasIniciais={zonasEntrega}
-                />
-              </CardContent>
-            </Card>
-          </>
         )}
 
         {aba === "eventos" && (
