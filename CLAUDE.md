@@ -726,7 +726,9 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
   notificação ao comerciante via **Web Push** (`src/lib/push.ts` + `public/sw-push.js` + VAPID;
   em produção, setar `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` na Vercel),
   bloqueio de pedido fora do horário, e **taxa de entrega por bairro** (models `Bairro`/`ZonaEntrega`,
-  catálogo em `/admin/bairros`, seed `npm run db:seed:bairros`). Fase 2 pendente: WhatsApp Cloud API
+  catálogo em `/admin/bairros`, seed `npm run db:seed:bairros`). **Status só muda por
+  `mudarStatusPedido()`** (`src/lib/pedidos-historico.ts`): transação com `PedidoHistorico` e escrita
+  condicional ao status lido (409 em concorrência); cliente vê só status + horário das etapas. Fase 2 pendente: WhatsApp Cloud API
   para o cliente, agendamento, taxa por raio. Detalhes em `docs/pedido-online.md`.
 - Avaliações de visitantes
 - ~~Analytics para comerciantes~~ — implementado (ver seção Analytics e [`docs/analytics.md`](docs/analytics.md))

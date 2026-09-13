@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { clientePodeCancelar } from "@/lib/pedidos"
+import { mudarStatusPedido } from "@/lib/pedidos-historico"
 
 // Rota PÚBLICA — o `token` (cuid não-adivinhável) é a credencial de acesso.
 // GET: dados de acompanhamento. PATCH: cliente cancela (só enquanto AGUARDANDO).
@@ -35,6 +36,8 @@ export async function GET(
       motivoCancelamento: true,
       createdAt: true,
       updatedAt: true,
+      // Só status + horário: nome de quem mudou o status nunca vai para o cliente.
+      historico: { orderBy: { createdAt: "asc" }, select: { status: true, createdAt: true } },
       itens: {
         select: {
           id: true,
@@ -76,7 +79,7 @@ export async function PATCH(
 
   const pedido = await prisma.pedido.findUnique({
     where: { token },
-    select: { id: true, status: true },
+    select: { id: true, status: true, clienteNome: true },
   })
   if (!pedido) return NextResponse.json({ error: "Pedido não encontrado." }, { status: 404 })
 
@@ -87,11 +90,22 @@ export async function PATCH(
     )
   }
 
-  const atualizado = await prisma.pedido.update({
-    where: { id: pedido.id },
-    data: { status: "CANCELADO", motivoCancelamento: "Cancelado pelo cliente" },
-    select: { status: true },
+  // Condicional ao status lido: se a loja aceitou no mesmo instante, o
+  // cancelamento não sobrescreve o aceite.
+  const resultado = await mudarStatusPedido({
+    pedidoId: pedido.id,
+    de: pedido.status,
+    para: "CANCELADO",
+    motivo: "Cancelado pelo cliente",
+    origem: "CLIENTE",
+    autorNome: pedido.clienteNome,
   })
+  if (resultado === "conflito") {
+    return NextResponse.json(
+      { error: "A loja acabou de atualizar este pedido. Confira o status antes de cancelar." },
+      { status: 409 },
+    )
+  }
 
-  return NextResponse.json(atualizado)
+  return NextResponse.json({ status: "CANCELADO" })
 }

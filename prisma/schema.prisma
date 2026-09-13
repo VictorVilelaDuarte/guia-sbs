@@ -73,6 +73,13 @@ enum PedidoStatus {
   CANCELADO // cliente ou loja cancelou (terminal)
 }
 
+// Quem causou uma mudança de status do pedido (PedidoHistorico).
+enum OrigemHistorico {
+  CLIENTE // checkout ou cancelamento pelo /pedido/[token]
+  LOJA // membro da equipe no painel
+  ADMIN // admin do guia pelo "gerenciar"
+}
+
 enum TipoEntrega {
   ENTREGA
   RETIRADA
@@ -459,12 +466,34 @@ model Pedido {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  comercio Comercio     @relation(fields: [comercioId], references: [id], onDelete: Cascade)
-  itens    PedidoItem[]
+  comercio  Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  itens     PedidoItem[]
+  historico PedidoHistorico[]
 
   @@unique([comercioId, numero])
   @@index([comercioId, status, createdAt])
   @@map("pedidos")
+}
+
+// Linha do tempo do pedido: um registro por mudança de status, gravado na MESMA
+// transação da mudança (src/lib/pedidos-historico.ts). `autorNome` é snapshot —
+// o membro pode ser removido depois (e a conta apagada) sem o histórico perder o
+// autor; por isso `userId` é referência fraca, sem FK. Nome de funcionário nunca
+// vai para o cliente: a página pública só recebe status + horário.
+model PedidoHistorico {
+  id        String          @id @default(cuid())
+  pedidoId  String
+  status    PedidoStatus // status que o pedido passou a ter
+  origem    OrigemHistorico
+  userId    String? // referência fraca (sem FK)
+  autorNome String? // snapshot do nome no momento da ação
+  motivo    String? // recusa/cancelamento
+  createdAt DateTime        @default(now())
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoId, createdAt])
+  @@map("pedido_historicos")
 }
 
 model PedidoItem {

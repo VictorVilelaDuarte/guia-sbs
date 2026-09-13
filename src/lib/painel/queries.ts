@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, permissoesCtx, vinculosValidos } from "@/lib/comercio-ctx"
 import { getAnalyticsResumo } from "@/lib/analytics/queries"
+import { historicoPainelSelect } from "@/lib/pedidos-historico"
 import type {
   PedidoAdmin,
   PedidoConfigData,
@@ -130,6 +131,7 @@ export async function getPedidosData(comercioId: string) {
             observacao: true,
           },
         },
+        historico: historicoPainelSelect,
       },
     }),
     prisma.pedidoConfig.findUnique({ where: { comercioId } }),
@@ -168,6 +170,7 @@ export async function getPedidosData(comercioId: string) {
     motivoCancelamento: p.motivoCancelamento,
     createdAt: p.createdAt.toISOString(),
     itens: p.itens,
+    historico: p.historico.map((h) => ({ ...h, createdAt: h.createdAt.toISOString() })),
   }))
 
   const pedidoConfig: PedidoConfigData | null = config

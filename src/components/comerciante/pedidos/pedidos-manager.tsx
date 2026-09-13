@@ -7,6 +7,7 @@ import { Bike, Store, MessageCircle, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formaPagamentoLabel } from "@/lib/hospedagem"
 import {
+  HISTORICO_ACAO,
   STATUS_LABEL,
   STATUS_TOM,
   transicoesValidas,
@@ -16,7 +17,7 @@ import {
   type GrupoPedido,
 } from "@/lib/pedidos"
 import type { PedidoStatus } from "@prisma/client"
-import type { PedidoAdmin } from "./types"
+import type { HistoricoPedidoAdmin, PedidoAdmin } from "./types"
 import { PushToggle } from "./push-toggle"
 import { usePedidosAlerta } from "@/components/comerciante/painel/pedidos-alerta"
 
@@ -60,6 +61,20 @@ function hora(iso: string) {
   }).format(new Date(iso))
 }
 
+function dia(iso: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(new Date(iso))
+}
+
+function autorDoRegistro(h: HistoricoPedidoAdmin) {
+  if (h.origem === "CLIENTE") return "pelo cliente"
+  if (h.origem === "ADMIN") return "pela equipe do guia"
+  return h.autorNome ? `por ${h.autorNome}` : null
+}
+
 export function PedidosManager({
   pedidosIniciais,
 }: {
@@ -86,6 +101,15 @@ export function PedidosManager({
     return () => clearInterval(id)
   }, [])
 
+  async function recarregar() {
+    try {
+      const res = await fetch("/api/comerciante/pedidos", { cache: "no-store" })
+      if (res.ok) setPedidos(await res.json())
+    } catch {
+      // o polling tenta de novo
+    }
+  }
+
   async function mudarStatus(pedido: PedidoAdmin, novoStatus: PedidoStatus) {
     let motivo: string | undefined
     if (exigeMotivo(novoStatus)) {
@@ -106,13 +130,20 @@ export function PedidosManager({
       if (!res.ok) {
         const data = await res.json()
         toast.error(data.error ?? "Erro ao atualizar.")
+        // 409 = outra pessoa (ou o cliente) mudou o pedido antes: mostra o estado real.
+        if (res.status === 409) await recarregar()
         return
       }
       const upd = await res.json()
       setPedidos((arr) =>
         arr.map((p) =>
           p.id === pedido.id
-            ? { ...p, status: upd.status, motivoCancelamento: upd.motivoCancelamento }
+            ? {
+                ...p,
+                status: upd.status,
+                motivoCancelamento: upd.motivoCancelamento,
+                historico: upd.historico,
+              }
             : p,
         ),
       )
@@ -279,6 +310,35 @@ function PedidoCard({
           <p className="text-rose-500">✕ {pedido.motivoCancelamento}</p>
         )}
       </div>
+
+      {/* Histórico — pedidos anteriores ao registro não têm linha do tempo */}
+      {pedido.historico.length > 0 && (
+        <details className="group mt-2 border-t border-border pt-2">
+          <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground hover:text-foreground">
+            <span className="group-open:hidden">▸</span>
+            <span className="hidden group-open:inline">▾</span> Histórico ({pedido.historico.length})
+          </summary>
+          <ol className="mt-1.5 space-y-1">
+            {pedido.historico.map((h) => {
+              const autor = autorDoRegistro(h)
+              const outroDia = dia(h.createdAt) !== dia(pedido.createdAt)
+              return (
+                <li key={h.id} className="flex gap-2 text-xs">
+                  <span className="w-16 shrink-0 tabular-nums text-muted-foreground">
+                    {outroDia ? `${dia(h.createdAt)} ` : ""}
+                    {hora(h.createdAt)}
+                  </span>
+                  <span>
+                    <span className="font-medium">{HISTORICO_ACAO[h.status]}</span>
+                    {autor && <span className="text-muted-foreground"> {autor}</span>}
+                    {h.motivo && <span className="text-rose-500"> · {h.motivo}</span>}
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+        </details>
+      )}
 
       {/* Ações */}
       {proximos.length > 0 && (

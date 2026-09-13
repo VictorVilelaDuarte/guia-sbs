@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 4 implementados — §11). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 implementados — §11; aguardando merge). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
@@ -853,8 +853,13 @@ permitido; remover o vínculo corta o acesso na próxima requisição (sem esper
 **Verificação:** usuário com duas lojas alterna e cada tela mostra só a loja escolhida; cookie
 forjado com loja sem vínculo é ignorado; alerta de pedido não dispara ao trocar de loja.
 
-### 11.5 PR 5 — Histórico do pedido
+### 11.5 PR 5 — Histórico do pedido ✅ implementado
 
+- **Implementação (2026-09-13):** schema ampliado em relação ao planejado — `origem`
+  (`CLIENTE`/`LOJA`/`ADMIN`) e `autorNome` **snapshot**, porque remover membro apaga a conta (PR 3) e
+  o histórico perderia o autor. Achado: as rotas liam o status e depois gravavam — com equipe, dois
+  aceites simultâneos ou cancelar×aceitar se sobrescreviam; `mudarStatusPedido()` grava condicional
+  ao status lido (409). Decisão: página do cliente mostra o **horário de cada etapa** (sem nomes).
 - `model PedidoHistorico` (schema do §Fase 1) + `db:push`.
 - Gravado na mesma transação de: criação do pedido (`AGUARDANDO`, `userId` null), mudança de status
   pelo painel (`userId` do ctx; admin grava o próprio id) e cancelamento pelo cliente em

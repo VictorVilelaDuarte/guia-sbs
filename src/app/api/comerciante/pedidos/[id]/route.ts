@@ -5,6 +5,7 @@ import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 import { PedidoStatus } from "@prisma/client"
 import { podeTransicionar, exigeMotivo } from "@/lib/pedidos"
+import { historicoPainelSelect, mudarStatusPedido } from "@/lib/pedidos-historico"
 
 const patchSchema = z.object({
   status: z.enum(Object.values(PedidoStatus) as [string, ...string[]]),
@@ -30,7 +31,9 @@ async function ownerCheck(pedidoId: string, ...permissoes: Permissao[]) {
   return { item: pedido, ctx }
 }
 
-// Comerciante avança o status do pedido, validado pela máquina de estados.
+// Comerciante avança o status do pedido, validado pela máquina de estados. A
+// mudança e o registro no histórico (com o autor) são uma transação só, e só
+// valem se o status ainda for o lido — ver src/lib/pedidos-historico.ts.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -59,15 +62,27 @@ export async function PATCH(
     return NextResponse.json({ error: "Informe o motivo." }, { status: 400 })
   }
 
-  const atualizado = await prisma.pedido.update({
-    where: { id },
-    data: {
-      status: novoStatus,
-      motivoCancelamento: exigeMotivo(novoStatus)
-        ? parsed.data.motivoCancelamento!.trim()
-        : null,
-    },
+  const { ctx } = check
+  const autor = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } })
+  const resultado = await mudarStatusPedido({
+    pedidoId: id,
+    de: pedido.status,
+    para: novoStatus,
+    motivo: parsed.data.motivoCancelamento?.trim() ?? null,
+    origem: ctx.isAdmin ? "ADMIN" : "LOJA",
+    userId: ctx.userId,
+    autorNome: autor?.name ?? null,
   })
+  if (resultado === "conflito") {
+    return NextResponse.json(
+      { error: "Este pedido foi atualizado por outra pessoa. A lista foi recarregada." },
+      { status: 409 },
+    )
+  }
 
+  const atualizado = await prisma.pedido.findUnique({
+    where: { id },
+    select: { status: true, motivoCancelamento: true, historico: historicoPainelSelect },
+  })
   return NextResponse.json(atualizado)
 }
