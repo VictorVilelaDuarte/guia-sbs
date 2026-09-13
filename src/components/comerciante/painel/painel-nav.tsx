@@ -11,6 +11,7 @@ import {
   ReceiptText,
   Store,
   Briefcase,
+  Users,
   type LucideIcon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -31,6 +32,8 @@ interface ItemGestao {
   // Aparece se o usuário tiver ALGUMA destas permissões (sem campo: todos).
   permissoes?: Permissao[]
   badgePedidos?: boolean
+  // Fora da barra inferior do mobile (uso raro; cabem no máximo 5 itens).
+  somenteDesktop?: boolean
 }
 
 const ITENS_GESTAO: ItemGestao[] = [
@@ -62,6 +65,14 @@ const ITENS_GESTAO: ItemGestao[] = [
     icon: BedDouble,
     categoria: "HOSPEDAGEM",
     permissoes: ["quartos:editar"],
+  },
+  {
+    href: "/comerciante/gestao/equipe",
+    label: "Equipe",
+    icon: Users,
+    feature: "gestao_equipe",
+    permissoes: ["equipe:gerenciar"],
+    somenteDesktop: true,
   },
 ]
 
@@ -176,7 +187,7 @@ export function GestaoBottomNav(props: NavProps) {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="mx-auto flex max-w-3xl">
-          {itensVisiveis(props).map((item) => {
+          {itensVisiveis(props).filter((i) => !i.somenteDesktop).map((item) => {
             const on = ativo(pathname, item.href)
             const bloqueado = !!item.feature && !temFeature(props.features, item.feature)
             const Icon = item.icon

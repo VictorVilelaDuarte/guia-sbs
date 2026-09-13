@@ -208,7 +208,7 @@ export interface ResumoPedidosHoje {
 }
 
 export async function getResumoData(comercioId: string, opts: { pedidos: boolean }) {
-  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos] =
+  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos] =
     await Promise.all([
       opts.pedidos
         ? prisma.pedido.count({ where: { comercioId, status: "AGUARDANDO" } })
@@ -238,6 +238,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
         _count: { _all: true },
       }),
       prisma.tipoQuarto.count({ where: { comercioId, ativo: true } }),
+      prisma.comercioMembro.count({ where: { comercioId, ativo: true } }),
     ])
 
   const porTipo = (tipo: "PRODUTO" | "SERVICO") =>
@@ -253,6 +254,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
     produtos: porTipo("PRODUTO"),
     servicos: porTipo("SERVICO"),
     quartos,
+    membrosAtivos,
   }
 }
 

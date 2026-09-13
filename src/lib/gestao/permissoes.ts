@@ -45,3 +45,15 @@ export function permissoesDo(papel: PapelMembro | null): readonly Permissao[] {
 export function temPermissao(lista: readonly Permissao[], ...alguma: Permissao[]): boolean {
   return alguma.some((p) => lista.includes(p))
 }
+
+// Rótulos e descrições dos papéis para a interface (tela de equipe).
+export const PAPEIS: readonly { papel: PapelMembro; label: string; descricao: string }[] = [
+  { papel: "DONO", label: "Dono", descricao: "Acesso total, inclusive à equipe" },
+  { papel: "GERENTE", label: "Gerente", descricao: "Tudo da operação e da vitrine, sem mexer na equipe" },
+  { papel: "ATENDENTE", label: "Atendente", descricao: "Pedidos e disponibilidade dos itens" },
+  { papel: "PRODUCAO", label: "Produção", descricao: "Só a fila de pedidos" },
+]
+
+export function papelLabel(papel: PapelMembro): string {
+  return PAPEIS.find((p) => p.papel === papel)?.label ?? papel
+}

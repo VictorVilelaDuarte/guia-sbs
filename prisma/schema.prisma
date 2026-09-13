@@ -96,14 +96,17 @@ model Plan {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(COMERCIANTE)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  password    String
+  role        Role     @default(COMERCIANTE)
+  active      Boolean  @default(true)
+  // Senha temporária gerada pela tela de equipe: o painel e as APIs ficam
+  // bloqueados até o usuário trocar (/comerciante/trocar-senha).
+  trocarSenha Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Comércios em que o usuário é o titular cadastrado pelo admin. Acesso ao
   // painel NÃO vem daqui — vem de `membros` (ComercioMembro).

@@ -7,6 +7,7 @@ import { temPermissao } from "@/lib/gestao/permissoes"
 import {
   AlertTriangle,
   BedDouble,
+  Users,
   BookOpen,
   ChevronRight,
   Lock,
@@ -88,6 +89,9 @@ export default async function GestaoResumoPage() {
   const atalhoCardapio = temPermissao(permissoes, "cardapio:editar", "itens:disponibilidade")
   const atalhoProdutos = temPermissao(permissoes, "catalogo:editar", "itens:disponibilidade")
   const atalhoQuartos = hospedagem && temPermissao(permissoes, "quartos:editar")
+  // Equipe fica fora da barra inferior do mobile — o atalho é o caminho no celular.
+  const atalhoEquipe = temPermissao(permissoes, "equipe:gerenciar")
+  const temEquipe = temFeature(features, "gestao_equipe")
   const r = await getResumoData(base.comercio.id, { pedidos: operaPedidos })
 
   const ticketMedio = r.hoje && r.hoje.concluidos > 0 ? r.hoje.faturamento / r.hoje.concluidos : 0
@@ -191,6 +195,19 @@ export default async function GestaoResumoPage() {
               icon={BedDouble}
               titulo="Acomodações"
               detalhe={`${r.quartos} tipo(s) de quarto ativo(s)`}
+            />
+          )}
+          {atalhoEquipe && (
+            <Atalho
+              href="/comerciante/gestao/equipe"
+              icon={Users}
+              titulo="Equipe"
+              bloqueado={!temEquipe}
+              detalhe={
+                temEquipe
+                  ? `${r.membrosAtivos} pessoa(s) com acesso`
+                  : "Disponível no plano Premium"
+              }
             />
           )}
         </div>

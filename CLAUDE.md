@@ -97,6 +97,8 @@ Dividido em duas áreas (Fase 0 do [`docs/modulo-gestao.md`](docs/modulo-gestao.
 
 ```
 src/app/comerciante/
+  trocar-senha/           — troca de senha (obrigatória com senha temporária) — FORA do (painel)
+  (painel)/               — route group (não afeta URLs) com o shell abaixo
   layout.tsx              — shell: header, banner de admin, AreaSwitch, GestaoTabs (desktop),
                             GestaoBottomNav (mobile), PedidosAlertaProvider, estado "sem comércio"
   page.tsx                — entrada: pedido_online ativo → /gestao; senão → /vitrine
@@ -107,7 +109,12 @@ src/app/comerciante/
   gestao/produtos         — ProdutosManager com ?tipo=servico (key={tipo} — reseta estado ao trocar)
   gestao/pedidos          — PedidosManager + PedidoConfigForm + ZonasEntregaManager (feature pedido_online)
   gestao/acomodacoes      — QuartosManager (categoria HOSPEDAGEM; fora dela, 404)
+  gestao/equipe           — EquipeManager (equipe:gerenciar; feature gestao_equipe, senão cadeado)
 ```
+
+> Os arquivos acima (exceto `trocar-senha/`) vivem em `src/app/comerciante/(painel)/`. O route group
+> existe para o `trocar-senha` ficar fora do shell: o layout do painel redireciona para lá quando o
+> usuário tem `trocarSenha`, e dentro do shell o redirect cairia em loop.
 
 - **Loaders:** `src/lib/painel/queries.ts` — um por página (`getVitrineData`, `getCardapioData`, `getCatalogoData`, `getPedidosData`, `getQuartosData`, `getResumoData`) + `getPainelBase()` (ctx + dados mínimos do comércio, com `React.cache` para deduplicar layout e página). Toda página resolve o comércio por `getPainelBase()` → `getComercioCtx()`, nunca por `session.user.id`.
 - **Gates:** item de feature bloqueada continua no menu com cadeado e a página mostra `<RecursoBloqueado>` (não 404); item de categoria só aparece para a categoria.
@@ -170,8 +177,16 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 
 - `Comercio.ownerId` é só o **titular** cadastrado pelo admin; perdeu o `@unique` (`User.comerciosTitular` é 1:N).
 - `POST /api/admin/comercios` cria o comércio **com** o vínculo DONO (nested create). Comércio sem vínculo = titular vê "Nenhum comércio vinculado".
-- Comércios anteriores à Fase 1 ganharam o vínculo por `prisma/migrate-membros-dono.ts` (idempotente). **Deploy de ambiente novo/produção:** `npm run db:push` → `npx tsx prisma/migrate-membros-dono.ts` → publicar o código.
+- Comércios anteriores à Fase 1 ganharam o vínculo por `prisma/migrate-membros-dono.ts` (idempotente). **Deploy de ambiente novo/produção:** `npm run db:push` → `npx tsx prisma/migrate-membros-dono.ts` → `npx tsx prisma/migrate-flag-gestao-equipe.ts` → publicar o código (scripts idempotentes).
 - Até o seletor multi-loja (PR 4 do §11), `POST /api/admin/comercios` recusa usuário que já tem vínculo ativo — a segunda loja seria inalcançável.
+
+**Tela de equipe** (`/comerciante/gestao/equipe`, PR 3): o DONO adiciona membros (e-mail novo cria conta COMERCIANTE com **senha temporária exibida uma única vez** e `User.trocarSenha = true`; e-mail de comerciante existente só ganha o vínculo; e-mail de admin é recusado), troca papel, desativa/reativa, remove e gera nova senha. Regras em `src/lib/gestao/equipe.ts` (as rotas em `/api/comerciante/gestao/equipe` só autenticam e traduzem `ErroEquipe`):
+- ninguém altera o **próprio** vínculo; o vínculo do **titular** (`ownerId`) só o admin altera; sempre resta **um DONO ativo**;
+- **nova senha só para quem pertence apenas a este comércio** e não é titular de nenhum — senão o dono da loja A adicionaria o dono da loja B e tomaria a conta dele;
+- remover apaga a **conta** junto quando a pessoa não tem vínculo em outro comércio nem é titular.
+- Flag **`gestao_equipe`**: sem ela, `getComercioCtx()` ignora vínculos não-DONO (o dado fica guardado). Ligada no `premium` por `prisma/migrate-flag-gestao-equipe.ts`.
+- **`trocarSenha`**: o layout do painel redireciona para `/comerciante/trocar-senha` e `getComercioCtx()` devolve `null` (APIs bloqueadas). A troca é `POST /api/comerciante/conta/senha` (usa a sessão, não o ctx). Nada disso vai no JWT — lido do banco a cada request, então remover/desativar/rebaixar vale na próxima requisição. Todo comerciante tem o link "Alterar senha" no cabeçalho.
+- Item "Equipe" fica **fora da barra inferior do mobile** (`somenteDesktop`); no celular o caminho é o atalho do Resumo.
 
 **Permissões por papel** (matriz fixa em `src/lib/gestao/permissoes.ts` — módulo sem runtime, usado também no client):
 
@@ -380,6 +395,8 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 | `destaque_busca` | Perfil em posição destacada nos resultados |
 | `analytics` | Estatísticas de visualizações e cliques |
 | `qr_code` | QR Code personalizado do perfil |
+| `pedido_online` | Pedido online pelo cardápio (depende de `cardapio`) |
+| `gestao_equipe` | Membros com papéis no painel do comércio (tela de equipe) |
 
 A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
 

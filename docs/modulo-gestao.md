@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 e 2 implementados — §11). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1, 2 e 3 implementados — §11). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
@@ -808,8 +808,14 @@ rodar o script duas vezes não duplica vínculo; criar comércio pelo admin gera
 **Verificação:** matriz inteira exercitada por API com um usuário de cada papel (criado por
 script, já que a tela de equipe é o PR 3).
 
-### 11.3 PR 3 — Tela de equipe
+### 11.3 PR 3 — Tela de equipe ✅ implementado
 
+- **Decisões de 2026-09-12:** flag ligada no `premium` via `prisma/migrate-flag-gestao-equipe.ts`;
+  o vínculo do **titular** não é alterável pela tela de equipe (só pelo admin); remover um membro
+  **apaga a conta** quando ele não tem vínculo em outro comércio nem é titular.
+- **Implementação:** regras em `src/lib/gestao/equipe.ts`; shell movido para o route group
+  `src/app/comerciante/(painel)/` (URLs iguais) para `trocar-senha/` ficar fora dele; "Equipe"
+  fora da barra inferior do mobile (atalho no Resumo); link "Alterar senha" no cabeçalho.
 - Flag de plano **`gestao_equipe`** em `FEATURES_DISPONIVEIS`. Sem ela: página com cadeado e
   **membros não-DONO perdem o acesso** (`getComercioCtx` ignora o vínculo) — o dado do vínculo
   fica guardado e volta a valer se o plano voltar.
