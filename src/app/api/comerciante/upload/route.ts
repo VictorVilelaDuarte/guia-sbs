@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import type { Permissao } from "@/lib/gestao/permissoes"
 import { uploadFile } from "@/lib/supabase-storage"
+
+// Permissão exigida pelo destino do arquivo (tipo omitido = foto da vitrine).
+function permissoesDoTipo(tipo: string | null): Permissao[] {
+  if (tipo === "produto" || tipo === "cardapio") return ["cardapio:editar", "catalogo:editar"]
+  if (tipo === "quarto") return ["quartos:editar"]
+  return ["vitrine:editar"] // logo, evento, fotos
+}
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 const MAX_SIZE = 5 * 1024 * 1024 // 5MB
@@ -50,6 +58,8 @@ export async function POST(req: NextRequest) {
     // comerciante no próprio painel, ou admin no painel de gestão (cookie)
     const ctx = await getComercioCtx()
     if (!ctx) return NextResponse.json({ error: "Comércio não encontrado." }, { status: 404 })
+    const negado = negarSemPermissao(ctx, ...permissoesDoTipo(tipo))
+    if (negado) return negado
     pasta = ctx.comercioId
   }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 // Registro/remoção de inscrições Web Push do comerciante. Cada dispositivo
@@ -21,6 +21,8 @@ const unsubscribeSchema = z.object({
 export async function POST(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "pedidos:operar")
+  if (negado) return negado
 
   const parsed = subscribeSchema.safeParse(await req.json())
   if (!parsed.success) {
@@ -42,6 +44,8 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "pedidos:operar")
+  if (negado) return negado
 
   const parsed = unsubscribeSchema.safeParse(await req.json())
   if (!parsed.success) {

@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { temFeature, type FeatureKey } from "@/lib/plan-features"
+import { temPermissao, type Permissao } from "@/lib/gestao/permissoes"
 import { usePedidosAlerta } from "./pedidos-alerta"
 
 // Navegação do painel: switch de área (Minha vitrine | Gestão) e itens da área
@@ -27,6 +28,8 @@ interface ItemGestao {
   icon: LucideIcon
   feature?: FeatureKey
   categoria?: string
+  // Aparece se o usuário tiver ALGUMA destas permissões (sem campo: todos).
+  permissoes?: Permissao[]
   badgePedidos?: boolean
 }
 
@@ -37,27 +40,46 @@ const ITENS_GESTAO: ItemGestao[] = [
     label: "Pedidos",
     icon: ReceiptText,
     feature: "pedido_online",
+    permissoes: ["pedidos:operar"],
     badgePedidos: true,
   },
-  { href: "/comerciante/gestao/cardapio", label: "Cardápio", icon: BookOpen, feature: "cardapio" },
-  { href: "/comerciante/gestao/produtos", label: "Produtos", icon: Package },
+  {
+    href: "/comerciante/gestao/cardapio",
+    label: "Cardápio",
+    icon: BookOpen,
+    feature: "cardapio",
+    permissoes: ["cardapio:editar", "itens:disponibilidade"],
+  },
+  {
+    href: "/comerciante/gestao/produtos",
+    label: "Produtos",
+    icon: Package,
+    permissoes: ["catalogo:editar", "itens:disponibilidade"],
+  },
   {
     href: "/comerciante/gestao/acomodacoes",
     label: "Acomodações",
     icon: BedDouble,
     categoria: "HOSPEDAGEM",
+    permissoes: ["quartos:editar"],
   },
 ]
 
 interface NavProps {
   features: unknown
   categorias: string[]
+  permissoes: readonly Permissao[]
 }
 
-function itensVisiveis({ categorias }: NavProps) {
-  // Itens de feature bloqueada continuam visíveis (com cadeado) — a página
-  // explica o recurso. Itens de categoria só aparecem para aquela categoria.
-  return ITENS_GESTAO.filter((i) => !i.categoria || categorias.includes(i.categoria))
+function itensVisiveis({ categorias, permissoes }: NavProps) {
+  // Feature fora do plano: item continua visível com cadeado (o dono pode
+  // contratar). Sem permissão do papel ou fora da categoria: item some (o
+  // membro não tem o que fazer a respeito).
+  return ITENS_GESTAO.filter(
+    (i) =>
+      (!i.categoria || categorias.includes(i.categoria)) &&
+      (!i.permissoes || temPermissao(permissoes, ...i.permissoes)),
+  )
 }
 
 function ativo(pathname: string, href: string) {
@@ -78,10 +100,13 @@ function Badge({ n, className }: { n: number; className?: string }) {
   )
 }
 
-export function AreaSwitch() {
+export function AreaSwitch({ permissoes }: { permissoes: readonly Permissao[] }) {
   const pathname = usePathname()
   const alerta = usePedidosAlerta()
   const naGestao = pathname.startsWith("/comerciante/gestao")
+
+  // Sem nada da vitrine (ex.: atendente, produção), o painel é só Gestão.
+  if (!temPermissao(permissoes, "vitrine:editar", "analytics:ver")) return null
 
   const cls = (on: boolean) =>
     cn(

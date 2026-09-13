@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { deleteFile } from "@/lib/supabase-storage"
 
 export async function DELETE(
@@ -9,6 +9,8 @@ export async function DELETE(
 ) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "vitrine:editar")
+  if (negado) return negado
 
   const { id } = await params
   const foto = await prisma.foto.findUnique({

@@ -4,6 +4,8 @@ import { ProdutosManager } from "@/components/comerciante/produtos-manager"
 import { getCatalogoData, getPainelBase } from "@/lib/painel/queries"
 import { temFeature, LIMITES_FREE } from "@/lib/plan-features"
 import { cn } from "@/lib/utils"
+import { notFound } from "next/navigation"
+import { temPermissao } from "@/lib/gestao/permissoes"
 
 const TIPOS = {
   PRODUTO: {
@@ -27,6 +29,8 @@ export default async function GestaoProdutosPage({
 }) {
   const [{ tipo: tipoParam }, base] = await Promise.all([searchParams, getPainelBase()])
   if (!base) return null
+  if (!temPermissao(base.permissoes, "catalogo:editar", "itens:disponibilidade")) notFound()
+  const podeEditar = temPermissao(base.permissoes, "catalogo:editar")
 
   const tipo = tipoParam === "servico" ? "SERVICO" : "PRODUTO"
   const cfg = TIPOS[tipo]
@@ -60,8 +64,9 @@ export default async function GestaoProdutosPage({
         <CardHeader>
           <CardTitle className="text-base">{cfg.titulo}</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {cfg.descricao}
-            {limite ? ` Plano Gratuito: até ${limite} itens por aba.` : ""}
+            {podeEditar
+              ? cfg.descricao + (limite ? ` Plano Gratuito: até ${limite} itens por aba.` : "")
+              : "Marque como oculto o item indisponível; ele some da vitrine até ser mostrado de novo."}
           </p>
         </CardHeader>
         <CardContent>
@@ -74,6 +79,7 @@ export default async function GestaoProdutosPage({
             categoriasCatalogoIniciais={catalogoCategorias.filter((c) => c.tipo === tipo)}
             tipo={tipo}
             limite={limite}
+            somenteDisponibilidade={!podeEditar}
           />
         </CardContent>
       </Card>

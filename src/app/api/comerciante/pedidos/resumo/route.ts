@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { temFeature } from "@/lib/plan-features"
 
 // Consulta leve para o alerta de pedidos do shell do painel (polling em todas
@@ -13,6 +13,8 @@ import { temFeature } from "@/lib/plan-features"
 export async function GET(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "pedidos:operar")
+  if (negado) return negado
 
   const agora = new Date()
   if (!temFeature(ctx.features, "pedido_online")) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 const createSchema = z.object({
@@ -17,6 +17,8 @@ const createSchema = z.object({
 export async function GET() {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "vitrine:editar")
+  if (negado) return negado
 
   const eventos = await prisma.evento.findMany({
     where: { comercioId: ctx.comercioId },
@@ -29,6 +31,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "vitrine:editar")
+  if (negado) return negado
 
   let body: unknown
   try {

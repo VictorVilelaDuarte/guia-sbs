@@ -1,7 +1,7 @@
 import { cache } from "react"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, permissoesCtx } from "@/lib/comercio-ctx"
 import { getAnalyticsResumo } from "@/lib/analytics/queries"
 import type {
   PedidoAdmin,
@@ -32,7 +32,7 @@ export const getPainelBase = cache(async () => {
     },
   })
   if (!comercio) return null
-  return { ctx, comercio }
+  return { ctx, comercio, permissoes: permissoesCtx(ctx) }
 })
 
 const produtoInclude = {

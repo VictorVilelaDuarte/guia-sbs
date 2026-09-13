@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 import { PedidoStatus } from "@prisma/client"
 import { podeTransicionar, exigeMotivo } from "@/lib/pedidos"
@@ -10,9 +11,11 @@ const patchSchema = z.object({
   motivoCancelamento: z.string().max(280).optional().nullable(),
 })
 
-async function ownerCheck(pedidoId: string) {
+async function ownerCheck(pedidoId: string, ...permissoes: Permissao[]) {
   const ctx = await getComercioCtx()
-  if (!ctx) return null
+  if (!ctx) return { erro: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) }
+  const negado = negarSemPermissao(ctx, ...permissoes)
+  if (negado) return { erro: negado }
 
   const pedido = await prisma.pedido.findUnique({
     where: { id: pedidoId },
@@ -23,8 +26,8 @@ async function ownerCheck(pedidoId: string) {
       comercioId: true,
     },
   })
-  if (!pedido || pedido.comercioId !== ctx.comercioId) return null
-  return pedido
+  if (!pedido || pedido.comercioId !== ctx.comercioId) return { erro: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) }
+  return { item: pedido, ctx }
 }
 
 // Comerciante avança o status do pedido, validado pela máquina de estados.
@@ -33,8 +36,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  const pedido = await ownerCheck(id)
-  if (!pedido) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id, "pedidos:operar")
+  if ("erro" in check) return check.erro
+  const pedido = check.item
 
   const body = await req.json()
   const parsed = patchSchema.safeParse(body)

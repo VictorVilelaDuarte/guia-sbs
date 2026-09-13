@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 
 const patchSchema = z.object({
   nome: z.string().min(1).max(80).optional(),
 })
 
-async function ownerCheck(categoriaId: string) {
+async function ownerCheck(categoriaId: string, ...permissoes: Permissao[]) {
   const ctx = await getComercioCtx()
-  if (!ctx) return null
+  if (!ctx) return { erro: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) }
+  const negado = negarSemPermissao(ctx, ...permissoes)
+  if (negado) return { erro: negado }
 
   const categoria = await prisma.cardapioCategoria.findUnique({
     where: { id: categoriaId },
-      })
+  })
 
-  if (!categoria || categoria.comercioId !== ctx.comercioId) return null
-  return categoria
+  if (!categoria || categoria.comercioId !== ctx.comercioId) return { erro: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) }
+  return { item: categoria, ctx }
 }
 
 export async function PATCH(
@@ -24,8 +27,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const categoria = await ownerCheck(id)
-  if (!categoria) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id, "cardapio:editar")
+  if ("erro" in check) return check.erro
 
   const body = await req.json()
   const parsed = patchSchema.safeParse(body)
@@ -45,8 +48,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const categoria = await ownerCheck(id)
-  if (!categoria) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id, "cardapio:editar")
+  if ("erro" in check) return check.erro
 
   // Itens e suas imagens são deletados via cascade no banco.
   // Imagens no storage ficam órfãs — aceitável por ora.

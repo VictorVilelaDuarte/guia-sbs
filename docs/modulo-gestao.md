@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PR 1 implementado — §11). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 e 2 implementados — §11). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
@@ -771,7 +771,7 @@ script = comerciante sem vínculo = "Nenhum comércio vinculado".
 logo/fotos antigos continuam aparecendo; item de outro comércio via rota `[id]` retorna 404/403;
 rodar o script duas vezes não duplica vínculo; criar comércio pelo admin gera o vínculo DONO.
 
-### 11.2 PR 2 — Permissões
+### 11.2 PR 2 — Permissões ✅ implementado
 
 `src/lib/gestao/permissoes.ts` — matriz fixa (decisão 3):
 
@@ -780,7 +780,7 @@ rodar o script duas vezes não duplica vínculo; criar comércio pelo admin gera
 | `vitrine:editar` (informações, logo, fotos, eventos, tags, comodidades) | ✅ | ✅ | | |
 | `analytics:ver` | ✅ | ✅ | | |
 | `cardapio:editar` / `catalogo:editar` / `quartos:editar` | ✅ | ✅ | | |
-| `cardapio:disponibilidade` (só ligar/desligar `disponivel`) | ✅ | ✅ | ✅ | |
+| `itens:disponibilidade` (só ligar/desligar `disponivel` de itens do cardápio **e** do catálogo) | ✅ | ✅ | ✅ | |
 | `pedidos:operar` (ver lista, mudar status) | ✅ | ✅ | ✅ | ✅ |
 | `pedidos:configurar` (config, zonas de entrega) | ✅ | ✅ | | |
 | `vendas:ver` (faturamento e ticket no resumo; relatórios na Fase 3) | ✅ | ✅ | | |
@@ -788,8 +788,17 @@ rodar o script duas vezes não duplica vínculo; criar comércio pelo admin gera
 
 - `exigirPermissao(ctx, p)` em todas as rotas de `/api/comerciante/*` (27 com o `resumo`); admin
   passa sempre. Recusa ⇒ **403**.
-- `cardapio:disponibilidade`: `PATCH` de item/produto aceita a permissão **só** quando o corpo
-  contém apenas `disponivel` — senão exige `cardapio:editar`/`catalogo:editar`.
+- `itens:disponibilidade`: `PATCH` de item/produto aceita a permissão **só** quando o corpo
+  contém apenas `disponivel` — senão exige `cardapio:editar`/`catalogo:editar`. (Planejado como
+  `cardapio:disponibilidade`; ampliado na implementação porque o botão Visível/Oculto do catálogo
+  usa a mesma rota e o atendente também marca produto esgotado.)
+- **Implementação:** matriz em `src/lib/gestao/permissoes.ts` (sem runtime — usada no client);
+  guards `negarSemPermissao(ctx, ...)` / `pode(ctx, ...)` em `src/lib/comercio-ctx.ts`;
+  `getPainelBase()` expõe `permissoes`. `produtos` e `produtos/[id]` decidem pelo item
+  (`categoriaCardapioId` → cardápio; senão catálogo — na origem e no destino, se o PATCH mover o
+  item); `upload` decide pelo `tipo`. Managers de cardápio e catálogo ganharam
+  `somenteDisponibilidade`. De quebra: o PATCH de produto passou a validar que a
+  `categoriaCardapioId` de destino é do mesmo comércio (antes não validava).
 - Páginas e navegação: itens sem permissão **somem** (diferente de feature fora do plano, que
   mostra cadeado — lá o dono pode contratar; aqui o membro não pode fazer nada a respeito).
   Página acessada direto sem permissão ⇒ `notFound()`.

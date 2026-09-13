@@ -44,8 +44,12 @@ import { SortableCategoriaWrapper, SortableItemWrapper } from "./sortable-wrappe
 
 export function CardapioManager({
   categoriasIniciais,
+  somenteDisponibilidade = false,
 }: {
   categoriasIniciais: CardapioCategoria[]
+  // Papel com itens:disponibilidade mas sem cardapio:editar (ex.: atendente):
+  // só vê a lista e liga/desliga Visível/Oculto. A API aplica a mesma regra.
+  somenteDisponibilidade?: boolean
 }) {
   const [categorias, setCategorias] = useState<CardapioCategoria[]>(categoriasIniciais)
   const [catDialog, setCatDialog] = useState(false)
@@ -231,10 +235,12 @@ export function CardapioManager({
             </button>
           )}
         </div>
-        <Button size="sm" onClick={() => { setEditandoCat(null); setCatDialog(true) }}>
-          <FolderPlus className="h-4 w-4 mr-1.5" />
-          Nova categoria
-        </Button>
+        {!somenteDisponibilidade && (
+          <Button size="sm" onClick={() => { setEditandoCat(null); setCatDialog(true) }}>
+            <FolderPlus className="h-4 w-4 mr-1.5" />
+            Nova categoria
+          </Button>
+        )}
       </div>
 
       <p className="text-sm text-muted-foreground">
@@ -251,11 +257,15 @@ export function CardapioManager({
       {categorias.length === 0 && !buscaAtiva && (
         <div className="flex flex-col items-center justify-center gap-3 py-12 rounded-lg border border-dashed border-input text-muted-foreground">
           <UtensilsCrossed className="h-10 w-10 opacity-40" />
-          <p className="text-sm">Crie categorias para organizar o seu cardápio.</p>
-          <Button variant="outline" size="sm" onClick={() => { setEditandoCat(null); setCatDialog(true) }}>
-            <FolderPlus className="h-4 w-4 mr-1.5" />
-            Criar primeira categoria
-          </Button>
+          <p className="text-sm">
+            {somenteDisponibilidade ? "O cardápio ainda não tem itens." : "Crie categorias para organizar o seu cardápio."}
+          </p>
+          {!somenteDisponibilidade && (
+            <Button variant="outline" size="sm" onClick={() => { setEditandoCat(null); setCatDialog(true) }}>
+              <FolderPlus className="h-4 w-4 mr-1.5" />
+              Criar primeira categoria
+            </Button>
+          )}
         </div>
       )}
 
@@ -274,14 +284,16 @@ export function CardapioManager({
                   <div className="rounded-xl border border-input overflow-hidden">
                     {/* Header da categoria */}
                     <div className={cn("flex items-center gap-2 bg-muted/40 px-3 py-2.5", !colapsada && "border-b border-input")}>
-                      <button
-                        type="button"
-                        className="flex h-7 w-5 items-center justify-center text-black hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
-                        aria-label="Arrastar categoria"
-                        {...dragHandleProps}
-                      >
-                        <GripVertical className="h-4 w-4" />
-                      </button>
+                      {!somenteDisponibilidade && (
+                        <button
+                          type="button"
+                          className="flex h-7 w-5 items-center justify-center text-black hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+                          aria-label="Arrastar categoria"
+                          {...dragHandleProps}
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -297,44 +309,50 @@ export function CardapioManager({
                         <ChevronDown className={cn("h-3.5 w-3.5 text-black shrink-0 transition-transform", colapsada && "-rotate-90")} />
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => { setDefaultCatId(cat.id); setEditandoItem(null); setItemDialog(true) }}
-                        className="flex items-center gap-1 text-xs text-black hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors cursor-pointer"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Item
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setEditandoCat(cat); setCatDialog(true) }}
-                        className="flex h-7 w-7 items-center justify-center rounded text-black hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCat(cat)}
-                        disabled={removendoId === cat.id}
-                        className="flex h-7 w-7 items-center justify-center rounded text-black hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors cursor-pointer"
-                      >
-                        {removendoId === cat.id
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : <Trash2 className="h-3.5 w-3.5" />}
-                      </button>
+                      {!somenteDisponibilidade && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setDefaultCatId(cat.id); setEditandoItem(null); setItemDialog(true) }}
+                            className="flex items-center gap-1 text-xs text-black hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors cursor-pointer"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Item
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setEditandoCat(cat); setCatDialog(true) }}
+                            className="flex h-7 w-7 items-center justify-center rounded text-black hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCat(cat)}
+                            disabled={removendoId === cat.id}
+                            className="flex h-7 w-7 items-center justify-center rounded text-black hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors cursor-pointer"
+                          >
+                            {removendoId === cat.id
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Trash2 className="h-3.5 w-3.5" />}
+                          </button>
+                        </>
+                      )}
                     </div>
 
                     {/* Itens */}
                     {!colapsada && cat.produtos.length === 0 ? (
                       <div className="px-4 py-6 text-center text-sm text-muted-foreground">
                         Nenhum item nesta categoria.{" "}
-                        <button
-                          type="button"
-                          onClick={() => { setDefaultCatId(cat.id); setEditandoItem(null); setItemDialog(true) }}
-                          className="text-primary hover:underline cursor-pointer"
-                        >
-                          Adicionar item
-                        </button>
+                        {!somenteDisponibilidade && (
+                          <button
+                            type="button"
+                            onClick={() => { setDefaultCatId(cat.id); setEditandoItem(null); setItemDialog(true) }}
+                            className="text-primary hover:underline cursor-pointer"
+                          >
+                            Adicionar item
+                          </button>
+                        )}
                       </div>
                     ) : !colapsada ? (
                       <SortableContext
@@ -351,14 +369,16 @@ export function CardapioManager({
                                   isDragging && "opacity-40"
                                 )}>
                                   {/* Drag handle */}
-                                  <button
-                                    type="button"
-                                    className="flex items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none self-center"
-                                    aria-label="Arrastar item"
-                                    {...itemDragHandleProps}
-                                  >
-                                    <GripVertical className="h-4 w-4" />
-                                  </button>
+                                  {!somenteDisponibilidade && (
+                                    <button
+                                      type="button"
+                                      className="flex items-center justify-center text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none self-center"
+                                      aria-label="Arrastar item"
+                                      {...itemDragHandleProps}
+                                    >
+                                      <GripVertical className="h-4 w-4" />
+                                    </button>
+                                  )}
 
                                   {/* Imagem */}
                                   <div className="relative h-16 w-16 shrink-0 rounded-md overflow-hidden bg-muted">
@@ -408,13 +428,15 @@ export function CardapioManager({
 
                                   {/* Ações */}
                                   <div className="flex flex-col gap-1 shrink-0">
-                                    <button
-                                      type="button"
-                                      onClick={() => { setEditandoItem(produto); setItemDialog(true) }}
-                                      className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </button>
+                                    {!somenteDisponibilidade && (
+                                      <button
+                                        type="button"
+                                        onClick={() => { setEditandoItem(produto); setItemDialog(true) }}
+                                        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
                                     <button
                                       type="button"
                                       onClick={() => toggleDisponivel(produto)}
@@ -424,16 +446,18 @@ export function CardapioManager({
                                         ? <EyeOff className="h-3.5 w-3.5" />
                                         : <Eye className="h-3.5 w-3.5" />}
                                     </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteItem(produto)}
-                                      disabled={removendoId === produto.id}
-                                      className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors cursor-pointer"
-                                    >
-                                      {removendoId === produto.id
-                                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                        : <Trash2 className="h-3.5 w-3.5" />}
-                                    </button>
+                                    {!somenteDisponibilidade && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteItem(produto)}
+                                        disabled={removendoId === produto.id}
+                                        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 disabled:opacity-50 transition-colors cursor-pointer"
+                                      >
+                                        {removendoId === produto.id
+                                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                          : <Trash2 className="h-3.5 w-3.5" />}
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
                               )}

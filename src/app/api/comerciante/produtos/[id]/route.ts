@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao, pode } from "@/lib/comercio-ctx"
+import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 import { deleteFile } from "@/lib/supabase-storage"
 
@@ -24,6 +25,12 @@ const patchSchema = z.object({
   variacoes: z.array(variacaoSchema).optional(),
 })
 
+// Cardápio e catálogo compartilham o model Produto: a permissão de edição
+// depende de onde o item está — e, num PATCH que o move, de para onde vai.
+function permissaoDeEdicao(categoriaCardapioId: string | null): Permissao {
+  return categoriaCardapioId ? "cardapio:editar" : "catalogo:editar"
+}
+
 async function ownerCheck(produtoId: string) {
   const ctx = await getComercioCtx()
   if (!ctx) return null
@@ -36,7 +43,7 @@ async function ownerCheck(produtoId: string) {
   })
 
   if (!produto || produto.comercioId !== ctx.comercioId) return null
-  return produto
+  return { produto, ctx }
 }
 
 export async function PATCH(
@@ -44,12 +51,38 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const produto = await ownerCheck(id)
-  if (!produto) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id)
+  if (!check) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const { produto, ctx } = check
 
   const body = await req.json()
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
+
+  // Só ligar/desligar a disponibilidade (botão Visível/Oculto) é liberado para
+  // quem tem itens:disponibilidade (ex.: atendente). Qualquer outro campo exige
+  // editar o cardápio/catálogo — na origem e no destino, se o item mudar de lugar.
+  const soDisponibilidade =
+    Object.keys(parsed.data).length === 1 && parsed.data.disponivel !== undefined
+  if (!(soDisponibilidade && pode(ctx, "itens:disponibilidade"))) {
+    const origem = permissaoDeEdicao(produto.categoriaCardapioId)
+    const destino =
+      parsed.data.categoriaCardapioId !== undefined
+        ? permissaoDeEdicao(parsed.data.categoriaCardapioId)
+        : origem
+    const negado = negarSemPermissao(ctx, origem) ?? negarSemPermissao(ctx, destino)
+    if (negado) return negado
+  }
+
+  if (parsed.data.categoriaCardapioId) {
+    const categoria = await prisma.cardapioCategoria.findUnique({
+      where: { id: parsed.data.categoriaCardapioId },
+      select: { comercioId: true },
+    })
+    if (!categoria || categoria.comercioId !== produto.comercioId) {
+      return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
+    }
+  }
 
   if (parsed.data.categoriaCatalogoId) {
     const tipoAlvo = parsed.data.tipo ?? produto.tipo
@@ -103,8 +136,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const produto = await ownerCheck(id)
-  if (!produto) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id)
+  if (!check) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const { produto, ctx } = check
+  const negado = negarSemPermissao(ctx, permissaoDeEdicao(produto.categoriaCardapioId))
+  if (negado) return negado
 
   for (const url of produto.imagens) {
     try {

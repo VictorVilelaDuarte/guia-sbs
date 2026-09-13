@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getPainelBase } from "@/lib/painel/queries"
 import { temFeature } from "@/lib/plan-features"
+import { temPermissao } from "@/lib/gestao/permissoes"
 import { PedidosAlertaProvider } from "@/components/comerciante/painel/pedidos-alerta"
 import {
   AreaSwitch,
@@ -51,6 +52,7 @@ export default async function ComercianteLayout({
 
   const comercio = base?.comercio
   const isAdmin = base?.ctx.isAdmin ?? false
+  const permissoes = base?.permissoes ?? []
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -102,7 +104,12 @@ export default async function ComercianteLayout({
             </CardContent>
           </Card>
         ) : (
-          <PedidosAlertaProvider ativo={temFeature(comercio.plan.features, "pedido_online")}>
+          <PedidosAlertaProvider
+            ativo={
+              temFeature(comercio.plan.features, "pedido_online") &&
+              temPermissao(permissoes, "pedidos:operar")
+            }
+          >
             <div className="space-y-6">
               {isAdmin && (
                 <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
@@ -132,12 +139,20 @@ export default async function ComercianteLayout({
                 </div>
               </div>
 
-              <AreaSwitch />
-              <GestaoTabs features={comercio.plan.features} categorias={comercio.categorias} />
+              <AreaSwitch permissoes={permissoes} />
+              <GestaoTabs
+                features={comercio.plan.features}
+                categorias={comercio.categorias}
+                permissoes={permissoes}
+              />
 
               <div>{children}</div>
             </div>
-            <GestaoBottomNav features={comercio.plan.features} categorias={comercio.categorias} />
+            <GestaoBottomNav
+              features={comercio.plan.features}
+              categorias={comercio.categorias}
+              permissoes={permissoes}
+            />
           </PedidosAlertaProvider>
         )}
       </main>

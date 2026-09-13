@@ -173,6 +173,19 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 - Comércios anteriores à Fase 1 ganharam o vínculo por `prisma/migrate-membros-dono.ts` (idempotente). **Deploy de ambiente novo/produção:** `npm run db:push` → `npx tsx prisma/migrate-membros-dono.ts` → publicar o código.
 - Até o seletor multi-loja (PR 4 do §11), `POST /api/admin/comercios` recusa usuário que já tem vínculo ativo — a segunda loja seria inalcançável.
 
+**Permissões por papel** (matriz fixa em `src/lib/gestao/permissoes.ts` — módulo sem runtime, usado também no client):
+
+| Permissão | DONO | GERENTE | ATENDENTE | PRODUCAO |
+|---|:-:|:-:|:-:|:-:|
+| `vitrine:editar`, `analytics:ver`, `cardapio:editar`, `catalogo:editar`, `quartos:editar`, `pedidos:configurar`, `vendas:ver` | ✅ | ✅ | | |
+| `itens:disponibilidade` (só o `disponivel` de itens do cardápio/catálogo) | ✅ | ✅ | ✅ | |
+| `pedidos:operar` | ✅ | ✅ | ✅ | ✅ |
+| `equipe:gerenciar` | ✅ | | | |
+
+- **Toda rota de `/api/comerciante/*` chama `getComercioCtx()` e depois `negarSemPermissao(ctx, ...permissões)`** (403; passa se tiver ALGUMA). Admin passa sempre. Rota nova sem guard de permissão é bug.
+- Casos que decidem pelo dado: `produtos`/`produtos/[id]` (item com `categoriaCardapioId` → `cardapio:editar`, senão `catalogo:editar`; PATCH só com `disponivel` aceita `itens:disponibilidade`); `upload` (pelo `tipo`).
+- **Interface:** `getPainelBase()` expõe `permissoes`; itens sem permissão **somem** (nav, abas, atalhos, cards) — diferente de feature fora do plano, que mostra cadeado. Página acessada direto sem permissão ⇒ `notFound()`. Quem não tem `vitrine:editar` nem `analytics:ver` não vê o switch de área e entra direto na Gestão. `CardapioManager`/`ProdutosManager` têm `somenteDisponibilidade`.
+
 ### Upload de imagens
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:

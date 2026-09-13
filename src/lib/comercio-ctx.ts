@@ -1,8 +1,10 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { cookies } from "next/headers"
+import { NextResponse } from "next/server"
 import type { PapelMembro } from "@prisma/client"
 import { ADMIN_COMERCIO_COOKIE } from "@/lib/admin-comercio-cookie"
+import { permissoesDo, temPermissao, type Permissao } from "@/lib/gestao/permissoes"
 
 export interface ComercioCtx {
   comercioId: string
@@ -72,4 +74,21 @@ export async function getComercioCtx(): Promise<ComercioCtx | null> {
   }
 
   return null
+}
+
+// Permissões do usuário no comércio do contexto (admin: todas).
+export function permissoesCtx(ctx: ComercioCtx): readonly Permissao[] {
+  return permissoesDo(ctx.isAdmin ? null : ctx.papel)
+}
+
+// Verdadeiro se o contexto tem ALGUMA das permissões pedidas.
+export function pode(ctx: ComercioCtx, ...alguma: Permissao[]): boolean {
+  return temPermissao(permissoesCtx(ctx), ...alguma)
+}
+
+// Guard das rotas de API: devolve a resposta 403 quando falta permissão, ou
+// null para seguir. Uso: `const negado = negarSemPermissao(ctx, "x"); if (negado) return negado`.
+export function negarSemPermissao(ctx: ComercioCtx, ...alguma: Permissao[]): NextResponse | null {
+  if (pode(ctx, ...alguma)) return null
+  return NextResponse.json({ error: "Seu papel neste comércio não permite esta ação." }, { status: 403 })
 }
