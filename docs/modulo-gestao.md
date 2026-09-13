@@ -1,6 +1,7 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** planejado — nada implementado. Decisões de produto fechadas (2026-09-12).
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PR 1 implementado — §11). Decisões de
+> produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
 
@@ -41,6 +42,11 @@ O produto passa a ter duas propostas de valor vendáveis separadamente:
    `comercio_ativo` validado contra os vínculos e seletor simples no shell do painel.
 8. **Escopo — ✅ fiscal, financeiro e compras fora da v1, no roadmap futuro.** A v1 é gestão leve
    (Fases 0–5). As áreas pesadas ficam listadas no §6 para avaliação posterior.
+9. **Titularidade e storage — ✅ storage por `comercioId`, `ownerId` deixa de ser único** (2026-09-12).
+   Uploads novos vão para `{comercioId}/...`; arquivos antigos em `{ownerId}/...` ficam onde estão
+   (as URLs completas estão salvas no banco). Com isso um usuário pode ser titular de várias lojas
+   sem colisão de arquivos (ex.: dois `logo.png` na mesma pasta). A alternativa — um usuário
+   "titular técnico" por loja — foi descartada por criar usuários falsos permanentes.
 
 ---
 
@@ -270,17 +276,10 @@ model PedidoHistorico {
 // User ganha: trocarSenha Boolean @default(false), membros ComercioMembro[]
 ```
 
-**`Comercio.ownerId` continua existindo** como o *titular* da conta: os paths do storage são
-chaveados por ele (`{ownerId}/fotos/...`) e reescrevê-los não traz benefício. A migração cria um
-`ComercioMembro { papel: DONO }` para cada `ownerId` atual — a partir daí, **acesso** é decidido
-só por `ComercioMembro`.
-
-> `Comercio.ownerId @unique` e a relação 1:1 `User.comercio` impedem que um mesmo usuário seja
-> **titular** de duas lojas. Com a decisão 7 isso deixa de ser limitação: um usuário pode ser
-> `DONO` em N comércios via `ComercioMembro`; o `ownerId` de cada loja aponta para quem a abriu.
-> Quando o admin cria a segunda loja de um dono existente, o `ownerId` recebe um usuário titular
-> técnico ou o `@unique` é removido — **decidir na implementação** conferindo o impacto no
-> `/api/admin/comercios` (criação) e em `getDashboardComercioData`.
+**`Comercio.ownerId` continua existindo** como o *titular* da conta (quem o admin cadastrou como
+responsável), mas **perde o `@unique`** (decisão 9) e deixa de decidir acesso: a migração cria um
+`ComercioMembro { papel: DONO }` para cada `ownerId` atual e, a partir daí, **acesso** é decidido
+só por `ComercioMembro`. A relação `User.comercio` (1:1) vira `User.comerciosTitular` (1:N).
 
 **Permissões em código, não em banco** (decisão 3): `src/lib/gestao/permissoes.ts` mapeia
 `PapelMembro → Permissao[]` (`pedidos:operar`, `cardapio:editar`, `clientes:ver`,
@@ -608,8 +607,7 @@ sem mudar comportamento só gera diff para revisar.
   `PedidoHistorico`, agregados de cliente e baixa/estorno de estoque.
 - `src/lib/pedidos.ts` — máquina de estados (`podeTransicionar`) e `calcularSubtotal`/`arredondar`,
   que passam a centavos na Fase 3a.
-- `src/app/api/admin/comercios/route.ts` — criação de comércio + usuário titular (impacto do
-  `ownerId @unique` na Fase 1).
+- `src/app/api/admin/comercios/route.ts` — criação de comércio + vínculo DONO do titular (§11.1).
 - `src/lib/plan-features.ts` — onde entram as flags `gestao_*`.
 - `src/components/comerciante/analytics-panel.tsx` — padrão do teaser borrado para plano grátis.
 - `docs/pedido-online.md` — decisões do pedido (snapshot, token, sem pagamento online).
@@ -728,7 +726,122 @@ nem `revalidatePath` do dashboard), então trocar a página que os renderiza é 
 
 ### 10.4 Depois da Fase 0
 
-Com a Fase 0 em produção, a próxima é a **Fase 1 (equipe, permissões e multi-loja)**, começando
-por fechar a questão do `Comercio.ownerId @unique` (§Fase 1). O PR 1 já deixa o terreno pronto:
-todas as páginas e rotas resolvem o comércio por `getComercioCtx()`, que é exatamente onde entram
-`ComercioMembro`, `comercio_ativo` e `exigirPermissao`.
+Fase 0 em produção (`main`, 2026-09-12). Próxima: **Fase 1 — plano de execução no §11**.
+
+---
+
+## 11. Plano de execução — Fase 1 (equipe, permissões e multi-loja)
+
+Levantamento feito no código em 2026-09-12. Mesma lógica da Fase 0: PRs pequenos, cada um
+verificável sozinho, em ordem de dependência. Branch `feat/gestao-fase-1`.
+
+### Achados do levantamento que moldam a ordem
+
+- **O projeto não usa migrations** (`prisma/migrations` não existe): o schema vai por
+  `npm run db:push` e migrações de dado por script em `prisma/` (padrão do
+  `migrate-unify-produto.ts`). Cada PR com schema novo lista o passo de deploy.
+- **9 rotas `[id]` autorizam comparando `item.comercio.ownerId === ctx.ownerId`** (fotos, tags,
+  eventos, produtos, itens e categorias do cardápio, categorias do catálogo, quartos, pedidos).
+  Com `ownerId` não-único isso vira **falha de autorização**: o dono de duas lojas conseguiria
+  editar itens da loja B estando com a loja A ativa. Por isso a troca para `comercioId` entra no
+  PR 1, junto com a remoção do `@unique` — não depois.
+- **Uploads chaveados por `ownerId`** (`{ownerId}/logo.ext` com `x-upsert`): dois comércios do
+  mesmo titular sobrescreveriam o logo um do outro. Resolvido pela decisão 9 no PR 1.
+- **`POST /api/admin/comercios` bloqueia usuário que já tem comércio** e o dialog de criação só
+  lista usuários sem comércio. O bloqueio **fica** até o PR 4 — sem seletor de loja, a segunda
+  loja de um usuário seria inalcançável pelo painel.
+
+### 11.1 PR 1 — Vínculos e storage (fundação, sem mudança visível) ✅ implementado
+
+| Arquivo | Mudança |
+|---|---|
+| `prisma/schema.prisma` | `enum PapelMembro`, `model ComercioMembro`; `Comercio.ownerId` sem `@unique` (+ `@@index`); `User.comercio` → `User.comerciosTitular Comercio[]`; `User.membros ComercioMembro[]` |
+| `prisma/migrate-membros-dono.ts` (novo) | Cria `ComercioMembro { DONO }` para cada comércio a partir do `ownerId`. Idempotente (`skipDuplicates`) — pode rodar mais de uma vez |
+| `src/lib/comercio-ctx.ts` | COMERCIANTE resolve pelo vínculo ativo (hoje só existe o DONO — comportamento idêntico). `ComercioCtx` ganha `userId` e `papel` (`null` para admin) |
+| 9 rotas `[id]` de `/api/comerciante/*` | Autorização por `item.comercioId === ctx.comercioId` |
+| `src/app/api/comerciante/upload/route.ts` | Path `{comercioId}/...`; admin com `comercioId` no form só confirma que o comércio existe |
+| `src/app/api/admin/comercios/route.ts` | Cria o comércio **e** o vínculo DONO na mesma transação; bloqueio de "já possui comércio" passa a olhar `comerciosTitular` |
+| `src/app/api/admin/usuarios/route.ts`, `admin/(painel)/usuarios/page.tsx` | Leem `comerciosTitular` no lugar de `comercio` (o JSON da API mantém o campo `comercio` para o dialog) |
+
+**Deploy:** `npm run db:push` (produção: com `DIRECT_URL`) **e em seguida**
+`npx tsx prisma/migrate-membros-dono.ts` — **antes** de publicar o código. Código novo sem o
+script = comerciante sem vínculo = "Nenhum comércio vinculado".
+
+**Verificação:** comerciante e admin idênticos ao antes; upload novo cai em `{comercioId}/...` e
+logo/fotos antigos continuam aparecendo; item de outro comércio via rota `[id]` retorna 404/403;
+rodar o script duas vezes não duplica vínculo; criar comércio pelo admin gera o vínculo DONO.
+
+### 11.2 PR 2 — Permissões
+
+`src/lib/gestao/permissoes.ts` — matriz fixa (decisão 3):
+
+| Permissão | DONO | GERENTE | ATENDENTE | PRODUCAO |
+|---|:-:|:-:|:-:|:-:|
+| `vitrine:editar` (informações, logo, fotos, eventos, tags, comodidades) | ✅ | ✅ | | |
+| `analytics:ver` | ✅ | ✅ | | |
+| `cardapio:editar` / `catalogo:editar` / `quartos:editar` | ✅ | ✅ | | |
+| `cardapio:disponibilidade` (só ligar/desligar `disponivel`) | ✅ | ✅ | ✅ | |
+| `pedidos:operar` (ver lista, mudar status) | ✅ | ✅ | ✅ | ✅ |
+| `pedidos:configurar` (config, zonas de entrega) | ✅ | ✅ | | |
+| `vendas:ver` (faturamento e ticket no resumo; relatórios na Fase 3) | ✅ | ✅ | | |
+| `equipe:gerenciar` | ✅ | | | |
+
+- `exigirPermissao(ctx, p)` em todas as rotas de `/api/comerciante/*` (27 com o `resumo`); admin
+  passa sempre. Recusa ⇒ **403**.
+- `cardapio:disponibilidade`: `PATCH` de item/produto aceita a permissão **só** quando o corpo
+  contém apenas `disponivel` — senão exige `cardapio:editar`/`catalogo:editar`.
+- Páginas e navegação: itens sem permissão **somem** (diferente de feature fora do plano, que
+  mostra cadeado — lá o dono pode contratar; aqui o membro não pode fazer nada a respeito).
+  Página acessada direto sem permissão ⇒ `notFound()`.
+- Entrada `/comerciante`: sem `vitrine:editar` nem `analytics:ver`, o switch de área some e a
+  entrada vai para `/gestao/pedidos`.
+
+**Verificação:** matriz inteira exercitada por API com um usuário de cada papel (criado por
+script, já que a tela de equipe é o PR 3).
+
+### 11.3 PR 3 — Tela de equipe
+
+- Flag de plano **`gestao_equipe`** em `FEATURES_DISPONIVEIS`. Sem ela: página com cadeado e
+  **membros não-DONO perdem o acesso** (`getComercioCtx` ignora o vínculo) — o dado do vínculo
+  fica guardado e volta a valer se o plano voltar.
+- `User.trocarSenha Boolean @default(false)` no schema.
+- `/comerciante/gestao/equipe` (permissão `equipe:gerenciar`): lista de membros com papel e status;
+  adicionar (nome, e-mail, papel); mudar papel; desativar/reativar; remover; gerar nova senha
+  temporária.
+- APIs em `/api/comerciante/gestao/equipe` (+ `[id]`):
+  - e-mail novo ⇒ cria `User` COMERCIANTE com senha temporária (exibida **uma vez** na resposta) e
+    `trocarSenha: true`;
+  - e-mail existente com role COMERCIANTE ⇒ só cria o vínculo (sem senha nova);
+  - e-mail de ADMIN/SUPER_ADMIN ⇒ 409 (admin já acessa tudo pelo gerenciar);
+  - o DONO não pode rebaixar nem remover a si mesmo se for o **único** DONO ativo.
+- Troca obrigatória: o `comerciante/layout.tsx` consulta `trocarSenha` e redireciona para
+  `/comerciante/trocar-senha` (fora do shell) — sem colocar a flag no JWT, pelo mesmo motivo do
+  papel.
+
+**Verificação:** dono adiciona atendente → atendente loga, é forçado a trocar a senha, vê só o
+permitido; remover o vínculo corta o acesso na próxima requisição (sem esperar o token expirar).
+
+### 11.4 PR 4 — Multi-loja
+
+- Cookie httpOnly **`comercio_ativo`** (nome em módulo sem imports, como o `admin_comercio_id`),
+  validado contra os vínculos ativos a cada request; ausente/inválido ⇒ primeiro vínculo.
+- `POST /api/comerciante/comercio-ativo` troca o cookie (só para comércio com vínculo) e o
+  seletor no shell recarrega a rota atual. Com um vínculo só, o seletor não aparece.
+- O `PedidosAlertaProvider` reinicia a linha de base ao trocar de loja (`key` pelo `comercioId`) —
+  senão os pedidos da loja nova contariam como "novos".
+- Admin: remove o bloqueio de "já possui comércio" no `POST /api/admin/comercios` e no dialog.
+
+**Verificação:** usuário com duas lojas alterna e cada tela mostra só a loja escolhida; cookie
+forjado com loja sem vínculo é ignorado; alerta de pedido não dispara ao trocar de loja.
+
+### 11.5 PR 5 — Histórico do pedido
+
+- `model PedidoHistorico` (schema do §Fase 1) + `db:push`.
+- Gravado na mesma transação de: criação do pedido (`AGUARDANDO`, `userId` null), mudança de status
+  pelo painel (`userId` do ctx; admin grava o próprio id) e cancelamento pelo cliente em
+  `/api/pedidos/[token]` (`userId` null).
+- Card do pedido mostra a linha do tempo ("Aceito por Ana às 19:02").
+- Pedidos anteriores ao PR ficam sem histórico — sem backfill (não há como saber quem fez).
+
+**Verificação:** pedido criado → aceito por um atendente → cancelado; os três eventos aparecem
+com autor e horário corretos.

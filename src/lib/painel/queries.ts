@@ -11,7 +11,7 @@ import type {
 
 // Loaders do painel do comerciante — um por página, cada um buscando só o que
 // a página exibe. Todos recebem o comercioId resolvido por getComercioCtx()
-// (comerciante pelo ownerId, admin pelo cookie admin_comercio_id).
+// (comerciante pelo vínculo em ComercioMembro, admin pelo cookie admin_comercio_id).
 
 const TZ = "America/Sao_Paulo"
 

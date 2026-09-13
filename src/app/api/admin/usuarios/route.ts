@@ -24,10 +24,22 @@ export async function GET() {
 
   const usuarios = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true, comercio: { select: { id: true, nome: true } } },
+    select: {
+      id: true, name: true, email: true, role: true, active: true, createdAt: true,
+      membros: {
+        where: { ativo: true },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+        select: { comercio: { select: { id: true, nome: true } } },
+      },
+    },
   })
 
-  return NextResponse.json(usuarios)
+  // `comercio` = primeiro comércio com vínculo ativo (contrato consumido pelo
+  // dialog de criar comércio, que só oferece usuários sem nenhum vínculo).
+  return NextResponse.json(
+    usuarios.map(({ membros, ...u }) => ({ ...u, comercio: membros[0]?.comercio ?? null })),
+  )
 }
 
 export async function POST(req: NextRequest) {

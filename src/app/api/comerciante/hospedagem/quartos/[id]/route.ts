@@ -24,9 +24,8 @@ async function ownerCheck(quartoId: string) {
   if (!ctx) return null
   const quarto = await prisma.tipoQuarto.findUnique({
     where: { id: quartoId },
-    include: { comercio: { select: { ownerId: true } } },
-  })
-  if (!quarto || quarto.comercio.ownerId !== ctx.ownerId) return null
+      })
+  if (!quarto || quarto.comercioId !== ctx.comercioId) return null
   return quarto
 }
 

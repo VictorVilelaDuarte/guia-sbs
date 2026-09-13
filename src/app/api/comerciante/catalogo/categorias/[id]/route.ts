@@ -13,10 +13,9 @@ async function ownerCheck(categoriaId: string) {
 
   const categoria = await prisma.catalogoCategoria.findUnique({
     where: { id: categoriaId },
-    include: { comercio: { select: { ownerId: true } } },
-  })
+      })
 
-  if (!categoria || categoria.comercio.ownerId !== ctx.ownerId) return null
+  if (!categoria || categoria.comercioId !== ctx.comercioId) return null
   return categoria
 }
 

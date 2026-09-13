@@ -21,10 +21,9 @@ async function ownerCheck(eventoId: string) {
 
   const evento = await prisma.evento.findUnique({
     where: { id: eventoId },
-    include: { comercio: { select: { ownerId: true } } },
-  })
+      })
 
-  if (!evento || evento.comercio.ownerId !== ctx.ownerId) return null
+  if (!evento || evento.comercioId !== ctx.comercioId) return null
   return evento
 }
 

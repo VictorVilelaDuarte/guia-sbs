@@ -20,10 +20,10 @@ async function ownerCheck(pedidoId: string) {
       id: true,
       status: true,
       tipoEntrega: true,
-      comercio: { select: { ownerId: true } },
+      comercioId: true,
     },
   })
-  if (!pedido || pedido.comercio.ownerId !== ctx.ownerId) return null
+  if (!pedido || pedido.comercioId !== ctx.comercioId) return null
   return pedido
 }
 

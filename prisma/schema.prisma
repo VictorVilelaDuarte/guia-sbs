@@ -16,6 +16,16 @@ enum Role {
 
 // PlanType enum removido — substituído pelo model Plan
 
+// Papel de um usuário dentro de um comércio (ComercioMembro). As permissões de
+// cada papel vivem em código (src/lib/gestao/permissoes.ts), não no banco —
+// ver docs/modulo-gestao.md (Fase 1).
+enum PapelMembro {
+  DONO // tudo, inclusive equipe
+  GERENTE // tudo operacional + vendas, sem equipe
+  ATENDENTE // pedidos e disponibilidade do cardápio
+  PRODUCAO // só a fila de pedidos (cozinha/preparo)
+}
+
 enum ComercioStatus {
   PENDENTE
   ATIVO
@@ -95,8 +105,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  comercio Comercio?
-  sessions Session[]
+  // Comércios em que o usuário é o titular cadastrado pelo admin. Acesso ao
+  // painel NÃO vem daqui — vem de `membros` (ComercioMembro).
+  comerciosTitular Comercio[]
+  membros          ComercioMembro[]
+  sessions         Session[]
 
   @@map("users")
 }
@@ -136,7 +149,9 @@ model Comercio {
   instagram  String?
   horarios   String?
   logo       String?
-  ownerId    String         @unique
+  // Titular (responsável cadastrado pelo admin). Não é único: um usuário pode
+  // ser titular de várias lojas. Acesso ao painel é decidido por ComercioMembro.
+  ownerId    String
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
@@ -156,8 +171,31 @@ model Comercio {
   pedidoConfig       PedidoConfig?
   pushSubscriptions  PushSubscription[]
   zonasEntrega       ZonaEntrega[]
+  membros            ComercioMembro[]
 
+  @@index([ownerId])
   @@map("comercios")
+}
+
+// Vínculo usuário ↔ comércio com papel. É a fonte de verdade de acesso ao painel
+// (getComercioCtx). Todo comércio tem ao menos um DONO — criado junto com o
+// comércio (POST /api/admin/comercios) e, para os antigos, por
+// prisma/migrate-membros-dono.ts. `ativo: false` corta o acesso sem apagar.
+model ComercioMembro {
+  id         String      @id @default(cuid())
+  comercioId String
+  userId     String
+  papel      PapelMembro
+  ativo      Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([comercioId, userId])
+  @@index([userId])
+  @@map("comercio_membros")
 }
 
 // Perfil de hospedagem (1:1 com Comercio) — criado sob demanda só para
@@ -445,17 +483,17 @@ model PedidoItem {
 // HospedagemPerfil). aceitaPedidos liga/desliga independente de aberto/fechado.
 // proximoNumero é o contador de `numero`, incrementado em transação ao criar.
 model PedidoConfig {
-  id               String   @id @default(cuid())
-  comercioId       String   @unique
-  aceitaPedidos    Boolean  @default(false)
-  entregaAtiva     Boolean  @default(true)
-  retiradaAtiva    Boolean  @default(true)
-  pedidoMinimo     Float    @default(0)
-  tempoPreparoMin  Int?
-  formasPagamento  String[]
-  proximoNumero    Int      @default(1)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(cuid())
+  comercioId      String   @unique
+  aceitaPedidos   Boolean  @default(false)
+  entregaAtiva    Boolean  @default(true)
+  retiradaAtiva   Boolean  @default(true)
+  pedidoMinimo    Float    @default(0)
+  tempoPreparoMin Int?
+  formasPagamento String[]
+  proximoNumero   Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
 
@@ -503,15 +541,15 @@ model Bairro {
 // `nome`/`cidade`/`uf` são denormalizados (copiados do catálogo ou digitados) —
 // o checkout e o snapshot do pedido leem direto daqui, sem depender do catálogo.
 model ZonaEntrega {
-  id         String  @id @default(cuid())
+  id         String   @id @default(cuid())
   comercioId String
   bairroId   String? // catálogo (rastreio); null = custom da loja
   nome       String
   cidade     String
   uf         String
   taxa       Float
-  ativo      Boolean @default(true)
-  ordem      Int     @default(0)
+  ativo      Boolean  @default(true)
+  ordem      Int      @default(0)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

@@ -35,34 +35,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Arquivo muito grande. Máximo 5MB." }, { status: 400 })
   }
 
-  let userId: string
+  // Pasta do storage = id do comércio. Arquivos antigos ficaram em {ownerId}/...
+  // e continuam válidos (a URL completa está salva no banco); pastas por titular
+  // colidiriam quando um usuário é titular de mais de uma loja (ex.: logo.png).
+  let pasta: string
   if (isAdmin && comercioId) {
     const comercio = await prisma.comercio.findUnique({
       where: { id: comercioId },
-      select: { ownerId: true },
+      select: { id: true },
     })
     if (!comercio) return NextResponse.json({ error: "Comércio não encontrado." }, { status: 404 })
-    userId = comercio.ownerId
+    pasta = comercio.id
   } else {
     // comerciante no próprio painel, ou admin no painel de gestão (cookie)
     const ctx = await getComercioCtx()
     if (!ctx) return NextResponse.json({ error: "Comércio não encontrado." }, { status: 404 })
-    userId = ctx.ownerId
+    pasta = ctx.comercioId
   }
 
   const ext = file.name.split(".").pop() ?? "jpg"
   const path =
     tipo === "logo"
-      ? `${userId}/logo.${ext}`
+      ? `${pasta}/logo.${ext}`
       : tipo === "produto"
-      ? `${userId}/produtos/${Date.now()}.${ext}`
+      ? `${pasta}/produtos/${Date.now()}.${ext}`
       : tipo === "evento"
-      ? `${userId}/eventos/${Date.now()}.${ext}`
+      ? `${pasta}/eventos/${Date.now()}.${ext}`
       : tipo === "cardapio"
-      ? `${userId}/cardapio/${Date.now()}.${ext}`
+      ? `${pasta}/cardapio/${Date.now()}.${ext}`
       : tipo === "quarto"
-      ? `${userId}/quartos/${Date.now()}.${ext}`
-      : `${userId}/fotos/${Date.now()}.${ext}`
+      ? `${pasta}/quartos/${Date.now()}.${ext}`
+      : `${pasta}/fotos/${Date.now()}.${ext}`
 
   const url = await uploadFile(path, file)
   return NextResponse.json({ url })

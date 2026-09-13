@@ -24,7 +24,12 @@ async function getUsuarios() {
       role: true,
       active: true,
       createdAt: true,
-      comercio: { select: { nome: true } },
+      // Comércios em que o usuário tem acesso (vínculo ativo) — não só os que é titular.
+      membros: {
+        where: { ativo: true },
+        orderBy: { createdAt: "asc" },
+        select: { comercio: { select: { nome: true } } },
+      },
     },
   })
 }
@@ -87,7 +92,7 @@ export default async function UsuariosPage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {u.comercio?.nome ?? "—"}
+                  {u.membros.length > 0 ? u.membros.map((m) => m.comercio.nome).join(", ") : "—"}
                 </TableCell>
                 <TableCell>
                   <Badge variant={u.active ? "default" : "destructive"}>

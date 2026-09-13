@@ -159,27 +159,39 @@ O admin gerencia **tudo** de qualquer comércio (fotos, cardápio, produtos, eve
 
 - **Cookie de contexto:** `/admin/comercios/[id]/gerenciar` não tem `page.tsx` — o middleware grava o cookie httpOnly `admin_comercio_id` e **redireciona** para `/comerciante` (ou, com `?tab=`, para a rota equivalente via `rotaPainelLegada`). Nome do cookie em `src/lib/admin-comercio-cookie.ts` — módulo sem imports, compartilhado com o Edge; **nunca importar `@/lib/comercio-ctx` no middleware**, puxa Prisma. Links para essa rota usam `prefetch={false}` (o prefetch gravaria o cookie).
 - **Acesso de admin a `/comerciante/*`:** o middleware libera ADMIN/SUPER_ADMIN só com o cookie presente (checagem otimista); o `comerciante/layout.tsx` valida via `getComercioCtx()` e manda para `/admin/comercios` se o comércio não existir. A página mostra banner âmbar e "Voltar ao admin" no lugar de "Sair" (que deslogaria o admin).
-- **`getComercioCtx()`** (`src/lib/comercio-ctx.ts`) — helper único usado por **todas** as rotas `/api/comerciante/*` **e pelas páginas** de `/comerciante/*`: sessão COMERCIANTE resolve o comércio por `ownerId`; sessão ADMIN/SUPER_ADMIN resolve pelo cookie. Retorna `{ comercioId, ownerId, isAdmin, features }`. O cookie é ignorado para não-admins (anti-forjamento, verificado). Rota ou página nova em `/comerciante` **deve** usar este helper — não criar guard local nem resolver por `session.user.id`.
+- **`getComercioCtx()`** (`src/lib/comercio-ctx.ts`) — helper único usado por **todas** as rotas `/api/comerciante/*` **e pelas páginas** de `/comerciante/*`: sessão COMERCIANTE resolve o comércio pelo **vínculo ativo em `ComercioMembro`** (ver seção Equipe e vínculos); sessão ADMIN/SUPER_ADMIN resolve pelo cookie. Retorna `{ comercioId, ownerId, isAdmin, features, userId, papel }`. **Autorização de item por id compara `item.comercioId === ctx.comercioId` — nunca `ownerId`** (não é único nem representa quem está logado). O cookie é ignorado para não-admins (anti-forjamento, verificado). Rota ou página nova em `/comerciante` **deve** usar este helper — não criar guard local nem resolver por `session.user.id`.
 - **Shell:** o banner âmbar e o "Voltar ao admin" ficam no `comerciante/layout.tsx` e aparecem em todas as páginas do painel.
 - As abas seguem o plano do comércio normalmente (admin vê o mesmo gate de features que o comerciante).
 - **Limitação conhecida:** o cookie guarda um único comércio-alvo — gerenciar dois comércios em abas paralelas faz os fetches da aba antiga atingirem o comércio da aba mais recente (o banner da página avisa).
+
+### Equipe e vínculos (`ComercioMembro`)
+
+Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execução no §11. **Acesso ao painel é decidido por `ComercioMembro`** (`comercioId`, `userId`, `papel: DONO | GERENTE | ATENDENTE | PRODUCAO`, `ativo`), não por `Comercio.ownerId`.
+
+- `Comercio.ownerId` é só o **titular** cadastrado pelo admin; perdeu o `@unique` (`User.comerciosTitular` é 1:N).
+- `POST /api/admin/comercios` cria o comércio **com** o vínculo DONO (nested create). Comércio sem vínculo = titular vê "Nenhum comércio vinculado".
+- Comércios anteriores à Fase 1 ganharam o vínculo por `prisma/migrate-membros-dono.ts` (idempotente). **Deploy de ambiente novo/produção:** `npm run db:push` → `npx tsx prisma/migrate-membros-dono.ts` → publicar o código.
+- Até o seletor multi-loja (PR 4 do §11), `POST /api/admin/comercios` recusa usuário que já tem vínculo ativo — a segunda loja seria inalcançável.
 
 ### Upload de imagens
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:
 
-**Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload, inclui `comercioId` no formData. A rota busca `ownerId` via `prisma.comercio.findUnique({ where: { id: comercioId }, select: { ownerId: true } })` para montar o path correto no storage (que é sempre keyed por `userId = ownerId`). Sem `comercioId`, resolve via `getComercioCtx()` — cobre tanto o comerciante no próprio painel quanto o admin no painel de gestão (cookie `admin_comercio_id`).
+**Pasta por comércio:** o path no storage é keyed por **`comercioId`** (decisão 9 do `docs/modulo-gestao.md`). Arquivos enviados antes de 2026-09-12 estão em `{ownerId}/...` e continuam válidos — a URL completa fica salva no banco, nada foi movido. Pastas por titular colidiriam quando um usuário é titular de várias lojas (dois `logo.png` com `x-upsert`).
+
+**Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload fora do painel (ex.: `LogoUploader` em `/admin/comercios/[id]`), inclui `comercioId` no formData e a rota só confere que o comércio existe. Sem `comercioId`, resolve via `getComercioCtx()` — cobre tanto o comerciante no próprio painel quanto o admin no painel de gestão (cookie `admin_comercio_id`).
 
 **heic2any só com import dinâmico:** o módulo executa `window.__heic2any__worker = new Worker(...)` na carga — import estático num Client Component quebra o SSR do build de produção com `ReferenceError: window is not defined` (o `next dev` **não** acusa; só `next start`). Sempre `const { default: heic2any } = await import("heic2any")` dentro da função de conversão.
 
 **Upload de fotos de produtos (cardápio):** o componente `produto-dialog.tsx` suporta múltiplos arquivos simultâneos, drag-and-drop e conversão de HEIC/HEIF para JPEG antes do envio (via `heic2any`). A detecção de HEIC usa tanto o MIME type quanto a extensão do arquivo (iOS Safari às vezes omite o MIME type). A quantidade máxima de slots disponíveis (`MAX_IMAGENS - imagens.length`) limita dinamicamente tanto o seletor de arquivos (`multiple` é `false` quando só resta 1 slot) quanto o drop handler.
 
 ```
-{userId}/logo.{ext}
-{userId}/fotos/{timestamp}.{ext}
-{userId}/produtos/{timestamp}.{ext}
-{userId}/eventos/{timestamp}.{ext}
-{userId}/cardapio/{timestamp}.{ext}
+{comercioId}/logo.{ext}
+{comercioId}/fotos/{timestamp}.{ext}
+{comercioId}/produtos/{timestamp}.{ext}
+{comercioId}/eventos/{timestamp}.{ext}
+{comercioId}/cardapio/{timestamp}.{ext}
+{comercioId}/quartos/{timestamp}.{ext}
 ```
 
 ### Auth config separada (Edge-compatible)
@@ -324,7 +336,7 @@ Array sempre com 7 elementos (Segunda a Domingo). O campo `temPausa`, `pausaInic
 
 ## Banco de Dados
 
-Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (1:1). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`, `CatalogoCategoria[]`, `Subcategoria[]` (N:M). `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. `Produto` → `CardapioCategoria?` (cardápio) e `CatalogoCategoria?` (catálogo), ambas opcionais com `onDelete: SetNull`. Demais relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
+Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (titular, `ownerId` — N:1, não único). Acesso ao painel: `User` ↔ `Comercio` via `ComercioMembro` (N:N com papel). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`, `CatalogoCategoria[]`, `Subcategoria[]` (N:M). `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. `Produto` → `CardapioCategoria?` (cardápio) e `CatalogoCategoria?` (catálogo), ambas opcionais com `onDelete: SetNull`. Demais relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
 
 **`Comercio.categorias: Categoria[]`** — array nativo PostgreSQL. Substitui o campo singular `categoria`. O **primeiro elemento é sempre a categoria principal**. Para filtrar: `{ categorias: { has: "ALIMENTACAO" } }`. Para contar por categoria na home page, usar raw query (o `groupBy` do Prisma não suporta arrays): `SELECT unnest(categorias) AS cat, COUNT(*) FROM comercios WHERE status = 'ATIVO' GROUP BY cat`. Migração original: `UPDATE comercios SET categorias = ARRAY[categoria]::"Categoria"[]`.
 
@@ -607,7 +619,7 @@ lados (não tem `"use client"`). Reutilizado pelo painel e pela vitrine.
 **APIs do comerciante:** `PUT /api/comerciante/hospedagem` (upsert do perfil); `POST
 /api/comerciante/hospedagem/quartos` e `PATCH`/`DELETE .../quartos/[id]`. Fotos de quarto
 seguem o padrão do `produto-dialog` — upload via `/api/comerciante/upload` com `tipo: "quarto"`
-(path `{userId}/quartos/{ts}.{ext}`); o array `fotos` é salvo no payload do quarto. `comodidades`
+(path `{comercioId}/quartos/{ts}.{ext}`); o array `fotos` é salvo no payload do quarto. `comodidades`
 e `formasPagamento` validados contra as keys do catálogo.
 
 **Painel:** dividido entre as duas áreas — tipos de quarto em **Gestão → Acomodações**

@@ -29,10 +29,14 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: parsed.data.ownerId },
-    include: { comercio: true },
+    select: { id: true, _count: { select: { membros: { where: { ativo: true } } } } },
   })
   if (!user) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 })
-  if (user.comercio) return NextResponse.json({ error: "Usuário já possui comércio vinculado." }, { status: 409 })
+  // Bloqueio temporário: até existir o seletor de loja (Fase 1, PR 4 do
+  // docs/modulo-gestao.md), a segunda loja de um usuário seria inalcançável no painel.
+  if (user._count.membros > 0) {
+    return NextResponse.json({ error: "Usuário já possui comércio vinculado." }, { status: 409 })
+  }
 
   const planFree = await prisma.plan.findUnique({ where: { slug: "free" } })
   if (!planFree) return NextResponse.json({ error: "Plano padrão não encontrado. Execute o seed." }, { status: 500 })
@@ -44,6 +48,8 @@ export async function POST(req: NextRequest) {
     slug = `${base}-${count++}`
   }
 
+  // Comércio e vínculo DONO nascem juntos: sem o vínculo, o titular não acessa
+  // o painel (getComercioCtx resolve por ComercioMembro).
   const comercio = await prisma.comercio.create({
     data: {
       slug,
@@ -52,6 +58,7 @@ export async function POST(req: NextRequest) {
       descricao: parsed.data.descricao,
       ownerId: parsed.data.ownerId,
       planId: planFree.id,
+      membros: { create: { userId: parsed.data.ownerId, papel: "DONO" } },
     },
   })
 

@@ -13,10 +13,9 @@ export async function DELETE(
   const { id } = await params
   const foto = await prisma.foto.findUnique({
     where: { id },
-    include: { comercio: { select: { ownerId: true } } },
   })
 
-  if (!foto || foto.comercio.ownerId !== ctx.ownerId) {
+  if (!foto || foto.comercioId !== ctx.comercioId) {
     return NextResponse.json({ error: "Não encontrado." }, { status: 404 })
   }
 

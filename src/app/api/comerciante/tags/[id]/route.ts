@@ -13,12 +13,11 @@ export async function DELETE(
 
   const tag = await prisma.tag.findUnique({
     where: { id },
-    include: { comercio: { select: { ownerId: true } } },
   })
 
   if (!tag) return NextResponse.json({ error: "Tag não encontrada." }, { status: 404 })
 
-  if (tag.comercio.ownerId !== ctx.ownerId) {
+  if (tag.comercioId !== ctx.comercioId) {
     return NextResponse.json({ error: "Sem permissão." }, { status: 403 })
   }
 
