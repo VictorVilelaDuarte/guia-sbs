@@ -15,6 +15,18 @@ export const STATUS_LABEL: Record<PedidoStatus, string> = {
   CANCELADO: "Cancelado",
 }
 
+// Ação registrada no histórico do pedido (painel): "Aceito por Ana".
+export const HISTORICO_ACAO: Record<PedidoStatus, string> = {
+  AGUARDANDO: "Pedido feito",
+  ACEITO: "Aceito",
+  EM_PREPARO: "Em preparo",
+  PRONTO: "Pronto",
+  SAIU_ENTREGA: "Saiu para entrega",
+  CONCLUIDO: "Concluído",
+  RECUSADO: "Recusado",
+  CANCELADO: "Cancelado",
+}
+
 // Mensagem voltada ao cliente na página de acompanhamento (mais calorosa que o label seco).
 export const STATUS_LABEL_CLIENTE: Record<PedidoStatus, string> = {
   AGUARDANDO: "Aguardando a loja confirmar",

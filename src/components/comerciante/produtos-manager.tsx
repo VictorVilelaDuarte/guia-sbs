@@ -20,12 +20,16 @@ export function ProdutosManager({
   categoriasCatalogoIniciais = [],
   tipo = "PRODUTO",
   limite,
+  somenteDisponibilidade = false,
 }: {
   produtosIniciais: Produto[]
   categoriasCardapio: CardapioCategoria[]
   categoriasCatalogoIniciais?: CatalogoCategoria[]
   tipo?: TipoProduto
   limite?: number
+  // Papel com itens:disponibilidade mas sem catalogo:editar (ex.: atendente):
+  // só vê a lista e liga/desliga Visível/Oculto. A API aplica a mesma regra.
+  somenteDisponibilidade?: boolean
 }) {
   const label = tipo === "SERVICO" ? "serviço" : "produto"
   const labelPlural = tipo === "SERVICO" ? "serviços" : "produtos"
@@ -227,14 +231,16 @@ export function ProdutosManager({
 
         {/* Ações */}
         <div className="flex flex-col gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={() => abrirEdicao(p)}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            aria-label="Editar"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
+          {!somenteDisponibilidade && (
+            <button
+              type="button"
+              onClick={() => abrirEdicao(p)}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              aria-label="Editar"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => toggleDisponivel(p)}
@@ -243,17 +249,19 @@ export function ProdutosManager({
           >
             {p.disponivel ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           </button>
-          <button
-            type="button"
-            onClick={() => handleDelete(p.id)}
-            disabled={removendoId === p.id}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 cursor-pointer"
-            aria-label="Excluir"
-          >
-            {removendoId === p.id
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              : <Trash2 className="h-3.5 w-3.5" />}
-          </button>
+          {!somenteDisponibilidade && (
+            <button
+              type="button"
+              onClick={() => handleDelete(p.id)}
+              disabled={removendoId === p.id}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50 cursor-pointer"
+              aria-label="Excluir"
+            >
+              {removendoId === p.id
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Trash2 className="h-3.5 w-3.5" />}
+            </button>
+          )}
         </div>
       </div>
     )
@@ -288,16 +296,18 @@ export function ProdutosManager({
             </button>
           )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button size="sm" variant="outline" onClick={() => setCriandoCategoria(true)}>
-            <FolderPlus className="h-4 w-4 mr-1.5" />
-            Categoria
-          </Button>
-          <Button size="sm" onClick={() => abrirNovo()} disabled={atingiuLimite}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            {`Novo ${label}`}
-          </Button>
-        </div>
+        {!somenteDisponibilidade && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={() => setCriandoCategoria(true)}>
+              <FolderPlus className="h-4 w-4 mr-1.5" />
+              Categoria
+            </Button>
+            <Button size="sm" onClick={() => abrirNovo()} disabled={atingiuLimite}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              {`Novo ${label}`}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Criação de categoria inline */}
@@ -334,7 +344,7 @@ export function ProdutosManager({
               : `${produtos.length}${limite !== undefined ? `/${limite}` : ""} ${produtos.length === 1 ? label : labelPlural}`}
       </p>
 
-      {atingiuLimite && (
+      {atingiuLimite && !somenteDisponibilidade && (
         <p className="text-xs text-amber-600 font-medium">
           Limite de {limite} {labelPlural} atingido. Faça upgrade para o plano Premium para adicionar mais.
         </p>
@@ -347,11 +357,17 @@ export function ProdutosManager({
           ) : (
             <PackageOpen className="h-10 w-10 opacity-40" />
           )}
-          <p className="text-sm">Adicione {labelPlural} para exibir no seu perfil.</p>
-          <Button variant="outline" size="sm" onClick={() => abrirNovo()}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            {`Adicionar primeiro ${label}`}
-          </Button>
+          <p className="text-sm">
+            {somenteDisponibilidade
+              ? `Nenhum ${label} cadastrado.`
+              : `Adicione ${labelPlural} para exibir no seu perfil.`}
+          </p>
+          {!somenteDisponibilidade && (
+            <Button variant="outline" size="sm" onClick={() => abrirNovo()}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              {`Adicionar primeiro ${label}`}
+            </Button>
+          )}
         </div>
       ) : buscaAtiva ? (
         // Durante a busca, lista plana com os resultados (ignora agrupamento)
@@ -411,6 +427,7 @@ export function ProdutosManager({
                           {itens.length}
                         </span>
                       </h4>
+                      {!somenteDisponibilidade && (
                       <div className="flex items-center gap-0.5">
                         <button
                           type="button"
@@ -437,6 +454,7 @@ export function ProdutosManager({
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
+                      )}
                     </>
                   )}
                 </div>

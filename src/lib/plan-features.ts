@@ -35,6 +35,11 @@ export const FEATURES_DISPONIVEIS = [
     descricao: "Catálogo público de produtos e serviços no perfil do comércio",
   },
   {
+    key: "gestao_equipe",
+    label: "Equipe",
+    descricao: "Cadastrar membros com papéis (gerente, atendente, produção) no painel do comércio",
+  },
+  {
     key: "pedido_online",
     label: "Pedido online",
     descricao: "Receber pedidos pelo cardápio com carrinho, checkout e painel de gestão (requer Cardápio)",

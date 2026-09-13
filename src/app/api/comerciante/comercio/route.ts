@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 const patchSchema = z.object({
@@ -64,6 +64,8 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "vitrine:editar")
+  if (negado) return negado
 
   try {
     const body = await req.json()

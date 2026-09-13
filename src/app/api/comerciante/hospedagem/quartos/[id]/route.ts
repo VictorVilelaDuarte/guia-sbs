@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 import { COMODIDADE_KEYS } from "@/lib/hospedagem"
 import { deleteFile } from "@/lib/supabase-storage"
@@ -19,21 +20,22 @@ const patchSchema = z.object({
   ativo: z.boolean().optional(),
 })
 
-async function ownerCheck(quartoId: string) {
+async function ownerCheck(quartoId: string, ...permissoes: Permissao[]) {
   const ctx = await getComercioCtx()
-  if (!ctx) return null
+  if (!ctx) return { erro: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) }
+  const negado = negarSemPermissao(ctx, ...permissoes)
+  if (negado) return { erro: negado }
   const quarto = await prisma.tipoQuarto.findUnique({
     where: { id: quartoId },
-    include: { comercio: { select: { ownerId: true } } },
   })
-  if (!quarto || quarto.comercio.ownerId !== ctx.ownerId) return null
-  return quarto
+  if (!quarto || quarto.comercioId !== ctx.comercioId) return { erro: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) }
+  return { item: quarto, ctx }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const quarto = await ownerCheck(id)
-  if (!quarto) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id, "quartos:editar")
+  if ("erro" in check) return check.erro
 
   const body = await req.json()
   const parsed = patchSchema.safeParse(body)
@@ -47,8 +49,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const quarto = await ownerCheck(id)
-  if (!quarto) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id, "quartos:editar")
+  if ("erro" in check) return check.erro
+  const quarto = check.item
 
   // Remove as fotos do storage (best-effort, como nas demais rotas).
   for (const url of quarto.fotos) {

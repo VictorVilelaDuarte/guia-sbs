@@ -167,6 +167,20 @@ CONCLUIDO / RECUSADO / CANCELADO = terminais
 - A tabela de transições mora em `src/lib/pedidos.ts` (`TRANSICOES`, `podeTransicionar(de, para)`),
   usada **tanto** na API do comerciante (validação) **quanto** na UI (habilitar botões).
 
+### Histórico e concorrência (2026-09-13 — módulo de gestão, Fase 1 / PR 5)
+
+- **Toda mudança de status passa por `mudarStatusPedido()`** (`src/lib/pedidos-historico.ts`): a
+  mudança e o registro em `PedidoHistorico` são **uma transação**. A criação do pedido grava o
+  primeiro registro (`AGUARDANDO`, origem `CLIENTE`) na transação do checkout.
+- **Controle de concorrência:** a gravação é `updateMany({ where: { id, status: lido } })` — se o
+  status mudou entre a leitura e a escrita (dois atendentes aceitando juntos, cliente cancelando no
+  instante do aceite), responde **409** e nada é gravado. Nunca usar `pedido.update` direto para status.
+- `PedidoHistorico` guarda `origem` (`CLIENTE`/`LOJA`/`ADMIN`), `autorNome` **snapshot** (membro
+  removido tem a conta apagada, o nome fica) e `userId` como referência fraca (sem FK).
+- Painel: card do pedido com seção "Histórico" ("Aceito por Ana", "pela equipe do guia" para admin).
+- Cliente (`/pedido/[token]`): recebe **só `status` + `createdAt`** — horário de cada etapa, **nunca
+  nome de funcionário nem origem**.
+
 ---
 
 ## Fluxo do cliente

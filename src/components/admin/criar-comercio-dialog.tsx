@@ -38,7 +38,7 @@ interface Usuario {
   name: string
   email: string
   role: string
-  comercio: { id: string; nome: string } | null
+  comercios: { id: string; nome: string; papel: string; ativo: boolean }[]
 }
 
 export function CriarComercioDialog() {
@@ -58,10 +58,10 @@ export function CriarComercioDialog() {
     fetch("/api/admin/usuarios")
       .then((r) => r.json())
       .then((data: Usuario[]) => {
+        // Dono pode ter várias lojas; funcionário (qualquer papel ≠ DONO) pertence
+        // a um único comércio e não pode ser titular de outro.
         const elegíveis = data.filter(
-          (u) =>
-            u.role === "COMERCIANTE" &&
-            !u.comercio
+          (u) => u.role === "COMERCIANTE" && !u.comercios.some((c) => c.papel !== "DONO"),
         )
         setUsuarios(elegíveis)
       })
@@ -126,6 +126,11 @@ export function CriarComercioDialog() {
                 {usuarios.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.name} ({u.email})
+                    {u.comercios.length > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {" "}· já é dono de {u.comercios.map((c) => c.nome).join(", ")}
+                      </span>
+                    )}
                   </SelectItem>
                 ))}
               </SelectContent>

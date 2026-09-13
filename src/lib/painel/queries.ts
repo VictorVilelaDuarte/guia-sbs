@@ -1,8 +1,9 @@
 import { cache } from "react"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, permissoesCtx, vinculosValidos } from "@/lib/comercio-ctx"
 import { getAnalyticsResumo } from "@/lib/analytics/queries"
+import { historicoPainelSelect } from "@/lib/pedidos-historico"
 import type {
   PedidoAdmin,
   PedidoConfigData,
@@ -11,7 +12,7 @@ import type {
 
 // Loaders do painel do comerciante — um por página, cada um buscando só o que
 // a página exibe. Todos recebem o comercioId resolvido por getComercioCtx()
-// (comerciante pelo ownerId, admin pelo cookie admin_comercio_id).
+// (comerciante pelo vínculo em ComercioMembro, admin pelo cookie admin_comercio_id).
 
 const TZ = "America/Sao_Paulo"
 
@@ -32,7 +33,11 @@ export const getPainelBase = cache(async () => {
     },
   })
   if (!comercio) return null
-  return { ctx, comercio }
+  // Lojas para o seletor do cabeçalho (só comerciante; admin gerencia uma por vez).
+  const lojas = ctx.isAdmin
+    ? []
+    : ((await vinculosValidos(ctx.userId)) ?? []).map((m) => ({ id: m.comercio.id, nome: m.comercio.nome }))
+  return { ctx, comercio, permissoes: permissoesCtx(ctx), lojas }
 })
 
 const produtoInclude = {
@@ -126,6 +131,7 @@ export async function getPedidosData(comercioId: string) {
             observacao: true,
           },
         },
+        historico: historicoPainelSelect,
       },
     }),
     prisma.pedidoConfig.findUnique({ where: { comercioId } }),
@@ -164,6 +170,7 @@ export async function getPedidosData(comercioId: string) {
     motivoCancelamento: p.motivoCancelamento,
     createdAt: p.createdAt.toISOString(),
     itens: p.itens,
+    historico: p.historico.map((h) => ({ ...h, createdAt: h.createdAt.toISOString() })),
   }))
 
   const pedidoConfig: PedidoConfigData | null = config
@@ -208,7 +215,7 @@ export interface ResumoPedidosHoje {
 }
 
 export async function getResumoData(comercioId: string, opts: { pedidos: boolean }) {
-  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos] =
+  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos] =
     await Promise.all([
       opts.pedidos
         ? prisma.pedido.count({ where: { comercioId, status: "AGUARDANDO" } })
@@ -238,6 +245,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
         _count: { _all: true },
       }),
       prisma.tipoQuarto.count({ where: { comercioId, ativo: true } }),
+      prisma.comercioMembro.count({ where: { comercioId, ativo: true } }),
     ])
 
   const porTipo = (tipo: "PRODUTO" | "SERVICO") =>
@@ -253,6 +261,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
     produtos: porTipo("PRODUTO"),
     servicos: porTipo("SERVICO"),
     quartos,
+    membrosAtivos,
   }
 }
 

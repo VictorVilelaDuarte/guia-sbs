@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 // Zonas de entrega da loja (bairro + taxa). PUT substitui o conjunto inteiro.
@@ -21,6 +21,8 @@ const putSchema = z.object({ zonas: z.array(zonaSchema).max(300) })
 export async function GET() {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "pedidos:configurar")
+  if (negado) return negado
 
   const zonas = await prisma.zonaEntrega.findMany({
     where: { comercioId: ctx.comercioId },
@@ -32,6 +34,8 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "pedidos:configurar")
+  if (negado) return negado
 
   const parsed = putSchema.safeParse(await req.json())
   if (!parsed.success) {

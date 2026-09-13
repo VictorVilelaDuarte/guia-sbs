@@ -32,6 +32,8 @@ export default async function PaginaPedido({
           observacao: true,
         },
       },
+      // Só status + horário: nome de quem mudou o status nunca vai para o cliente.
+      historico: { orderBy: { createdAt: "asc" }, select: { status: true, createdAt: true } },
       comercio: {
         select: {
           nome: true,
@@ -67,6 +69,7 @@ export default async function PaginaPedido({
     motivoCancelamento: pedido.motivoCancelamento,
     createdAt: pedido.createdAt.toISOString(),
     itens: pedido.itens,
+    historico: pedido.historico.map((h) => ({ status: h.status, createdAt: h.createdAt.toISOString() })),
     comercio: pedido.comercio,
   }
 

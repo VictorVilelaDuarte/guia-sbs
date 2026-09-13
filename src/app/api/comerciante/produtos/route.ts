@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 const variacaoSchema = z.object({
@@ -26,6 +26,8 @@ const createSchema = z.object({
 export async function GET() {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "cardapio:editar", "catalogo:editar", "itens:disponibilidade")
+  if (negado) return negado
 
   const produtos = await prisma.produto.findMany({
     where: { comercioId: ctx.comercioId },
@@ -47,6 +49,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos.", issues: parsed.error.issues }, { status: 400 })
+
+  // Item com categoria do cardápio nasce no cardápio; sem ela, no catálogo.
+  const negadoCriar = negarSemPermissao(
+    ctx,
+    parsed.data.categoriaCardapioId ? "cardapio:editar" : "catalogo:editar",
+  )
+  if (negadoCriar) return negadoCriar
 
   if (parsed.data.categoriaCardapioId) {
     const categoria = await prisma.cardapioCategoria.findUnique({

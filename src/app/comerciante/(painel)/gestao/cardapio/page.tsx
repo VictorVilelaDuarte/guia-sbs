@@ -2,11 +2,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CardapioManager } from "@/components/comerciante/cardapio-manager"
 import { RecursoBloqueado } from "@/components/comerciante/painel/recurso-bloqueado"
 import { getCardapioData, getPainelBase } from "@/lib/painel/queries"
+import { notFound } from "next/navigation"
 import { temFeature } from "@/lib/plan-features"
+import { temPermissao } from "@/lib/gestao/permissoes"
 
 export default async function GestaoCardapioPage() {
   const base = await getPainelBase()
   if (!base) return null
+  if (!temPermissao(base.permissoes, "cardapio:editar", "itens:disponibilidade")) notFound()
+  const podeEditar = temPermissao(base.permissoes, "cardapio:editar")
 
   if (!temFeature(base.comercio.plan.features, "cardapio")) {
     return (
@@ -24,11 +28,13 @@ export default async function GestaoCardapioPage() {
       <CardHeader>
         <CardTitle className="text-base">Cardápio</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Organize itens por categoria e defina a ordem de exibição no perfil.
+          {podeEditar
+            ? "Organize itens por categoria e defina a ordem de exibição no perfil."
+            : "Marque como oculto o item que acabou; ele some do cardápio até ser mostrado de novo."}
         </p>
       </CardHeader>
       <CardContent>
-        <CardapioManager categoriasIniciais={categorias} />
+        <CardapioManager categoriasIniciais={categorias} somenteDisponibilidade={!podeEditar} />
       </CardContent>
     </Card>
   )

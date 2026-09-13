@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 
 export async function GET() {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "cardapio:editar", "itens:disponibilidade")
+  if (negado) return negado
 
   const categorias = await prisma.cardapioCategoria.findMany({
     where: { comercioId: ctx.comercioId },

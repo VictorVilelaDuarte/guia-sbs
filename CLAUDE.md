@@ -97,6 +97,8 @@ Dividido em duas áreas (Fase 0 do [`docs/modulo-gestao.md`](docs/modulo-gestao.
 
 ```
 src/app/comerciante/
+  trocar-senha/           — troca de senha (obrigatória com senha temporária) — FORA do (painel)
+  (painel)/               — route group (não afeta URLs) com o shell abaixo
   layout.tsx              — shell: header, banner de admin, AreaSwitch, GestaoTabs (desktop),
                             GestaoBottomNav (mobile), PedidosAlertaProvider, estado "sem comércio"
   page.tsx                — entrada: pedido_online ativo → /gestao; senão → /vitrine
@@ -107,7 +109,12 @@ src/app/comerciante/
   gestao/produtos         — ProdutosManager com ?tipo=servico (key={tipo} — reseta estado ao trocar)
   gestao/pedidos          — PedidosManager + PedidoConfigForm + ZonasEntregaManager (feature pedido_online)
   gestao/acomodacoes      — QuartosManager (categoria HOSPEDAGEM; fora dela, 404)
+  gestao/equipe           — EquipeManager (equipe:gerenciar; feature gestao_equipe, senão cadeado)
 ```
+
+> Os arquivos acima (exceto `trocar-senha/`) vivem em `src/app/comerciante/(painel)/`. O route group
+> existe para o `trocar-senha` ficar fora do shell: o layout do painel redireciona para lá quando o
+> usuário tem `trocarSenha`, e dentro do shell o redirect cairia em loop.
 
 - **Loaders:** `src/lib/painel/queries.ts` — um por página (`getVitrineData`, `getCardapioData`, `getCatalogoData`, `getPedidosData`, `getQuartosData`, `getResumoData`) + `getPainelBase()` (ctx + dados mínimos do comércio, com `React.cache` para deduplicar layout e página). Toda página resolve o comércio por `getPainelBase()` → `getComercioCtx()`, nunca por `session.user.id`.
 - **Gates:** item de feature bloqueada continua no menu com cadeado e a página mostra `<RecursoBloqueado>` (não 404); item de categoria só aparece para a categoria.
@@ -159,27 +166,61 @@ O admin gerencia **tudo** de qualquer comércio (fotos, cardápio, produtos, eve
 
 - **Cookie de contexto:** `/admin/comercios/[id]/gerenciar` não tem `page.tsx` — o middleware grava o cookie httpOnly `admin_comercio_id` e **redireciona** para `/comerciante` (ou, com `?tab=`, para a rota equivalente via `rotaPainelLegada`). Nome do cookie em `src/lib/admin-comercio-cookie.ts` — módulo sem imports, compartilhado com o Edge; **nunca importar `@/lib/comercio-ctx` no middleware**, puxa Prisma. Links para essa rota usam `prefetch={false}` (o prefetch gravaria o cookie).
 - **Acesso de admin a `/comerciante/*`:** o middleware libera ADMIN/SUPER_ADMIN só com o cookie presente (checagem otimista); o `comerciante/layout.tsx` valida via `getComercioCtx()` e manda para `/admin/comercios` se o comércio não existir. A página mostra banner âmbar e "Voltar ao admin" no lugar de "Sair" (que deslogaria o admin).
-- **`getComercioCtx()`** (`src/lib/comercio-ctx.ts`) — helper único usado por **todas** as rotas `/api/comerciante/*` **e pelas páginas** de `/comerciante/*`: sessão COMERCIANTE resolve o comércio por `ownerId`; sessão ADMIN/SUPER_ADMIN resolve pelo cookie. Retorna `{ comercioId, ownerId, isAdmin, features }`. O cookie é ignorado para não-admins (anti-forjamento, verificado). Rota ou página nova em `/comerciante` **deve** usar este helper — não criar guard local nem resolver por `session.user.id`.
+- **`getComercioCtx()`** (`src/lib/comercio-ctx.ts`) — helper único usado por **todas** as rotas `/api/comerciante/*` **e pelas páginas** de `/comerciante/*`: sessão COMERCIANTE resolve o comércio pelo **vínculo ativo em `ComercioMembro`** (ver seção Equipe e vínculos); sessão ADMIN/SUPER_ADMIN resolve pelo cookie. Retorna `{ comercioId, ownerId, isAdmin, features, userId, papel }`. **Autorização de item por id compara `item.comercioId === ctx.comercioId` — nunca `ownerId`** (não é único nem representa quem está logado). O cookie é ignorado para não-admins (anti-forjamento, verificado). Rota ou página nova em `/comerciante` **deve** usar este helper — não criar guard local nem resolver por `session.user.id`.
 - **Shell:** o banner âmbar e o "Voltar ao admin" ficam no `comerciante/layout.tsx` e aparecem em todas as páginas do painel.
 - As abas seguem o plano do comércio normalmente (admin vê o mesmo gate de features que o comerciante).
 - **Limitação conhecida:** o cookie guarda um único comércio-alvo — gerenciar dois comércios em abas paralelas faz os fetches da aba antiga atingirem o comércio da aba mais recente (o banner da página avisa).
+
+### Equipe e vínculos (`ComercioMembro`)
+
+Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execução no §11. **Acesso ao painel é decidido por `ComercioMembro`** (`comercioId`, `userId`, `papel: DONO | GERENTE | ATENDENTE | PRODUCAO`, `ativo`), não por `Comercio.ownerId`.
+
+- `Comercio.ownerId` é só o **titular** cadastrado pelo admin; perdeu o `@unique` (`User.comerciosTitular` é 1:N).
+- `POST /api/admin/comercios` cria o comércio **com** o vínculo DONO (nested create). Comércio sem vínculo = titular vê "Nenhum comércio vinculado".
+- Comércios anteriores à Fase 1 ganharam o vínculo por `prisma/migrate-membros-dono.ts` (idempotente). **Deploy de ambiente novo/produção:** `npm run db:push` → `npx tsx prisma/migrate-membros-dono.ts` → `npx tsx prisma/migrate-flag-gestao-equipe.ts` → publicar o código (scripts idempotentes).
+- **Regra de negócio (2026-09-13): funcionário (GERENTE/ATENDENTE/PRODUCAO) pertence a UM comércio; só DONO pode ter várias lojas.** Aplicada em código por `violaFuncionarioUnico()` (`src/lib/gestao/equipe.ts`) na tela de equipe (adicionar e trocar papel) e em `POST /api/admin/comercios` (funcionário de outra loja não vira titular). Não há constraint no banco — qualquer escrita nova de `ComercioMembro` deve passar por essa função.
+- **Multi-loja (PR 4):** o dono com mais de uma loja escolhe a ativa pelo `SeletorLoja` no cabeçalho (só aparece com ≥2 lojas válidas). A escolha fica no cookie httpOnly **`comercio_ativo`** (nome em `src/lib/comercio-ativo-cookie.ts`, módulo sem imports), gravado por `POST /api/comerciante/comercio-ativo` após validar o vínculo. `getComercioCtx()` só honra o cookie se houver vínculo válido com a loja (`vinculosValidos()`); senão usa a mais antiga. Trocar leva para a entrada `/comerciante` (a tela atual pode não existir na outra loja). O `PedidosAlertaProvider` tem `key` pelo comércio para refazer a linha de base. **Limitação aceita:** push continua único por aparelho — o dono recebe notificação só da última loja em que ativou neste aparelho.
+
+**Tela de equipe** (`/comerciante/gestao/equipe`, PR 3): o DONO adiciona membros (e-mail novo cria conta COMERCIANTE com **senha temporária exibida uma única vez** e `User.trocarSenha = true`; e-mail de comerciante existente só ganha o vínculo; e-mail de admin é recusado), troca papel, desativa/reativa, remove e gera nova senha. Regras em `src/lib/gestao/equipe.ts` (as rotas em `/api/comerciante/gestao/equipe` só autenticam e traduzem `ErroEquipe`):
+- ninguém altera o **próprio** vínculo; o vínculo do **titular** (`ownerId`) só o admin altera; sempre resta **um DONO ativo**;
+- **nova senha só para quem pertence apenas a este comércio** e não é titular de nenhum — senão o dono da loja A adicionaria o dono da loja B e tomaria a conta dele;
+- remover apaga a **conta** junto quando a pessoa não tem vínculo em outro comércio nem é titular.
+- Flag **`gestao_equipe`**: sem ela, `getComercioCtx()` ignora vínculos não-DONO (o dado fica guardado). Ligada no `premium` por `prisma/migrate-flag-gestao-equipe.ts`.
+- **`trocarSenha`**: o layout do painel redireciona para `/comerciante/trocar-senha` e `getComercioCtx()` devolve `null` (APIs bloqueadas). A troca é `POST /api/comerciante/conta/senha` (usa a sessão, não o ctx). Nada disso vai no JWT — lido do banco a cada request, então remover/desativar/rebaixar vale na próxima requisição. Todo comerciante tem o link "Alterar senha" no cabeçalho.
+- Item "Equipe" fica **fora da barra inferior do mobile** (`somenteDesktop`); no celular o caminho é o atalho do Resumo.
+
+**Permissões por papel** (matriz fixa em `src/lib/gestao/permissoes.ts` — módulo sem runtime, usado também no client):
+
+| Permissão | DONO | GERENTE | ATENDENTE | PRODUCAO |
+|---|:-:|:-:|:-:|:-:|
+| `vitrine:editar`, `analytics:ver`, `cardapio:editar`, `catalogo:editar`, `quartos:editar`, `pedidos:configurar`, `vendas:ver` | ✅ | ✅ | | |
+| `itens:disponibilidade` (só o `disponivel` de itens do cardápio/catálogo) | ✅ | ✅ | ✅ | |
+| `pedidos:operar` | ✅ | ✅ | ✅ | ✅ |
+| `equipe:gerenciar` | ✅ | | | |
+
+- **Toda rota de `/api/comerciante/*` chama `getComercioCtx()` e depois `negarSemPermissao(ctx, ...permissões)`** (403; passa se tiver ALGUMA). Admin passa sempre. Rota nova sem guard de permissão é bug.
+- Casos que decidem pelo dado: `produtos`/`produtos/[id]` (item com `categoriaCardapioId` → `cardapio:editar`, senão `catalogo:editar`; PATCH só com `disponivel` aceita `itens:disponibilidade`); `upload` (pelo `tipo`).
+- **Interface:** `getPainelBase()` expõe `permissoes`; itens sem permissão **somem** (nav, abas, atalhos, cards) — diferente de feature fora do plano, que mostra cadeado. Página acessada direto sem permissão ⇒ `notFound()`. Quem não tem `vitrine:editar` nem `analytics:ver` não vê o switch de área e entra direto na Gestão. `CardapioManager`/`ProdutosManager` têm `somenteDisponibilidade`.
 
 ### Upload de imagens
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:
 
-**Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload, inclui `comercioId` no formData. A rota busca `ownerId` via `prisma.comercio.findUnique({ where: { id: comercioId }, select: { ownerId: true } })` para montar o path correto no storage (que é sempre keyed por `userId = ownerId`). Sem `comercioId`, resolve via `getComercioCtx()` — cobre tanto o comerciante no próprio painel quanto o admin no painel de gestão (cookie `admin_comercio_id`).
+**Pasta por comércio:** o path no storage é keyed por **`comercioId`** (decisão 9 do `docs/modulo-gestao.md`). Arquivos enviados antes de 2026-09-12 estão em `{ownerId}/...` e continuam válidos — a URL completa fica salva no banco, nada foi movido. Pastas por titular colidiriam quando um usuário é titular de várias lojas (dois `logo.png` com `x-upsert`).
+
+**Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload fora do painel (ex.: `LogoUploader` em `/admin/comercios/[id]`), inclui `comercioId` no formData e a rota só confere que o comércio existe. Sem `comercioId`, resolve via `getComercioCtx()` — cobre tanto o comerciante no próprio painel quanto o admin no painel de gestão (cookie `admin_comercio_id`).
 
 **heic2any só com import dinâmico:** o módulo executa `window.__heic2any__worker = new Worker(...)` na carga — import estático num Client Component quebra o SSR do build de produção com `ReferenceError: window is not defined` (o `next dev` **não** acusa; só `next start`). Sempre `const { default: heic2any } = await import("heic2any")` dentro da função de conversão.
 
 **Upload de fotos de produtos (cardápio):** o componente `produto-dialog.tsx` suporta múltiplos arquivos simultâneos, drag-and-drop e conversão de HEIC/HEIF para JPEG antes do envio (via `heic2any`). A detecção de HEIC usa tanto o MIME type quanto a extensão do arquivo (iOS Safari às vezes omite o MIME type). A quantidade máxima de slots disponíveis (`MAX_IMAGENS - imagens.length`) limita dinamicamente tanto o seletor de arquivos (`multiple` é `false` quando só resta 1 slot) quanto o drop handler.
 
 ```
-{userId}/logo.{ext}
-{userId}/fotos/{timestamp}.{ext}
-{userId}/produtos/{timestamp}.{ext}
-{userId}/eventos/{timestamp}.{ext}
-{userId}/cardapio/{timestamp}.{ext}
+{comercioId}/logo.{ext}
+{comercioId}/fotos/{timestamp}.{ext}
+{comercioId}/produtos/{timestamp}.{ext}
+{comercioId}/eventos/{timestamp}.{ext}
+{comercioId}/cardapio/{timestamp}.{ext}
+{comercioId}/quartos/{timestamp}.{ext}
 ```
 
 ### Auth config separada (Edge-compatible)
@@ -306,7 +347,7 @@ src/app/mapa/
 
 Todos os mapas do projeto usam Google Maps via `@googlemaps/js-api-loader` (v2). O padrão de inicialização é sempre `setOptions({ key, v: "weekly" })` + `importLibrary("maps")` num `useEffect`. **Nunca importar Leaflet** — foi removido do projeto.
 
-**`src/components/public/mapa-view.tsx`** — exibe a localização de um comércio ou ponto turístico. Somente leitura (`gestureHandling: "none"`), sem controles de UI. Aplica o mesmo estilo terroso do `/mapa`. Mostra `InfoWindow` com logo (72×72px) ou nome como fallback. Exportado via wrapper dinâmico `mapa-view-dynamic.tsx` (fornece skeleton de loading; `ssr: false` não é mais necessário mas mantido pelo skeleton). Usado em `secao-localizacao.tsx` (vitrine) e `/pontos-turisticos/[slug]`.
+**`src/components/public/mapa-view.tsx`** — exibe a localização de um comércio ou ponto turístico. Somente leitura (`gestureHandling: "none"`), sem controles de UI. Aplica o mesmo estilo terroso do `/mapa`. Mostra `InfoWindow` com logo (72×72px) ou nome como fallback. Exportado via wrapper dinâmico `mapa-view-dynamic.tsx` (skeleton de loading + **`ssr: false` obrigatório**: o `@googlemaps/js-api-loader` v2 acessa `window` na carga do módulo e quebra o SSR com `ReferenceError: window is not defined` — só aparece no log do `next start`). Usado em `secao-localizacao.tsx` (vitrine) e `/pontos-turisticos/[slug]`.
 
 **`src/components/comerciante/mapa-picker.tsx`** — picker interativo para seleção de coordenadas em formulários de endereço. Marker draggável: `dragend` chama `onPick(lat, lng)`. Sincroniza posição via `useEffect([lat, lng])` quando o CEP é preenchido e o endereço é geocodificado. Controles de zoom habilitados, `gestureHandling: "cooperative"`. Sem estilo customizado (contexto de formulário). Carregado via `dynamic` em `endereco-input.tsx`.
 
@@ -324,7 +365,7 @@ Array sempre com 7 elementos (Segunda a Domingo). O campo `temPausa`, `pausaInic
 
 ## Banco de Dados
 
-Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (1:1). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`, `CatalogoCategoria[]`, `Subcategoria[]` (N:M). `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. `Produto` → `CardapioCategoria?` (cardápio) e `CatalogoCategoria?` (catálogo), ambas opcionais com `onDelete: SetNull`. Demais relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
+Entidades principais: `Plan` → `Comercio` (N:1) ← `User` (titular, `ownerId` — N:1, não único). Acesso ao painel: `User` ↔ `Comercio` via `ComercioMembro` (N:N com papel). `Comercio` → `Tag[]`, `Foto[]`, `Produto[]`, `Evento[]`, `CardapioCategoria[]`, `CatalogoCategoria[]`, `Subcategoria[]` (N:M). `CardapioCategoria` → `CardapioItem[]` → `CardapioVariacao[]`. `Produto` → `CardapioCategoria?` (cardápio) e `CatalogoCategoria?` (catálogo), ambas opcionais com `onDelete: SetNull`. Demais relações têm `onDelete: Cascade`. IDs gerados com `cuid()`.
 
 **`Comercio.categorias: Categoria[]`** — array nativo PostgreSQL. Substitui o campo singular `categoria`. O **primeiro elemento é sempre a categoria principal**. Para filtrar: `{ categorias: { has: "ALIMENTACAO" } }`. Para contar por categoria na home page, usar raw query (o `groupBy` do Prisma não suporta arrays): `SELECT unnest(categorias) AS cat, COUNT(*) FROM comercios WHERE status = 'ATIVO' GROUP BY cat`. Migração original: `UPDATE comercios SET categorias = ARRAY[categoria]::"Categoria"[]`.
 
@@ -355,6 +396,8 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 | `destaque_busca` | Perfil em posição destacada nos resultados |
 | `analytics` | Estatísticas de visualizações e cliques |
 | `qr_code` | QR Code personalizado do perfil |
+| `pedido_online` | Pedido online pelo cardápio (depende de `cardapio`) |
+| `gestao_equipe` | Membros com papéis no painel do comércio (tela de equipe) |
 
 A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
 
@@ -607,7 +650,7 @@ lados (não tem `"use client"`). Reutilizado pelo painel e pela vitrine.
 **APIs do comerciante:** `PUT /api/comerciante/hospedagem` (upsert do perfil); `POST
 /api/comerciante/hospedagem/quartos` e `PATCH`/`DELETE .../quartos/[id]`. Fotos de quarto
 seguem o padrão do `produto-dialog` — upload via `/api/comerciante/upload` com `tipo: "quarto"`
-(path `{userId}/quartos/{ts}.{ext}`); o array `fotos` é salvo no payload do quarto. `comodidades`
+(path `{comercioId}/quartos/{ts}.{ext}`); o array `fotos` é salvo no payload do quarto. `comodidades`
 e `formasPagamento` validados contra as keys do catálogo.
 
 **Painel:** dividido entre as duas áreas — tipos de quarto em **Gestão → Acomodações**
@@ -683,7 +726,9 @@ A página `/vitrine/[slug]/cardapio` exporta `export const viewport: Viewport = 
   notificação ao comerciante via **Web Push** (`src/lib/push.ts` + `public/sw-push.js` + VAPID;
   em produção, setar `NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` na Vercel),
   bloqueio de pedido fora do horário, e **taxa de entrega por bairro** (models `Bairro`/`ZonaEntrega`,
-  catálogo em `/admin/bairros`, seed `npm run db:seed:bairros`). Fase 2 pendente: WhatsApp Cloud API
+  catálogo em `/admin/bairros`, seed `npm run db:seed:bairros`). **Status só muda por
+  `mudarStatusPedido()`** (`src/lib/pedidos-historico.ts`): transação com `PedidoHistorico` e escrita
+  condicional ao status lido (409 em concorrência); cliente vê só status + horário das etapas. Fase 2 pendente: WhatsApp Cloud API
   para o cliente, agendamento, taxa por raio. Detalhes em `docs/pedido-online.md`.
 - Avaliações de visitantes
 - ~~Analytics para comerciantes~~ — implementado (ver seção Analytics e [`docs/analytics.md`](docs/analytics.md))

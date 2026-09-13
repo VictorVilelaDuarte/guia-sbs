@@ -16,6 +16,7 @@ import { AnalyticsPanel } from "@/components/comerciante/analytics-panel";
 import type { AnalyticsResumo } from "@/lib/analytics/types";
 import { cn } from "@/lib/utils";
 import { temFeature, LIMITES_FREE, type FeatureKey } from "@/lib/plan-features";
+import { temPermissao, type Permissao } from "@/lib/gestao/permissoes";
 import { Lock } from "lucide-react";
 import { toast } from "sonner";
 
@@ -73,16 +74,22 @@ interface AbaConfig {
   feature?: FeatureKey;
   // Quando definido, a aba só aparece se o comércio tiver essa categoria.
   categoria?: string;
+  permissao: Permissao;
 }
 
 const ABAS: AbaConfig[] = [
-  { id: "informacoes", label: "Informações" },
+  { id: "informacoes", label: "Informações", permissao: "vitrine:editar" },
   // sem `feature`: a aba abre para todos — o plano FREE vê o teaser
-  { id: "analytics", label: "Analytics" },
-  { id: "fotos", label: "Fotos" },
-  { id: "hospedagem", label: "Comodidades e políticas", categoria: "HOSPEDAGEM" },
-  { id: "eventos", label: "Eventos", feature: "eventos" },
-  { id: "tags", label: "Palavras-chave" },
+  { id: "analytics", label: "Analytics", permissao: "analytics:ver" },
+  { id: "fotos", label: "Fotos", permissao: "vitrine:editar" },
+  {
+    id: "hospedagem",
+    label: "Comodidades e políticas",
+    categoria: "HOSPEDAGEM",
+    permissao: "vitrine:editar",
+  },
+  { id: "eventos", label: "Eventos", feature: "eventos", permissao: "vitrine:editar" },
+  { id: "tags", label: "Palavras-chave", permissao: "vitrine:editar" },
 ];
 
 export function VitrineTabs({
@@ -90,34 +97,39 @@ export function VitrineTabs({
   subcategoriasDisponiveis,
   analytics,
   produtosCount,
+  permissoes,
   abaInicial,
 }: {
   comercio: ComercioParaVitrine;
   subcategoriasDisponiveis: SubcategoriaBasica[];
   analytics: AnalyticsResumo;
   produtosCount: number;
+  permissoes: readonly Permissao[];
   abaInicial?: string;
 }) {
   const features = comercio.plan.features;
 
-  // Deep-link via ?tab=. Valida que a aba existe, é da categoria do comércio e
-  // não está bloqueada por plano — determinístico (mesmo no SSR e client).
+  // Abas com `categoria` só aparecem para comércios daquela categoria; abas
+  // sem permissão do papel não aparecem.
+  const abasVisiveis = ABAS.filter(
+    (a) =>
+      (!a.categoria || comercio.categorias.includes(a.categoria)) &&
+      temPermissao(permissoes, a.permissao),
+  );
+  const abaPadrao = abasVisiveis[0]?.id ?? "informacoes";
+
+  // Deep-link via ?tab=. Valida que a aba está visível e não está bloqueada por
+  // plano — determinístico (mesmo no SSR e client).
   const [aba, setAba] = useState(() => {
-    if (!abaInicial) return "informacoes";
-    const cfg = ABAS.find((a) => a.id === abaInicial);
-    if (!cfg) return "informacoes";
-    if (cfg.categoria && !comercio.categorias.includes(cfg.categoria)) return "informacoes";
-    if (cfg.feature && !temFeature(features, cfg.feature)) return "informacoes";
-    return abaInicial;
+    const cfg = abasVisiveis.find((a) => a.id === abaInicial);
+    if (!cfg) return abaPadrao;
+    if (cfg.feature && !temFeature(features, cfg.feature)) return abaPadrao;
+    return cfg.id;
   });
 
   const ilimitado = temFeature(features, "fotos_ilimitadas");
   const fotoLimite = ilimitado ? undefined : LIMITES_FREE.fotos;
   const tagLimite = ilimitado ? undefined : LIMITES_FREE.tags;
-
-  const abasVisiveis = ABAS.filter(
-    (a) => !a.categoria || comercio.categorias.includes(a.categoria),
-  );
 
   function handleTabClick(tabConfig: AbaConfig) {
     if (tabConfig.feature && !temFeature(features, tabConfig.feature)) {

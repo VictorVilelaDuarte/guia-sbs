@@ -24,10 +24,23 @@ export async function GET() {
 
   const usuarios = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true, comercio: { select: { id: true, nome: true } } },
+    select: {
+      id: true, name: true, email: true, role: true, active: true, createdAt: true,
+      membros: {
+        orderBy: { createdAt: "asc" },
+        select: { papel: true, ativo: true, comercio: { select: { id: true, nome: true } } },
+      },
+    },
   })
 
-  return NextResponse.json(usuarios)
+  // `comercios` = vínculos do usuário (consumido pelo dialog de criar comércio,
+  // que esconde funcionários — funcionário pertence a um único comércio).
+  return NextResponse.json(
+    usuarios.map(({ membros, ...u }) => ({
+      ...u,
+      comercios: membros.map((m) => ({ id: m.comercio.id, nome: m.comercio.nome, papel: m.papel, ativo: m.ativo })),
+    })),
+  )
 }
 
 export async function POST(req: NextRequest) {

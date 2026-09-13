@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
 
 const schema = z.discriminatedUnion("tipo", [
@@ -11,6 +11,8 @@ const schema = z.discriminatedUnion("tipo", [
 export async function PATCH(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "cardapio:editar")
+  if (negado) return negado
 
   const body = await req.json()
   const parsed = schema.safeParse(body)

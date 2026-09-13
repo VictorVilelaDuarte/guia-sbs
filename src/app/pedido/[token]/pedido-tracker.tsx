@@ -44,6 +44,8 @@ export interface PedidoData {
   motivoCancelamento: string | null;
   createdAt: string;
   itens: ItemData[];
+  // Só status + horário (sem autor) — ver src/lib/pedidos-historico.ts.
+  historico: { status: PedidoStatus; createdAt: string }[];
   comercio: {
     nome: string;
     slug: string;
@@ -55,6 +57,20 @@ export interface PedidoData {
 
 function formatBRL(v: number) {
   return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function hora(iso: string) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
+// Horário em que o pedido chegou a cada etapa (o registro mais recente dela).
+function horarioDaEtapa(historico: PedidoData["historico"], status: PedidoStatus) {
+  const r = [...historico].reverse().find((h) => h.status === status);
+  return r ? hora(r.createdAt) : null;
 }
 
 export function PedidoTracker({ initial }: { initial: PedidoData }) {
@@ -98,10 +114,16 @@ export function PedidoTracker({ initial }: { initial: PedidoData }) {
           ...p,
           status: "CANCELADO",
           motivoCancelamento: "Cancelado pelo cliente",
+          historico: [...(p.historico ?? []), { status: "CANCELADO", createdAt: new Date().toISOString() }],
         }));
       } else {
         const data = await res.json();
         alert(data.error ?? "Não foi possível cancelar.");
+        // 409: a loja mudou o pedido no mesmo instante — mostra o status real.
+        if (res.status === 409) {
+          const atual = await fetch(`/api/pedidos/${initial.token}`, { cache: "no-store" });
+          if (atual.ok) setPedido(await atual.json());
+        }
       }
     } finally {
       setCancelando(false);
@@ -175,7 +197,11 @@ export function PedidoTracker({ initial }: { initial: PedidoData }) {
             {STATUS_LABEL_CLIENTE[pedido.status]}
           </h2>
           {cancelado && pedido.motivoCancelamento && (
-            <p className="mt-1 text-sm text-rose-500">{pedido.motivoCancelamento}</p>
+            <p className="mt-1 text-sm text-rose-500">
+              {pedido.motivoCancelamento}
+              {horarioDaEtapa(pedido.historico ?? [], pedido.status) &&
+                ` · ${horarioDaEtapa(pedido.historico ?? [], pedido.status)}`}
+            </p>
           )}
           {!terminal && pedido.comercio.pedidoConfig?.tempoPreparoMin && (
             <p className="mt-1 text-sm text-stone-500">
@@ -192,6 +218,7 @@ export function PedidoTracker({ initial }: { initial: PedidoData }) {
                 const feito = i < idxAtual;
                 const atual = i === idxAtual;
                 const ultimo = i === passos.length - 1;
+                const horario = feito || atual ? horarioDaEtapa(pedido.historico ?? [], passo) : null;
                 return (
                   <li key={passo} className="flex gap-3">
                     <div className="flex flex-col items-center">
@@ -229,6 +256,11 @@ export function PedidoTracker({ initial }: { initial: PedidoData }) {
                       )}
                     >
                       {STATUS_LABEL_CLIENTE[passo]}
+                      {horario && (
+                        <span className="ml-2 text-xs font-normal tabular-nums text-stone-400">
+                          {horario}
+                        </span>
+                      )}
                     </span>
                   </li>
                 );

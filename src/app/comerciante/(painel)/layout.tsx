@@ -5,15 +5,18 @@ import { Toaster } from "@/components/ui/sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { prisma } from "@/lib/prisma"
 import { getPainelBase } from "@/lib/painel/queries"
 import { temFeature } from "@/lib/plan-features"
+import { temPermissao } from "@/lib/gestao/permissoes"
 import { PedidosAlertaProvider } from "@/components/comerciante/painel/pedidos-alerta"
+import { SeletorLoja } from "@/components/comerciante/painel/seletor-loja"
 import {
   AreaSwitch,
   GestaoBottomNav,
   GestaoTabs,
 } from "@/components/comerciante/painel/painel-nav"
-import { ChevronLeft, LogOut, MapPin, ShieldCheck, Store } from "lucide-react"
+import { ChevronLeft, KeyRound, LogOut, MapPin, ShieldCheck, Store } from "lucide-react"
 
 const statusVariants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   ATIVO: "default",
@@ -44,6 +47,17 @@ export default async function ComercianteLayout({
   const isAdminRole = role === "ADMIN" || role === "SUPER_ADMIN"
   if (!isAdminRole && role !== "COMERCIANTE") redirect("/")
 
+  // Senha temporária (criada pela tela de equipe): troca obrigatória antes de
+  // qualquer tela do painel. Lido do banco a cada request, não do JWT — senão só
+  // valeria quando o token expirasse. As APIs também bloqueiam (getComercioCtx).
+  if (role === "COMERCIANTE") {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { trocarSenha: true },
+    })
+    if (user?.trocarSenha) redirect("/comerciante/trocar-senha")
+  }
+
   const base = await getPainelBase()
   // Admin só entra com um comércio-alvo válido no cookie (o middleware checa só
   // a presença do cookie; aqui confere que o comércio existe).
@@ -51,6 +65,7 @@ export default async function ComercianteLayout({
 
   const comercio = base?.comercio
   const isAdmin = base?.ctx.isAdmin ?? false
+  const permissoes = base?.permissoes ?? []
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -74,17 +89,27 @@ export default async function ComercianteLayout({
                 Voltar ao admin
               </Link>
             ) : (
-              <form
-                action={async () => {
-                  "use server"
-                  await signOut({ redirectTo: "/admin/login" })
-                }}
-              >
-                <Button type="submit" variant="ghost" size="sm">
-                  <LogOut className="h-4 w-4 mr-1" />
-                  Sair
-                </Button>
-              </form>
+              <>
+                <Link
+                  href="/comerciante/trocar-senha"
+                  className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+                  title="Alterar senha"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  <span className="hidden sm:inline">Alterar senha</span>
+                </Link>
+                <form
+                  action={async () => {
+                    "use server"
+                    await signOut({ redirectTo: "/admin/login" })
+                  }}
+                >
+                  <Button type="submit" variant="ghost" size="sm">
+                    <LogOut className="h-4 w-4 mr-1" />
+                    Sair
+                  </Button>
+                </form>
+              </>
             )}
           </div>
         </div>
@@ -102,7 +127,15 @@ export default async function ComercianteLayout({
             </CardContent>
           </Card>
         ) : (
-          <PedidosAlertaProvider ativo={temFeature(comercio.plan.features, "pedido_online")}>
+          <PedidosAlertaProvider
+            // key por comércio: ao trocar de loja o provider remonta e refaz a linha
+            // de base — senão os pedidos já existentes na loja nova tocariam como "novos".
+            key={comercio.id}
+            ativo={
+              temFeature(comercio.plan.features, "pedido_online") &&
+              temPermissao(permissoes, "pedidos:operar")
+            }
+          >
             <div className="space-y-6">
               {isAdmin && (
                 <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
@@ -117,7 +150,7 @@ export default async function ComercianteLayout({
 
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <h1 className="text-2xl font-bold truncate">{comercio.nome}</h1>
+                  <SeletorLoja lojas={base?.lojas ?? []} atualId={comercio.id} nomeAtual={comercio.nome} />
                   <p className="text-sm text-muted-foreground mt-0.5">
                     {isAdmin ? "Painel completo do comércio" : "Gerencie seu comércio"}
                   </p>
@@ -132,12 +165,20 @@ export default async function ComercianteLayout({
                 </div>
               </div>
 
-              <AreaSwitch />
-              <GestaoTabs features={comercio.plan.features} categorias={comercio.categorias} />
+              <AreaSwitch permissoes={permissoes} />
+              <GestaoTabs
+                features={comercio.plan.features}
+                categorias={comercio.categorias}
+                permissoes={permissoes}
+              />
 
               <div>{children}</div>
             </div>
-            <GestaoBottomNav features={comercio.plan.features} categorias={comercio.categorias} />
+            <GestaoBottomNav
+              features={comercio.plan.features}
+              categorias={comercio.categorias}
+              permissoes={permissoes}
+            />
           </PedidosAlertaProvider>
         )}
       </main>

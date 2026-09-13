@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import { historicoPainelSelect } from "@/lib/pedidos-historico"
 
 // Lista de pedidos do comércio para o painel (consumida por polling).
 // Filtros opcionais: ?desde=ISO (só pedidos atualizados depois) para polling incremental.
 export async function GET(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const negado = negarSemPermissao(ctx, "pedidos:operar")
+  if (negado) return negado
 
   const desdeParam = req.nextUrl.searchParams.get("desde")
   const desde = desdeParam ? new Date(desdeParam) : null
@@ -29,6 +32,7 @@ export async function GET(req: NextRequest) {
           observacao: true,
         },
       },
+      historico: historicoPainelSelect,
     },
   })
 

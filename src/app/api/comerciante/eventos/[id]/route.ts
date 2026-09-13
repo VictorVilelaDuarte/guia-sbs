@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 import { deleteFile } from "@/lib/supabase-storage"
 
@@ -15,17 +16,18 @@ const patchSchema = z.object({
   linkExterno: z.string().url().optional().nullable(),
 })
 
-async function ownerCheck(eventoId: string) {
+async function ownerCheck(eventoId: string, ...permissoes: Permissao[]) {
   const ctx = await getComercioCtx()
-  if (!ctx) return null
+  if (!ctx) return { erro: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) }
+  const negado = negarSemPermissao(ctx, ...permissoes)
+  if (negado) return { erro: negado }
 
   const evento = await prisma.evento.findUnique({
     where: { id: eventoId },
-    include: { comercio: { select: { ownerId: true } } },
   })
 
-  if (!evento || evento.comercio.ownerId !== ctx.ownerId) return null
-  return evento
+  if (!evento || evento.comercioId !== ctx.comercioId) return { erro: NextResponse.json({ error: "Não autorizado." }, { status: 401 }) }
+  return { item: evento, ctx }
 }
 
 export async function PATCH(
@@ -33,8 +35,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const evento = await ownerCheck(id)
-  if (!evento) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id, "vitrine:editar")
+  if ("erro" in check) return check.erro
 
   let body: unknown
   try {
@@ -70,8 +72,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const evento = await ownerCheck(id)
-  if (!evento) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
+  const check = await ownerCheck(id, "vitrine:editar")
+  if ("erro" in check) return check.erro
+  const evento = check.item
 
   if (evento.imagem) {
     try {

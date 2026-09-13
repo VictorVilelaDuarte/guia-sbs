@@ -1,4 +1,13 @@
-import type { PedidoStatus, TipoEntrega } from "@prisma/client"
+import type { OrigemHistorico, PedidoStatus, TipoEntrega } from "@prisma/client"
+
+export interface HistoricoPedidoAdmin {
+  id: string
+  status: PedidoStatus
+  origem: OrigemHistorico
+  autorNome: string | null
+  motivo: string | null
+  createdAt: string // ISO
+}
 
 export interface PedidoItemAdmin {
   id: string
@@ -32,6 +41,7 @@ export interface PedidoAdmin {
   motivoCancelamento: string | null
   createdAt: string // ISO
   itens: PedidoItemAdmin[]
+  historico: HistoricoPedidoAdmin[]
 }
 
 export interface PedidoConfigData {

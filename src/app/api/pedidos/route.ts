@@ -200,6 +200,10 @@ export async function POST(req: NextRequest) {
         taxaEntrega,
         total,
         itens: { create: snapshots },
+        // Primeiro registro da linha do tempo, na mesma transação da criação.
+        historico: {
+          create: { status: "AGUARDANDO", origem: "CLIENTE", autorNome: d.clienteNome.trim() },
+        },
       },
       select: { token: true, numero: true },
     })
