@@ -95,6 +95,28 @@ export async function listarEquipe(comercioId: string, userIdAtual: string): Pro
   })
 }
 
+// Regra de negócio (2026-09-13): funcionário (GERENTE/ATENDENTE/PRODUCAO) pertence
+// a UM comércio; só DONO pode ter várias lojas. Retorna a mensagem de recusa, ou
+// null se o vínculo pretendido em `comercioId` respeita a regra.
+export async function violaFuncionarioUnico(
+  userId: string,
+  comercioId: string,
+  papelPretendido: PapelMembro,
+): Promise<string | null> {
+  const outros = await prisma.comercioMembro.findMany({
+    where: { userId, comercioId: { not: comercioId } },
+    select: { papel: true },
+  })
+  if (outros.length === 0) return null
+  if (papelPretendido !== "DONO") {
+    return "Esta pessoa já tem acesso a outro comércio. Funcionário só pode fazer parte de um comércio."
+  }
+  if (outros.some((o) => o.papel !== "DONO")) {
+    return "Esta pessoa é funcionária de outro comércio e não pode ser dona deste."
+  }
+  return null
+}
+
 export class ErroEquipe extends Error {
   constructor(
     message: string,
@@ -156,6 +178,8 @@ export async function adicionarMembro(args: {
       select: { id: true },
     })
     if (jaMembro) throw new ErroEquipe("Esta pessoa já faz parte da equipe.")
+    const violacao = await violaFuncionarioUnico(existente.id, args.comercioId, args.papel)
+    if (violacao) throw new ErroEquipe(violacao)
     // Conta existente: só o vínculo. A senha continua sendo a da pessoa.
     const membro = await prisma.comercioMembro.create({
       data: { comercioId: args.comercioId, userId: existente.id, papel: args.papel },
@@ -187,6 +211,10 @@ export async function alterarMembro(args: {
   ativo?: boolean
 }) {
   const membro = await carregarMembro(args.membroId, args.comercioId, args.userIdAtual)
+  if (args.papel !== undefined && args.papel !== membro.papel) {
+    const violacao = await violaFuncionarioUnico(membro.userId, args.comercioId, args.papel)
+    if (violacao) throw new ErroEquipe(violacao)
+  }
   const deixaDeSerDonoAtivo =
     (args.papel !== undefined && args.papel !== "DONO") || args.ativo === false
   if (deixaDeSerDonoAtivo) await garantirOutroDono(membro, args.comercioId)

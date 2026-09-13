@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { slugify } from "@/lib/slugify"
+import { violaFuncionarioUnico } from "@/lib/gestao/equipe"
 
 const CATEGORIAS_ENUM = ["ALIMENTACAO", "HOSPEDAGEM", "TURISMO", "SERVICO", "COMERCIO", "ENTRETENIMENTO"] as const
 
@@ -29,14 +30,16 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: parsed.data.ownerId },
-    select: { id: true, _count: { select: { membros: { where: { ativo: true } } } } },
+    select: { id: true, role: true },
   })
   if (!user) return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 })
-  // Bloqueio temporário: até existir o seletor de loja (Fase 1, PR 4 do
-  // docs/modulo-gestao.md), a segunda loja de um usuário seria inalcançável no painel.
-  if (user._count.membros > 0) {
-    return NextResponse.json({ error: "Usuário já possui comércio vinculado." }, { status: 409 })
+  if (user.role !== "COMERCIANTE") {
+    return NextResponse.json({ error: "O responsável precisa ser um comerciante." }, { status: 400 })
   }
+  // Dono pode ter várias lojas (troca pelo seletor do painel); funcionário de
+  // outro comércio não pode virar titular. Comércio novo ainda não tem id: "".
+  const violacao = await violaFuncionarioUnico(user.id, "", "DONO")
+  if (violacao) return NextResponse.json({ error: violacao }, { status: 409 })
 
   const planFree = await prisma.plan.findUnique({ where: { slug: "free" } })
   if (!planFree) return NextResponse.json({ error: "Plano padrão não encontrado. Execute o seed." }, { status: 500 })

@@ -27,18 +27,19 @@ export async function GET() {
     select: {
       id: true, name: true, email: true, role: true, active: true, createdAt: true,
       membros: {
-        where: { ativo: true },
         orderBy: { createdAt: "asc" },
-        take: 1,
-        select: { comercio: { select: { id: true, nome: true } } },
+        select: { papel: true, ativo: true, comercio: { select: { id: true, nome: true } } },
       },
     },
   })
 
-  // `comercio` = primeiro comércio com vínculo ativo (contrato consumido pelo
-  // dialog de criar comércio, que só oferece usuários sem nenhum vínculo).
+  // `comercios` = vínculos do usuário (consumido pelo dialog de criar comércio,
+  // que esconde funcionários — funcionário pertence a um único comércio).
   return NextResponse.json(
-    usuarios.map(({ membros, ...u }) => ({ ...u, comercio: membros[0]?.comercio ?? null })),
+    usuarios.map(({ membros, ...u }) => ({
+      ...u,
+      comercios: membros.map((m) => ({ id: m.comercio.id, nome: m.comercio.nome, papel: m.papel, ativo: m.ativo })),
+    })),
   )
 }
 

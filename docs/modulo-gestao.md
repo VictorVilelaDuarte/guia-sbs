@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1, 2 e 3 implementados — §11). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 4 implementados — §11). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
@@ -836,8 +836,12 @@ script, já que a tela de equipe é o PR 3).
 **Verificação:** dono adiciona atendente → atendente loga, é forçado a trocar a senha, vê só o
 permitido; remover o vínculo corta o acesso na próxima requisição (sem esperar o token expirar).
 
-### 11.4 PR 4 — Multi-loja
+### 11.4 PR 4 — Multi-loja ✅ implementado
 
+- **Decisões de 2026-09-13:** (1) **funcionário pertence a um único comércio**; só DONO tem
+  várias lojas — travado em `violaFuncionarioUnico()` na equipe e na criação de comércio pelo admin;
+  (2) trocar de loja leva para a **entrada**; (3) **push por loja fica fora** — a inscrição segue única
+  por aparelho (limitação aceita: dono recebe push só da última loja ativada no aparelho).
 - Cookie httpOnly **`comercio_ativo`** (nome em módulo sem imports, como o `admin_comercio_id`),
   validado contra os vínculos ativos a cada request; ausente/inválido ⇒ primeiro vínculo.
 - `POST /api/comerciante/comercio-ativo` troca o cookie (só para comércio com vínculo) e o

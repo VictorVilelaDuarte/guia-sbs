@@ -1,7 +1,7 @@
 import { cache } from "react"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getComercioCtx, permissoesCtx } from "@/lib/comercio-ctx"
+import { getComercioCtx, permissoesCtx, vinculosValidos } from "@/lib/comercio-ctx"
 import { getAnalyticsResumo } from "@/lib/analytics/queries"
 import type {
   PedidoAdmin,
@@ -32,7 +32,11 @@ export const getPainelBase = cache(async () => {
     },
   })
   if (!comercio) return null
-  return { ctx, comercio, permissoes: permissoesCtx(ctx) }
+  // Lojas para o seletor do cabeçalho (só comerciante; admin gerencia uma por vez).
+  const lojas = ctx.isAdmin
+    ? []
+    : ((await vinculosValidos(ctx.userId)) ?? []).map((m) => ({ id: m.comercio.id, nome: m.comercio.nome }))
+  return { ctx, comercio, permissoes: permissoesCtx(ctx), lojas }
 })
 
 const produtoInclude = {

@@ -13,6 +13,7 @@ import { UsuariosActions } from "@/components/admin/usuarios-actions"
 import { CriarUsuarioDialog } from "@/components/admin/criar-usuario-dialog"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { papelLabel } from "@/lib/gestao/permissoes"
 
 async function getUsuarios() {
   return prisma.user.findMany({
@@ -28,7 +29,7 @@ async function getUsuarios() {
       membros: {
         where: { ativo: true },
         orderBy: { createdAt: "asc" },
-        select: { comercio: { select: { nome: true } } },
+        select: { papel: true, comercio: { select: { nome: true } } },
       },
     },
   })
@@ -92,7 +93,11 @@ export default async function UsuariosPage() {
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {u.membros.length > 0 ? u.membros.map((m) => m.comercio.nome).join(", ") : "—"}
+                  {u.membros.length > 0
+                    ? u.membros
+                        .map((m) => (m.papel === "DONO" ? m.comercio.nome : `${m.comercio.nome} (${papelLabel(m.papel)})`))
+                        .join(", ")
+                    : "—"}
                 </TableCell>
                 <TableCell>
                   <Badge variant={u.active ? "default" : "destructive"}>

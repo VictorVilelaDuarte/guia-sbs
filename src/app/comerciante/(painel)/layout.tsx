@@ -10,6 +10,7 @@ import { getPainelBase } from "@/lib/painel/queries"
 import { temFeature } from "@/lib/plan-features"
 import { temPermissao } from "@/lib/gestao/permissoes"
 import { PedidosAlertaProvider } from "@/components/comerciante/painel/pedidos-alerta"
+import { SeletorLoja } from "@/components/comerciante/painel/seletor-loja"
 import {
   AreaSwitch,
   GestaoBottomNav,
@@ -127,6 +128,9 @@ export default async function ComercianteLayout({
           </Card>
         ) : (
           <PedidosAlertaProvider
+            // key por comércio: ao trocar de loja o provider remonta e refaz a linha
+            // de base — senão os pedidos já existentes na loja nova tocariam como "novos".
+            key={comercio.id}
             ativo={
               temFeature(comercio.plan.features, "pedido_online") &&
               temPermissao(permissoes, "pedidos:operar")
@@ -146,7 +150,7 @@ export default async function ComercianteLayout({
 
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <h1 className="text-2xl font-bold truncate">{comercio.nome}</h1>
+                  <SeletorLoja lojas={base?.lojas ?? []} atualId={comercio.id} nomeAtual={comercio.nome} />
                   <p className="text-sm text-muted-foreground mt-0.5">
                     {isAdmin ? "Painel completo do comércio" : "Gerencie seu comércio"}
                   </p>
