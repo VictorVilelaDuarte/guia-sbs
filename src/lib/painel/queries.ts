@@ -175,12 +175,14 @@ export async function getQuartosData(comercioId: string) {
 // --- Gestão: resumo do dia -----------------------------------------------------
 
 export interface ResumoPedidosHoje {
-  pedidos: number // exclui recusados e cancelados
+  pedidos: number // exclui recusados e cancelados (todas as origens)
   concluidos: number
-  faturamento: number // soma dos CONCLUIDO
+  faturamento: number // soma dos CONCLUIDO — online, balcão e telefone
 }
 
-export async function getResumoData(comercioId: string, opts: { pedidos: boolean }) {
+// opts.pedidos: fila de pedidos online (aguardando/andamento/aceite).
+// opts.vendas: números do dia (pedidos online + venda manual de balcão/telefone).
+export async function getResumoData(comercioId: string, opts: { pedidos: boolean; vendas?: boolean }) {
   const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos, clientes] =
     await Promise.all([
       opts.pedidos
@@ -194,7 +196,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
             },
           })
         : 0,
-      opts.pedidos ? pedidosHoje(comercioId) : null,
+      opts.pedidos || opts.vendas ? pedidosHoje(comercioId) : null,
       opts.pedidos
         ? prisma.pedidoConfig.findUnique({
             where: { comercioId },

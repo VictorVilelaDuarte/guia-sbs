@@ -45,6 +45,11 @@ export const FEATURES_DISPONIVEIS = [
     descricao: "Cadastro de clientes da loja com histórico de pedidos, filtros e anotações",
   },
   {
+    key: "gestao_relatorios",
+    label: "Vendas e relatórios",
+    descricao: "Registrar vendas de balcão e telefone e ver relatórios de faturamento",
+  },
+  {
     key: "pedido_online",
     label: "Pedido online",
     descricao: "Receber pedidos pelo cardápio com carrinho, checkout e painel de gestão (requer Cardápio)",

@@ -194,7 +194,8 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 | Permissão | DONO | GERENTE | ATENDENTE | PRODUCAO |
 |---|:-:|:-:|:-:|:-:|
 | `vitrine:editar`, `analytics:ver`, `cardapio:editar`, `catalogo:editar`, `quartos:editar`, `pedidos:configurar`, `vendas:ver`, `clientes:editar` | ✅ | ✅ | | |
-| `clientes:ver` | ✅ | ✅ | ✅ | |
+| `vendas:cancelar` | ✅ | ✅ | | |
+| `clientes:ver`, `vendas:registrar` | ✅ | ✅ | ✅ | |
 | `itens:disponibilidade` (só o `disponivel` de itens do cardápio/catálogo) | ✅ | ✅ | ✅ | |
 | `pedidos:operar` | ✅ | ✅ | ✅ | ✅ |
 | `equipe:gerenciar` | ✅ | | | |
@@ -230,6 +231,17 @@ Fase 3 / PR 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.1). Valo
 - **Contas em centavos inteiros:** checkout usa `calcularSubtotalCentavos`/`centavosDe` (`src/lib/pedidos.ts`), `paraCentavos`/`deCentavos` (`src/lib/dinheiro.ts`). Nunca somar/comparar `Decimal` com `>`/`+` nem converter para `number` antes de somar.
 - SQL agregado (`SUM(total)`) soma em `numeric` (exato) e converte com `::float` só no fim.
 - **Troca de tipo de coluna nunca pelo `db:push`** (pode recriar a coluna e perder dados): foi feita por `prisma/migrate-dinheiro-decimal.ts` (`ALTER ... USING ROUND(col::numeric, 2)`, idempotente, confere somas). Testado: o client antigo (`Float`) lê e grava nas colunas `DECIMAL`, então a ordem de deploy é **script → `db:push` → publicar**, sem janela quebrada.
+
+### Venda manual (`Pedido.origem`)
+
+Fase 3 / PR 2 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.2). Venda de balcão/telefone é um **`Pedido`** com `origem` `BALCAO`/`TELEFONE` (online = `ONLINE`, default) e autor em `criadoPorId`/`criadoPorNome` — mesma numeração, histórico e faturamento dos pedidos online.
+
+- **Regras em `registrarVenda`** (`src/lib/gestao/vendas.ts`): preço do servidor (`precoEfetivo`, variação obrigatória), item avulso com `produtoId` nulo, entrega só por telefone, "valor recebido" (grava em `trocoPara`) só em dinheiro. Nasce `CONCLUIDO`; vai para a fila só por telefone + "Enviar para a fila" + flag `pedido_online`.
+- **Cliente só com WhatsApp:** nome sem WhatsApp fica só no snapshot do pedido (criar por nome duplicaria cadastro). Sem nome: `"Cliente balcão"`.
+- **Loja sem pedido online** ganha `PedidoConfig` sob demanda (`createMany({ skipDuplicates })`, `aceitaPedidos: false`) para ter o contador de números.
+- **Cancelar** (`cancelarVendaManual`, `vendas:cancelar`): só venda manual `CONCLUIDO`, motivo obrigatório, via `mudarStatusPedido`.
+- **Telas:** `/comerciante/gestao/vendas` (dia + origem na URL; valores só com `vendas:ver`) e `/vendas/nova` (sem barra inferior — `SEM_BARRA_INFERIOR` no `painel-nav.tsx`). No celular, `NovaVendaFab` flutua sobre a Gestão.
+- **Flag `gestao_relatorios`** (venda manual + relatórios, independe de `pedido_online`), ligada no premium por `prisma/migrate-flag-gestao-relatorios.ts`. **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar.
 
 ### Upload de imagens
 
@@ -428,6 +440,7 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 | `pedido_online` | Pedido online pelo cardápio (depende de `cardapio`) |
 | `gestao_equipe` | Membros com papéis no painel do comércio (tela de equipe) |
 | `gestao_clientes` | Cadastro de clientes da loja com histórico, filtros e anotações |
+| `gestao_relatorios` | Venda manual (balcão/telefone) e relatórios de vendas |
 
 A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
 

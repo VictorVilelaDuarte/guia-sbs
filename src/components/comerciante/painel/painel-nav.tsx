@@ -8,10 +8,12 @@ import {
   LayoutGrid,
   Lock,
   Package,
+  Plus,
   ReceiptText,
   Store,
   Briefcase,
   Contact,
+  Receipt,
   Users,
   type LucideIcon,
 } from "lucide-react"
@@ -60,6 +62,15 @@ const ITENS_GESTAO: ItemGestao[] = [
     icon: Package,
     permissoes: ["catalogo:editar", "itens:disponibilidade"],
     // No celular, Clientes ocupa a vaga; Produtos segue no atalho do Resumo.
+    somenteDesktop: true,
+  },
+  {
+    href: "/comerciante/gestao/vendas",
+    label: "Vendas",
+    icon: Receipt,
+    feature: "gestao_relatorios",
+    permissoes: ["vendas:registrar"],
+    // No celular, "Nova venda" é o botão flutuante e a lista vem pelo Resumo.
     somenteDesktop: true,
   },
   {
@@ -183,10 +194,13 @@ export function GestaoTabs(props: NavProps) {
   )
 }
 
+// Telas com barra de ação própria fixa no rodapé (não empilhar com a navegação).
+const SEM_BARRA_INFERIOR = ["/comerciante/gestao/vendas/nova"]
+
 export function GestaoBottomNav(props: NavProps) {
   const pathname = usePathname()
   const alerta = usePedidosAlerta()
-  if (!pathname.startsWith("/comerciante/gestao")) return null
+  if (!pathname.startsWith("/comerciante/gestao") || SEM_BARRA_INFERIOR.includes(pathname)) return null
 
   return (
     <>
@@ -229,3 +243,28 @@ export function GestaoBottomNav(props: NavProps) {
     </>
   )
 }
+
+// Botão flutuante "Nova venda" no celular (decisão 2 da Fase 3): a barra inferior
+// já tem 5 itens. Só aparece na Gestão, para quem registra venda com a flag.
+export function NovaVendaFab({ features, permissoes }: { features: unknown; permissoes: readonly Permissao[] }) {
+  const pathname = usePathname()
+  if (
+    !pathname.startsWith("/comerciante/gestao") ||
+    pathname.startsWith("/comerciante/gestao/vendas/nova") ||
+    !temFeature(features, "gestao_relatorios") ||
+    !temPermissao(permissoes, "vendas:registrar")
+  ) {
+    return null
+  }
+  return (
+    <Link
+      href="/comerciante/gestao/vendas/nova"
+      aria-label="Nova venda"
+      className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg md:hidden"
+      style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <Plus className="h-6 w-6" />
+    </Link>
+  )
+}
+

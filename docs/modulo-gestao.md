@@ -978,3 +978,30 @@ Branch `feat/gestao-fase-3`. Desenho da fase no §Fase 3.
 - **Deploy:** `npx tsx prisma/migrate-dinheiro-decimal.ts` (com `DIRECT_URL`) → `npm run db:push`
   (deve dizer "already in sync") → publicar.
 
+### 13.2 PR 2 — Venda manual (balcão e telefone) ✅ implementado
+
+**Decisões de 2026-09-14:**
+1. **Cancelar venda manual concluída** — permitido para dono e gerente (`vendas:cancelar`), com motivo
+   obrigatório registrado no histórico. Venda que foi para a fila segue o fluxo normal de pedidos.
+2. **"Nova venda" no celular** é botão flutuante (acima da barra inferior, só dentro da Gestão).
+3. **Desconto** fica para depois.
+
+- **Modelo:** venda manual é um `Pedido` com `origem` (`ONLINE` | `BALCAO` | `TELEFONE`, default
+  `ONLINE`) e autor (`criadoPorId`/`criadoPorNome`, snapshot). Mesma numeração, itens, histórico e
+  relatórios dos pedidos online — uma única fonte de faturamento. Mudança só aditiva (`db:push`).
+- **Regras** (`registrarVenda` em `src/lib/gestao/vendas.ts`): preço sempre do servidor (catálogo com
+  promoção vigente, variação obrigatória quando o produto tem); item avulso com nome e preço digitados
+  (`produtoId` nulo); entrega só no telefone, com taxa da zona; "valor recebido" só em dinheiro e ≥ total.
+  Nasce `CONCLUIDO`; vai para a fila (`AGUARDANDO`) só por telefone, com "Enviar para a fila" marcado e
+  loja com `pedido_online`.
+- **Cliente:** cadastro criado/vinculado **só com WhatsApp** (`vincularCliente`). Nome sem WhatsApp fica
+  apenas no pedido — criar `Cliente` por nome duplicaria cadastros a cada venda. Sem nome: "Cliente balcão".
+- **Numeração em loja sem pedido online:** o `PedidoConfig` é criado sob demanda com
+  `createMany({ skipDuplicates })` e `aceitaPedidos: false` — dá o contador sem ligar o pedido online.
+- **Telas:** `/comerciante/gestao/vendas` (vendas do dia, navegação por dia, filtro de origem; valores
+  só com `vendas:ver`) e `/vendas/nova` (mobile-first, sem barra inferior). Pedidos ganham selo e filtro
+  de origem; o Resumo soma todas as origens e mostra "Nova venda".
+- **APIs:** `POST /api/comerciante/gestao/vendas` (`vendas:registrar`), `POST .../vendas/[id]/cancelar`
+  (`vendas:cancelar`; 409 para pedido online ou não concluído), `GET .../clientes/busca?q=`
+  (autocomplete; vazio sem `gestao_clientes`). Todas exigem a flag `gestao_relatorios`.
+- **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar.

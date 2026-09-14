@@ -52,6 +52,8 @@ export function serializarPedidoAdmin(p: PedidoComItens): PedidoAdmin {
     total: paraNumero(p.total),
     motivoCancelamento: p.motivoCancelamento,
     createdAt: p.createdAt.toISOString(),
+    origem: p.origem,
+    criadoPorNome: p.criadoPorNome,
     itens: serializarItens(p.itens),
     historico: p.historico.map((h) => ({ ...h, createdAt: h.createdAt.toISOString() })),
   }

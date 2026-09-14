@@ -73,6 +73,14 @@ enum PedidoStatus {
   CANCELADO // cliente ou loja cancelou (terminal)
 }
 
+// Por onde a venda entrou (Fase 3). ONLINE = checkout do cardápio; BALCAO e
+// TELEFONE = venda manual registrada no painel (/comerciante/gestao/vendas/nova).
+enum OrigemPedido {
+  ONLINE
+  BALCAO
+  TELEFONE
+}
+
 // Quem causou uma mudança de status do pedido (PedidoHistorico).
 enum OrigemHistorico {
   CLIENTE // checkout ou cancelamento pelo /pedido/[token]
@@ -469,6 +477,11 @@ model Pedido {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
+  origem        OrigemPedido @default(ONLINE)
+  // Venda manual: quem registrou (snapshot do nome, como no histórico).
+  criadoPorId   String?
+  criadoPorNome String?
+
   // Cliente da loja (Fase 2 do módulo de gestão). O snapshot clienteNome/clienteWhats
   // acima continua sendo a verdade do pedido — o cliente pode ser editado ou excluído.
   clienteId String?
@@ -481,6 +494,7 @@ model Pedido {
   @@unique([comercioId, numero])
   @@index([comercioId, status, createdAt])
   @@index([clienteId, createdAt])
+  @@index([comercioId, origem, createdAt])
   @@map("pedidos")
 }
 

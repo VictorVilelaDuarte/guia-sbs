@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { temFeature } from "@/lib/plan-features"
 import { FORMA_PAGAMENTO_KEYS, formaPagamentoLabel } from "@/lib/hospedagem"
-import { calcularSubtotalCentavos, centavosDe } from "@/lib/pedidos"
+import { calcularSubtotalCentavos, centavosDe, precoEfetivo } from "@/lib/pedidos"
 import { deCentavos, paraCentavos, paraNumero } from "@/lib/dinheiro"
 import type { Prisma } from "@prisma/client"
 import { enviarPush, payloadNovoPedido } from "@/lib/push"
@@ -40,16 +40,6 @@ const createSchema = z.object({
 
 function erro(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
-}
-
-// Preço efetivo de um item sem variação — espelha isPromoAtiva do cardápio.
-function precoEfetivo(p: {
-  preco: number | null
-  precoPromo: number | null
-  promoFim: Date | null
-}): number | null {
-  const promoAtiva = p.precoPromo != null && (!p.promoFim || p.promoFim.getTime() > Date.now())
-  return promoAtiva ? p.precoPromo : p.preco
 }
 
 export async function POST(req: NextRequest) {

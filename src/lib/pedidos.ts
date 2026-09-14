@@ -15,6 +15,12 @@ export const STATUS_LABEL: Record<PedidoStatus, string> = {
   CANCELADO: "Cancelado",
 }
 
+export const ORIGEM_LABEL: Record<"ONLINE" | "BALCAO" | "TELEFONE", string> = {
+  ONLINE: "Online",
+  BALCAO: "Balcão",
+  TELEFONE: "Telefone",
+}
+
 // Ação registrada no histórico do pedido (painel): "Aceito por Ana".
 export const HISTORICO_ACAO: Record<PedidoStatus, string> = {
   AGUARDANDO: "Pedido feito",
@@ -134,6 +140,17 @@ export function centavosDe(reais: number): number {
 
 export function calcularSubtotalCentavos(itens: ItemCalculo[]): number {
   return itens.reduce((acc, i) => acc + centavosDe(i.precoUnit) * i.quantidade, 0)
+}
+
+// Preço vigente de um produto sem variação: promoção ativa vence o preço cheio.
+// Usado pelo checkout e pela venda manual (o servidor é a autoridade do preço).
+export function precoEfetivo(p: {
+  preco: number | null
+  precoPromo: number | null
+  promoFim: Date | null
+}): number | null {
+  const promoAtiva = p.precoPromo != null && (!p.promoFim || p.promoFim.getTime() > Date.now())
+  return promoAtiva ? p.precoPromo : p.preco
 }
 
 // Evita ruído de ponto flutuante (R$) — 2 casas.

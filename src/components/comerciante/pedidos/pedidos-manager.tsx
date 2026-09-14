@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { formaPagamentoLabel } from "@/lib/hospedagem"
 import {
   HISTORICO_ACAO,
+  ORIGEM_LABEL,
   STATUS_LABEL,
   STATUS_TOM,
   transicoesValidas,
@@ -82,6 +83,7 @@ export function PedidosManager({
 }) {
   const [pedidos, setPedidos] = useState<PedidoAdmin[]>(pedidosIniciais)
   const [filtro, setFiltro] = useState<GrupoPedido>("novos")
+  const [origem, setOrigem] = useState<"TODAS" | PedidoAdmin["origem"]>("TODAS")
   const alerta = usePedidosAlerta()
 
   // Polling da lista (status e pedidos novos). Som, título piscando e badge de
@@ -160,11 +162,33 @@ export function PedidosManager({
   }
   for (const p of pedidos) contagens[grupoDoStatus(p.status)]++
 
-  const visiveis = pedidos.filter((p) => grupoDoStatus(p.status) === filtro)
+  const visiveis = pedidos.filter(
+    (p) => grupoDoStatus(p.status) === filtro && (origem === "TODAS" || p.origem === origem),
+  )
+  // Filtro de origem só aparece quando há venda manual na lista.
+  const temManual = pedidos.some((p) => p.origem !== "ONLINE")
 
   return (
     <div className="space-y-4">
       <PushToggle />
+
+      {temManual && (
+        <div className="flex flex-wrap gap-1.5 text-xs">
+          {(["TODAS", "ONLINE", "TELEFONE", "BALCAO"] as const).map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => setOrigem(o)}
+              className={cn(
+                "rounded-full border px-2.5 py-1",
+                origem === o ? "border-foreground/40 bg-muted font-semibold" : "border-border text-muted-foreground",
+              )}
+            >
+              {o === "TODAS" ? "Todas as origens" : ORIGEM_LABEL[o]}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Tabs de grupo */}
       <div className="flex gap-2">
@@ -236,6 +260,11 @@ function PedidoCard({
         <div>
           <div className="flex items-center gap-2">
             <span className="font-bold">#{pedido.numero}</span>
+            {pedido.origem !== "ONLINE" && (
+              <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-700">
+                {ORIGEM_LABEL[pedido.origem]}
+              </span>
+            )}
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-xs font-semibold",
