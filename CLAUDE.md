@@ -193,7 +193,8 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 
 | Permissão | DONO | GERENTE | ATENDENTE | PRODUCAO |
 |---|:-:|:-:|:-:|:-:|
-| `vitrine:editar`, `analytics:ver`, `cardapio:editar`, `catalogo:editar`, `quartos:editar`, `pedidos:configurar`, `vendas:ver` | ✅ | ✅ | | |
+| `vitrine:editar`, `analytics:ver`, `cardapio:editar`, `catalogo:editar`, `quartos:editar`, `pedidos:configurar`, `vendas:ver`, `clientes:editar` | ✅ | ✅ | | |
+| `clientes:ver` | ✅ | ✅ | ✅ | |
 | `itens:disponibilidade` (só o `disponivel` de itens do cardápio/catálogo) | ✅ | ✅ | ✅ | |
 | `pedidos:operar` | ✅ | ✅ | ✅ | ✅ |
 | `equipe:gerenciar` | ✅ | | | |
@@ -210,7 +211,11 @@ Fase 2 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 - **Checkout:** `POST /api/pedidos` chama `vincularCliente(tx, ...)` **dentro da transação** e grava `Pedido.clienteId`. Usa `createMany({ skipDuplicates })` (ON CONFLICT DO NOTHING) + leitura — **não trocar por `upsert`**: em pedidos simultâneos do mesmo número novo, a violação de unicidade de um upsert aborta a transação do pedido no Postgres. O nome só vale na criação (não sobrescreve correção da loja). O cliente é criado para toda loja, com ou sem flag de plano.
 - **Sem agregados guardados:** total gasto, nº de pedidos e último pedido são calculados em SQL sobre os pedidos (decisão de 2026-09-13).
 - O snapshot `Pedido.clienteNome`/`clienteWhats` continua sendo a verdade do pedido; `clienteId` é `onDelete: SetNull`.
-- **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-clientes-pedidos.ts` (backfill idempotente a partir dos pedidos existentes) → publicar.
+- **Tela (PR 2):** `/comerciante/gestao/clientes` (lista) e `/[id]` (detalhe), Server Components com estado na URL (busca por `<form method=get>`, filtros e paginação por link). Consultas em `src/lib/gestao/clientes-dados.ts`: lista numa query SQL com CTE de totais por cliente (ordenar por "maior gasto" funciona entre páginas); busca por nome (`ILIKE`, sem ignorar acento) ou dígitos do WhatsApp normalizados; filtros "sumidos" (último concluído > 30 dias), "aniversariantes do mês" (fuso SP) e tag. **`$queryRaw` não converte lista nula** — coluna `tags` sem default no banco precisa de `COALESCE(c.tags, '{}')`.
+- **Aniversário só dia e mês:** guardado como `@db.Date` com ano fixo 2000 (bissexto, aceita 29/02); a tela nunca mostra ano (`aniversarioParaData`/`aniversarioDaData`).
+- **Escrita:** `POST /api/comerciante/gestao/clientes` e `PATCH .../[id]` (`clientes:editar` + flag `gestao_clientes`). WhatsApp duplicado → 409 com `clienteExistenteId`. Exclusão fica no PR 3 (anonimização LGPD).
+- **Permissões:** `clientes:ver` (dono, gerente, atendente), `clientes:editar` (dono, gerente). Flag `gestao_clientes` ligada no premium por `prisma/migrate-flag-gestao-clientes.ts`. No mobile, "Clientes" ocupa a vaga de "Produtos" na barra inferior.
+- **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-clientes-pedidos.ts` (backfill idempotente a partir dos pedidos existentes) → `npx tsx prisma/migrate-flag-gestao-clientes.ts` → publicar.
 
 ### Upload de imagens
 
@@ -408,6 +413,7 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 | `qr_code` | QR Code personalizado do perfil |
 | `pedido_online` | Pedido online pelo cardápio (depende de `cardapio`) |
 | `gestao_equipe` | Membros com papéis no painel do comércio (tela de equipe) |
+| `gestao_clientes` | Cadastro de clientes da loja com histórico, filtros e anotações |
 
 A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
 

@@ -40,6 +40,11 @@ export const FEATURES_DISPONIVEIS = [
     descricao: "Cadastrar membros com papéis (gerente, atendente, produção) no painel do comércio",
   },
   {
+    key: "gestao_clientes",
+    label: "Clientes",
+    descricao: "Cadastro de clientes da loja com histórico de pedidos, filtros e anotações",
+  },
+  {
     key: "pedido_online",
     label: "Pedido online",
     descricao: "Receber pedidos pelo cardápio com carrinho, checkout e painel de gestão (requer Cardápio)",

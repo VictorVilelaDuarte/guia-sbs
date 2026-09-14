@@ -14,6 +14,8 @@ export type Permissao =
   | "pedidos:operar" // ver pedidos, mudar status, receber alertas
   | "pedidos:configurar" // config de pedidos e zonas de entrega
   | "vendas:ver" // faturamento e ticket médio (relatórios na Fase 3)
+  | "clientes:ver" // lista e detalhe de clientes
+  | "clientes:editar" // cadastrar e editar clientes
   | "equipe:gerenciar"
 
 const TODAS: readonly Permissao[] = [
@@ -26,13 +28,16 @@ const TODAS: readonly Permissao[] = [
   "pedidos:operar",
   "pedidos:configurar",
   "vendas:ver",
+  "clientes:ver",
+  "clientes:editar",
   "equipe:gerenciar",
 ]
 
 export const PERMISSOES_POR_PAPEL: Record<PapelMembro, readonly Permissao[]> = {
   DONO: TODAS,
   GERENTE: TODAS.filter((p) => p !== "equipe:gerenciar"),
-  ATENDENTE: ["itens:disponibilidade", "pedidos:operar"],
+  // Atendente vê clientes (já vê nome/WhatsApp nos pedidos), mas não edita.
+  ATENDENTE: ["itens:disponibilidade", "pedidos:operar", "clientes:ver"],
   PRODUCAO: ["pedidos:operar"],
 }
 
@@ -50,7 +55,7 @@ export function temPermissao(lista: readonly Permissao[], ...alguma: Permissao[]
 export const PAPEIS: readonly { papel: PapelMembro; label: string; descricao: string }[] = [
   { papel: "DONO", label: "Dono", descricao: "Acesso total, inclusive à equipe" },
   { papel: "GERENTE", label: "Gerente", descricao: "Tudo da operação e da vitrine, sem mexer na equipe" },
-  { papel: "ATENDENTE", label: "Atendente", descricao: "Pedidos e disponibilidade dos itens" },
+  { papel: "ATENDENTE", label: "Atendente", descricao: "Pedidos, disponibilidade dos itens e consulta de clientes" },
   { papel: "PRODUCAO", label: "Produção", descricao: "Só a fila de pedidos" },
 ]
 

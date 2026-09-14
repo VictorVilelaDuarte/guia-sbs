@@ -905,8 +905,13 @@ formatação diferente: `+55 (12) 99999-0000`) reusa o cliente; pedidos simultâ
 novo geram um único cliente e nenhum pedido falha; mesmo WhatsApp em outra loja gera outro cliente;
 backfill rodado duas vezes não duplica.
 
-### 12.2 PR 2 — Tela de clientes
+### 12.2 PR 2 — Tela de clientes ✅ implementado
 
+- **Decisões de 2026-09-13:** flag ligada no premium (`prisma/migrate-flag-gestao-clientes.ts`);
+  aniversário **só dia e mês** (ano fixo 2000 no banco, nunca exibido); "Clientes" no lugar de
+  "Produtos" na barra inferior do mobile. **Achados na verificação:** `$queryRaw` devolve `null` para
+  `tags` de clientes criados sem tags (coluna sem default) — `COALESCE` na consulta; a busca por
+  WhatsApp com "+55" precisava da mesma normalização do cadastro. Busca por nome não ignora acentos.
 - Flag `gestao_clientes` e permissões novas `clientes:ver` (dono, gerente, atendente) e
   `clientes:editar` (dono, gerente).
 - `/comerciante/gestao/clientes`: lista paginada com busca (nome, WhatsApp), filtros "sumidos há 30+

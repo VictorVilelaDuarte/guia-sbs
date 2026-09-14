@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { getComercioCtx, permissoesCtx, vinculosValidos } from "@/lib/comercio-ctx"
 import { getAnalyticsResumo } from "@/lib/analytics/queries"
 import { historicoPainelSelect } from "@/lib/pedidos-historico"
+import { contagemClientes } from "@/lib/gestao/clientes-dados"
 import type {
   PedidoAdmin,
   PedidoConfigData,
@@ -215,7 +216,7 @@ export interface ResumoPedidosHoje {
 }
 
 export async function getResumoData(comercioId: string, opts: { pedidos: boolean }) {
-  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos] =
+  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos, clientes] =
     await Promise.all([
       opts.pedidos
         ? prisma.pedido.count({ where: { comercioId, status: "AGUARDANDO" } })
@@ -246,6 +247,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
       }),
       prisma.tipoQuarto.count({ where: { comercioId, ativo: true } }),
       prisma.comercioMembro.count({ where: { comercioId, ativo: true } }),
+      contagemClientes(comercioId),
     ])
 
   const porTipo = (tipo: "PRODUTO" | "SERVICO") =>
@@ -262,6 +264,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
     servicos: porTipo("SERVICO"),
     quartos,
     membrosAtivos,
+    clientes,
   }
 }
 

@@ -11,6 +11,7 @@ import {
   ReceiptText,
   Store,
   Briefcase,
+  Contact,
   Users,
   type LucideIcon,
 } from "lucide-react"
@@ -58,6 +59,15 @@ const ITENS_GESTAO: ItemGestao[] = [
     label: "Produtos",
     icon: Package,
     permissoes: ["catalogo:editar", "itens:disponibilidade"],
+    // No celular, Clientes ocupa a vaga; Produtos segue no atalho do Resumo.
+    somenteDesktop: true,
+  },
+  {
+    href: "/comerciante/gestao/clientes",
+    label: "Clientes",
+    icon: Contact,
+    feature: "gestao_clientes",
+    permissoes: ["clientes:ver"],
   },
   {
     href: "/comerciante/gestao/acomodacoes",
