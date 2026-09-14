@@ -15,7 +15,7 @@ import {
   AreaSwitch,
   GestaoBottomNav,
   GestaoTabs,
-  NovaVendaFab,
+  AbrirPdvFab,
 } from "@/components/comerciante/painel/painel-nav"
 import { ChevronLeft, KeyRound, LogOut, MapPin, ShieldCheck, Store } from "lucide-react"
 
@@ -180,7 +180,7 @@ export default async function ComercianteLayout({
               categorias={comercio.categorias}
               permissoes={permissoes}
             />
-            <NovaVendaFab features={comercio.plan.features} permissoes={permissoes} />
+            <AbrirPdvFab features={comercio.plan.features} permissoes={permissoes} />
           </PedidosAlertaProvider>
         )}
       </main>

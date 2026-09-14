@@ -71,14 +71,16 @@ enum PedidoStatus {
   CONCLUIDO // entregue / retirado (terminal)
   RECUSADO // loja recusou (terminal)
   CANCELADO // cliente ou loja cancelou (terminal)
+  ABERTA // comanda de mesa/nome no PDV: recebe itens e pagamentos até fechar
 }
 
 // Por onde a venda entrou (Fase 3). ONLINE = checkout do cardápio; BALCAO e
-// TELEFONE = venda manual registrada no painel (/comerciante/gestao/vendas/nova).
+// TELEFONE = venda manual registrada no PDV; COMANDA = conta de mesa/nome no PDV.
 enum OrigemPedido {
   ONLINE
   BALCAO
   TELEFONE
+  COMANDA
 }
 
 // Quem causou uma mudança de status do pedido (PedidoHistorico).
@@ -464,7 +466,7 @@ model Pedido {
   complemento String?
   referencia  String?
 
-  formaPagamento String // key de FORMAS_PAGAMENTO (src/lib/hospedagem.ts)
+  formaPagamento String // key de FORMAS_PAGAMENTO (src/lib/hospedagem.ts) ou "multiplas"; o detalhe está em PedidoPagamento
   trocoPara      Decimal? @db.Decimal(10, 2) // só quando formaPagamento = "dinheiro"
   observacoes    String?  @db.Text
 
@@ -472,6 +474,21 @@ model Pedido {
   subtotal    Decimal @db.Decimal(10, 2) // recalculado no servidor
   taxaEntrega Decimal @default(0) @db.Decimal(10, 2) // 0 em RETIRADA
   total       Decimal @db.Decimal(10, 2)
+
+  // PDV: total = subtotal - desconto + taxaServico + taxaEntrega. subtotal já vem
+  // líquido dos descontos por item. Percentuais guardados para recalcular a
+  // comanda quando os itens mudam (null = valor fixo / não cobra serviço).
+  desconto           Decimal  @default(0) @db.Decimal(10, 2)
+  descontoPercentual Decimal? @db.Decimal(5, 2)
+  taxaServico        Decimal  @default(0) @db.Decimal(10, 2)
+  servicoPercentual  Decimal? @db.Decimal(5, 2)
+
+  // Comanda (origem COMANDA): identificação livre da mesa e plano de divisão da
+  // conta salvo pelo PDV (modo, pessoas e itens de cada uma).
+  mesa        String?
+  divisao     Json?
+  fechadaEm   DateTime?
+  juntadaEmId String? // comanda que absorveu esta (status CANCELADO)
 
   motivoCancelamento String?
   createdAt          DateTime @default(now())
@@ -486,10 +503,11 @@ model Pedido {
   // acima continua sendo a verdade do pedido — o cliente pode ser editado ou excluído.
   clienteId String?
 
-  comercio  Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
-  cliente   Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  itens     PedidoItem[]
-  historico PedidoHistorico[]
+  comercio   Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  cliente    Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  itens      PedidoItem[]
+  historico  PedidoHistorico[]
+  pagamentos PedidoPagamento[]
 
   @@unique([comercioId, numero])
   @@index([comercioId, status, createdAt])
@@ -562,6 +580,7 @@ model PedidoHistorico {
   userId    String? // referência fraca (sem FK)
   autorNome String? // snapshot do nome no momento da ação
   motivo    String? // recusa/cancelamento
+  descricao String? // evento sem troca de status (comanda: item lançado, pagamento, transferência)
   createdAt DateTime        @default(now())
 
   pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
@@ -579,10 +598,43 @@ model PedidoItem {
   precoUnit    Decimal @db.Decimal(10, 2) // snapshot do preço unitário
   quantidade   Int
   observacao   String?
+  desconto     Decimal @default(0) @db.Decimal(10, 2) // desconto na linha (valor)
+
+  // Comanda: rodada de envio para a produção (null = ainda não enviado).
+  rodada    Int?
+  enviadoEm DateTime?
+  prontoEm  DateTime?
+  createdAt DateTime  @default(now())
 
   pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 
+  @@index([pedidoId])
   @@map("pedido_itens")
+}
+
+// Pagamentos de um pedido (PDV): várias formas na mesma venda, divisão da conta
+// entre pessoas e pagamento parcial de comanda. Fonte única dos relatórios por
+// forma de pagamento — o checkout online grava um pagamento com o total.
+model PedidoPagamento {
+  id               String    @id @default(cuid())
+  pedidoId         String
+  comercioId       String
+  forma            String // key de FORMAS_PAGAMENTO
+  valor            Decimal   @db.Decimal(10, 2) // quanto abate da conta
+  recebido         Decimal?  @db.Decimal(10, 2) // dinheiro entregue (troco = recebido - valor)
+  pagante          String? // "Pessoa 1", "Ana" — divisão da conta
+  userId           String?
+  autorNome        String?
+  estornadoEm      DateTime?
+  estornadoPorNome String?
+  motivoEstorno    String?
+  createdAt        DateTime  @default(now())
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoId])
+  @@index([comercioId, createdAt])
+  @@map("pedido_pagamentos")
 }
 
 // Config de pedidos do comércio (1:1, criado sob demanda — mesmo padrão de
@@ -598,6 +650,7 @@ model PedidoConfig {
   tempoPreparoMin Int?
   formasPagamento String[]
   proximoNumero   Int      @default(1)
+  taxaServicoPct  Decimal? @db.Decimal(5, 2) // PDV: taxa de serviço sugerida (null = desligada)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

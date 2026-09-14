@@ -42,6 +42,7 @@ const ACAO_LABEL: Record<PedidoStatus, string> = {
   CONCLUIDO: "Concluir",
   RECUSADO: "Recusar",
   CANCELADO: "Cancelar",
+  ABERTA: "Abrir",
 }
 
 const GRUPOS: { id: GrupoPedido; label: string }[] = [
@@ -358,7 +359,7 @@ function PedidoCard({
                     {hora(h.createdAt)}
                   </span>
                   <span>
-                    <span className="font-medium">{HISTORICO_ACAO[h.status]}</span>
+                    <span className="font-medium">{h.descricao ?? HISTORICO_ACAO[h.status]}</span>
                     {autor && <span className="text-muted-foreground"> {autor}</span>}
                     {h.motivo && <span className="text-rose-500"> · {h.motivo}</span>}
                   </span>

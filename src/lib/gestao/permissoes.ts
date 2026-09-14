@@ -15,7 +15,8 @@ export type Permissao =
   | "pedidos:configurar" // config de pedidos e zonas de entrega
   | "vendas:ver" // faturamento e ticket médio (relatórios na Fase 3)
   | "vendas:registrar" // venda manual (balcão e telefone)
-  | "vendas:cancelar" // cancelar venda manual já concluída
+  | "vendas:cancelar" // cancelar venda manual, estornar pagamento e tirar item já enviado à produção
+  | "vendas:desconto" // dar desconto no PDV (por item ou na conta)
   | "clientes:ver" // lista e detalhe de clientes
   | "clientes:editar" // cadastrar e editar clientes
   | "equipe:gerenciar"
@@ -32,6 +33,7 @@ const TODAS: readonly Permissao[] = [
   "vendas:ver",
   "vendas:registrar",
   "vendas:cancelar",
+  "vendas:desconto",
   "clientes:ver",
   "clientes:editar",
   "equipe:gerenciar",

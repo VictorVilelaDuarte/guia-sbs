@@ -13,12 +13,14 @@ export const STATUS_LABEL: Record<PedidoStatus, string> = {
   CONCLUIDO: "Concluído",
   RECUSADO: "Recusado",
   CANCELADO: "Cancelado",
+  ABERTA: "Aberta",
 }
 
-export const ORIGEM_LABEL: Record<"ONLINE" | "BALCAO" | "TELEFONE", string> = {
+export const ORIGEM_LABEL: Record<"ONLINE" | "BALCAO" | "TELEFONE" | "COMANDA", string> = {
   ONLINE: "Online",
   BALCAO: "Balcão",
   TELEFONE: "Telefone",
+  COMANDA: "Comanda",
 }
 
 // Ação registrada no histórico do pedido (painel): "Aceito por Ana".
@@ -31,6 +33,7 @@ export const HISTORICO_ACAO: Record<PedidoStatus, string> = {
   CONCLUIDO: "Concluído",
   RECUSADO: "Recusado",
   CANCELADO: "Cancelado",
+  ABERTA: "Comanda aberta",
 }
 
 // Mensagem voltada ao cliente na página de acompanhamento (mais calorosa que o label seco).
@@ -43,6 +46,7 @@ export const STATUS_LABEL_CLIENTE: Record<PedidoStatus, string> = {
   CONCLUIDO: "Pedido concluído",
   RECUSADO: "Pedido recusado pela loja",
   CANCELADO: "Pedido cancelado",
+  ABERTA: "Conta aberta",
 }
 
 // Tom para badges (chave de cor; o componente mapeia para classes Tailwind).
@@ -57,6 +61,7 @@ export const STATUS_TOM: Record<PedidoStatus, StatusTom> = {
   CONCLUIDO: "green",
   RECUSADO: "rose",
   CANCELADO: "rose",
+  ABERTA: "amber",
 }
 
 export const STATUS_TERMINAIS: PedidoStatus[] = ["CONCLUIDO", "RECUSADO", "CANCELADO"]

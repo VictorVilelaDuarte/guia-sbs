@@ -1,10 +1,11 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { ChevronLeft, ChevronRight, MonitorSmartphone, Printer } from "lucide-react"
 import type { OrigemPedido } from "@prisma/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RecursoBloqueado } from "@/components/comerciante/painel/recurso-bloqueado"
 import { CancelarVenda } from "@/components/comerciante/vendas/cancelar-venda"
+import { AbrirPdvLink } from "@/components/comerciante/pdv/abrir-pdv"
 import { getPainelBase } from "@/lib/painel/queries"
 import { hojeSP, listarVendasDoDia } from "@/lib/gestao/vendas"
 import { temPermissao } from "@/lib/gestao/permissoes"
@@ -55,7 +56,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Promi
 
   const hoje = hojeSP()
   const dia = /^\d{4}-\d{2}-\d{2}$/.test(params.dia ?? "") && params.dia! <= hoje ? params.dia! : hoje
-  const origem = (["ONLINE", "BALCAO", "TELEFONE"] as const).find((o) => o === params.origem) ?? null
+  const origem = (["ONLINE", "BALCAO", "TELEFONE", "COMANDA"] as const).find((o) => o === params.origem) ?? null
   const vendas = await listarVendasDoDia(base.comercio.id, { dia, origem: origem as OrigemPedido | null })
   const verValores = temPermissao(base.permissoes, "vendas:ver")
   const podeCancelar = temPermissao(base.permissoes, "vendas:cancelar")
@@ -82,9 +83,9 @@ export default async function VendasPage({ searchParams }: { searchParams: Promi
               {concluidas.length} concluída(s){verValores ? ` · ${brl(totalC)}` : ""}
             </p>
           </div>
-          <Link href="/comerciante/gestao/vendas/nova" className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
-            <Plus className="h-4 w-4" /> Nova venda
-          </Link>
+          <AbrirPdvLink className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
+            <MonitorSmartphone className="h-4 w-4" /> Abrir PDV
+          </AbrirPdvLink>
         </div>
         <div className="flex items-center justify-between text-sm">
           <Link href={url({ dia: somaDias(dia, -1) })} className="inline-flex items-center gap-1 hover:underline"><ChevronLeft className="h-4 w-4" /> Anterior</Link>
@@ -94,7 +95,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Promi
           ) : <span className="w-16" />}
         </div>
         <div className="flex flex-wrap gap-2">
-          {([null, "ONLINE", "BALCAO", "TELEFONE"] as const).map((o) => (
+          {([null, "ONLINE", "BALCAO", "TELEFONE", "COMANDA"] as const).map((o) => (
             <Link key={o ?? "todas"} href={url({ origem: o })} className={cn("rounded-full border px-3 py-1 text-sm", origem === o ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground")}>
               {o ? ORIGEM_LABEL[o] : "Todas"}
             </Link>
@@ -116,14 +117,22 @@ export default async function VendasPage({ searchParams }: { searchParams: Promi
                     <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", TOM_CLS[STATUS_TOM[v.status]])}>{STATUS_LABEL[v.status]}</span>
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {v.clienteNome} · {formaPagamentoLabel(v.formaPagamento)}
+                    {v.mesa ? `Mesa ${v.mesa} · ` : ""}{v.clienteNome}
+                    {v.pagamentos.length > 0 && ` · ${[...new Set(v.pagamentos.map((p) => formaPagamentoLabel(p.forma)))].join(" + ")}`}
                     {v.criadoPorNome && ` · por ${v.criadoPorNome}`}
                   </p>
                   {v.motivoCancelamento && <p className="text-xs text-rose-500">✕ {v.motivoCancelamento}</p>}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {verValores && <span className={cn("font-semibold tabular-nums", v.status === "CANCELADO" && "text-muted-foreground line-through")}>{brl(paraCentavos(v.total))}</span>}
-                  {podeCancelar && v.origem !== "ONLINE" && v.status === "CONCLUIDO" && <CancelarVenda pedidoId={v.id} numero={v.numero} />}
+                  <div className="flex items-center gap-3">
+                    {v.origem !== "ONLINE" && v.status !== "CANCELADO" && (
+                      <a href={`/comerciante/pdv/cupom/${v.id}`} target="cupom" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline">
+                        <Printer className="h-3 w-3" /> {v.status === "ABERTA" ? "Conferência" : "Cupom"}
+                      </a>
+                    )}
+                    {podeCancelar && v.origem !== "ONLINE" && v.status === "CONCLUIDO" && <CancelarVenda pedidoId={v.id} numero={v.numero} />}
+                  </div>
                 </div>
               </li>
             ))}

@@ -6,6 +6,7 @@ export interface HistoricoPedidoAdmin {
   origem: OrigemHistorico
   autorNome: string | null
   motivo: string | null
+  descricao: string | null // evento sem troca de status (comanda)
   createdAt: string // ISO
 }
 

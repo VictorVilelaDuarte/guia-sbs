@@ -4,16 +4,18 @@ import { getPainelBase, getResumoData } from "@/lib/painel/queries"
 import { temFeature } from "@/lib/plan-features"
 import { cn } from "@/lib/utils"
 import { temPermissao } from "@/lib/gestao/permissoes"
+import { AbrirPdvLink } from "@/components/comerciante/pdv/abrir-pdv"
 import {
   AlertTriangle,
   BedDouble,
   Contact,
   Users,
   BookOpen,
+  ChefHat,
   ChevronRight,
   Lock,
+  MonitorSmartphone,
   Package,
-  Plus,
   Receipt,
   ReceiptText,
 } from "lucide-react"
@@ -99,6 +101,7 @@ export default async function GestaoResumoPage() {
   const temEquipe = temFeature(features, "gestao_equipe")
   // Venda manual/relatórios independem de pedido online (decisão 4 da Fase 3).
   const registraVendas = temFeature(features, "gestao_relatorios") && temPermissao(permissoes, "vendas:registrar")
+  const atalhoProducao = temFeature(features, "gestao_relatorios") && temPermissao(permissoes, "pedidos:operar")
   const r = await getResumoData(base.comercio.id, { pedidos: operaPedidos, vendas: registraVendas })
 
   const ticketMedio = r.hoje && r.hoje.concluidos > 0 ? r.hoje.faturamento / r.hoje.concluidos : 0
@@ -114,9 +117,9 @@ export default async function GestaoResumoPage() {
                 <span className="text-xs capitalize text-muted-foreground">{dataHoje()}</span>
               </div>
               {registraVendas && (
-                <Link href="/comerciante/gestao/vendas/nova" className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
-                  <Plus className="h-4 w-4" /> Nova venda
-                </Link>
+                <AbrirPdvLink className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
+                  <MonitorSmartphone className="h-4 w-4" /> Abrir PDV
+                </AbrirPdvLink>
               )}
             </div>
 
@@ -137,6 +140,7 @@ export default async function GestaoResumoPage() {
               {operaPedidos && <Numero label="Aguardando" valor={String(r.aguardando)} destaque={r.aguardando > 0} />}
               {operaPedidos && <Numero label="Em andamento" valor={String(r.andamento)} />}
               <Numero label={operaPedidos ? "Pedidos hoje" : "Vendas hoje"} valor={String(r.hoje.pedidos)} />
+              {registraVendas && !operaPedidos && <Numero label="Comandas abertas" valor={String(r.comandasAbertas)} />}
               {verVendas && <Numero label="Ticket médio" valor={formatBRL(ticketMedio)} />}
             </div>
 
@@ -146,7 +150,7 @@ export default async function GestaoResumoPage() {
                 <p className="mt-1 text-3xl font-bold tabular-nums">{formatBRL(r.hoje.faturamento)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Soma das {r.hoje.concluidos} venda(s) concluída(s) hoje
-                  {registraVendas ? " — online, balcão e telefone." : " pelo cardápio online."}
+                  {registraVendas ? " — online, balcão, telefone e comandas." : " pelo cardápio online."}
                 </p>
               </div>
             )}
@@ -230,8 +234,11 @@ export default async function GestaoResumoPage() {
               href="/comerciante/gestao/vendas"
               icon={Receipt}
               titulo="Vendas"
-              detalhe="Vendas do dia, balcão e telefone"
+              detalhe={r.comandasAbertas > 0 ? `Vendas do dia · ${r.comandasAbertas} comanda(s) aberta(s)` : "Vendas do dia, balcão, telefone e comandas"}
             />
+          )}
+          {atalhoProducao && (
+            <Atalho href="/comerciante/gestao/producao" icon={ChefHat} titulo="Produção" detalhe="Rodadas das comandas para preparar" />
           )}
           {atalhoEquipe && (
             <Atalho

@@ -43,5 +43,5 @@ export async function mudarStatusPedido(args: {
 // só { status, createdAt } — nunca autorNome/origem/userId.
 export const historicoPainelSelect = {
   orderBy: { createdAt: "asc" as const },
-  select: { id: true, status: true, origem: true, autorNome: true, motivo: true, createdAt: true },
+  select: { id: true, status: true, origem: true, autorNome: true, motivo: true, descricao: true, createdAt: true },
 }

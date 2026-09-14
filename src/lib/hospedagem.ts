@@ -93,6 +93,10 @@ export const FORMA_PAGAMENTO_KEYS = FORMAS_PAGAMENTO.map((f) => f.key)
 
 const FORMA_PAGAMENTO_MAP = new Map(FORMAS_PAGAMENTO.map((f) => [f.key, f]))
 
+// Venda do PDV paga com mais de uma forma: o detalhe fica em PedidoPagamento.
+export const FORMA_MULTIPLAS = "multiplas"
+
 export function formaPagamentoLabel(key: string): string {
+  if (key === FORMA_MULTIPLAS) return "Várias formas"
   return FORMA_PAGAMENTO_MAP.get(key)?.label ?? key
 }

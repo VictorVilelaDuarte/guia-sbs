@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
   const pedidos = await prisma.pedido.findMany({
     where: {
       comercioId: ctx.comercioId,
+      status: { not: "ABERTA" }, // comanda aberta vive no PDV
       ...(desde && !isNaN(desde.getTime()) ? { updatedAt: { gt: desde } } : {}),
     },
     orderBy: { createdAt: "desc" },

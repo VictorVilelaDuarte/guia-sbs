@@ -119,7 +119,7 @@ export async function getCatalogoData(comercioId: string) {
 export async function getPedidosData(comercioId: string) {
   const [pedidos, config, zonas, bairrosCatalogo] = await Promise.all([
     prisma.pedido.findMany({
-      where: { comercioId },
+      where: { comercioId, status: { not: "ABERTA" } }, // comanda aberta vive no PDV
       orderBy: { createdAt: "desc" },
       take: 200,
       include: pedidoAdminInclude,
@@ -183,7 +183,7 @@ export interface ResumoPedidosHoje {
 // opts.pedidos: fila de pedidos online (aguardando/andamento/aceite).
 // opts.vendas: números do dia (pedidos online + venda manual de balcão/telefone).
 export async function getResumoData(comercioId: string, opts: { pedidos: boolean; vendas?: boolean }) {
-  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos, clientes] =
+  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos, clientes, comandasAbertas] =
     await Promise.all([
       opts.pedidos
         ? prisma.pedido.count({ where: { comercioId, status: "AGUARDANDO" } })
@@ -215,6 +215,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
       prisma.tipoQuarto.count({ where: { comercioId, ativo: true } }),
       prisma.comercioMembro.count({ where: { comercioId, ativo: true } }),
       contagemClientes(comercioId),
+      opts.vendas ? prisma.pedido.count({ where: { comercioId, origem: "COMANDA", status: "ABERTA" } }) : 0,
     ])
 
   const porTipo = (tipo: "PRODUTO" | "SERVICO") =>
@@ -232,6 +233,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
     quartos,
     membrosAtivos,
     clientes,
+    comandasAbertas,
   }
 }
 

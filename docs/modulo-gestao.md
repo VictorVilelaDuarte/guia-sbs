@@ -427,7 +427,7 @@ enum OrigemPedido {
 
 A venda manual **reusa tudo** do pedido online: mesmo `PedidoItem` com snapshot, mesma
 numeração, mesma máquina de estados (pode nascer direto em `CONCLUIDO` no balcão), mesmo vínculo
-com `Cliente`. Não é um PDV — é "lançar pedido" com busca de item e cliente, pensado para celular.
+com `Cliente`. ~~Não é um PDV~~ — **revisto em 2026-09-14: virou o PDV completo em tela cheia** (§13.3).
 
 > Venda que nasce `CONCLUIDO` **passa pelo aceite** para efeito de estoque (decisão 5): a função
 > de criação aplica a baixa como se tivesse havido o `ACEITO`. Senão, venda de balcão nunca
@@ -1005,3 +1005,49 @@ Branch `feat/gestao-fase-3`. Desenho da fase no §Fase 3.
   (`vendas:cancelar`; 409 para pedido online ou não concluído), `GET .../clientes/busca?q=`
   (autocomplete; vazio sem `gestao_clientes`). Todas exigem a flag `gestao_relatorios`.
 - **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar.
+
+### 13.3 PDV em tela cheia, pagamentos, divisão e comandas ✅ implementado
+
+Mudança de escopo pedida em 2026-09-14: a tela de lançamento dentro do painel vira o **PDV**, núcleo do
+sistema, em tela cheia e aba própria, com os recursos de um caixa profissional.
+
+**Decisões de 2026-09-14:**
+1. **Comandas e mesas entram agora** — mesa/nome digitado, sem cadastro de mapa de mesas.
+2. **Divisão da conta nos três modos:** igual, por itens e por valor.
+3. **Pagamento parcial só em comanda** (venda rápida fecha na hora).
+4. **Desconto agora** — por item e na conta, R$ ou %, permissão `vendas:desconto` (dono e gerente);
+   taxa de serviço opcional com percentual por loja.
+5. **Controle de caixa (abertura, sangria, fechamento) fica para depois.**
+6. **Cupom para imprimir** pela impressão do navegador (80mm), com "não é documento fiscal".
+7. **`/gestao/vendas/nova` removida** — redireciona para o PDV; a lista de Vendas segue no painel.
+8. PR 2 commitado como base; os três pacotes (tela, pagamentos, comandas) implementados em sequência.
+
+**Desenho:**
+- **Tela:** `/comerciante/pdv`, fora do shell do painel, aberta por link com `target` de nome fixo
+  (clicar de novo traz a mesma aba). Só no navegador (`ssr: false`): rascunho da venda no
+  `localStorage`, atalhos (`/`, `F2`, `F4`), botão de tela cheia. Computador: grade de produtos + conta ao
+  lado; celular: produtos ⇄ conta pela barra inferior.
+- **Totais em módulo puro** (`src/lib/gestao/totais.ts`) compartilhado pela tela e pelo servidor — o
+  servidor continua a autoridade. Serviço incide sobre o consumo já com desconto.
+- **`PedidoPagamento`** como fonte única dos relatórios por forma de pagamento: várias formas, troco por
+  pagamento, pessoa (`pagante`) e estorno (nunca apaga). O checkout online grava um pagamento com o total
+  e `prisma/migrate-pagamentos-pedidos.ts` cria o dos pedidos antigos (soma conferida).
+- **Divisão em módulo puro** (`src/lib/gestao/divisao.ts`): rateio por maiores restos, soma sempre
+  exata; por itens aceita parte compartilhada e separação por unidade, e distribui desconto/serviço/entrega
+  na proporção do consumo. O servidor não precisa conhecer a divisão — só confere que os pagamentos
+  fecham; na comanda o plano fica em `Pedido.divisao` para sobreviver a recarga e a outro aparelho.
+- **Comanda = `Pedido` `COMANDA`/`ABERTA`.** Cada ação trava a linha (`SELECT … FOR UPDATE`) e recalcula
+  os totais; nunca deixa o total abaixo do já pago. Uma comanda aberta por mesa (lock consultivo por
+  loja+mesa). Rodadas para a produção (`rodada`, `enviadoEm`, `prontoEm`) e tela **Produção** para a
+  cozinha. Juntar move itens e pagamentos e encerra a origem com `juntadaEmId`. Eventos sem troca de status
+  (item lançado, pagamento, transferência) em `PedidoHistorico.descricao`.
+- **Permissões finas no servidor:** desconto → `vendas:desconto`; reduzir/tirar item enviado, estornar e
+  cancelar comanda com itens → `vendas:cancelar` + motivo.
+- **Testado:** 88 cenários automáticos (cálculo, permissões, concorrência de dois caixas recebendo o mesmo
+  saldo e de duas pessoas abrindo a mesma mesa, juntar/transferir, cupom, telas) + conferência visual em
+  navegador headless (desktop e celular).
+- **Limitações conhecidas:** a produção mostra só as rodadas das comandas (pedido online segue na fila de
+  Pedidos); renomear a pessoa depois de ela pagar desfaz o vínculo "pago" na divisão (o pagamento continua
+  registrado); o PDV não funciona offline.
+- **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar →
+  `npx tsx prisma/migrate-pagamentos-pedidos.ts`.

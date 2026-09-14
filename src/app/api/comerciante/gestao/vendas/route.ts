@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
-import { temFeature } from "@/lib/plan-features"
-import { ErroVenda, registrarVenda } from "@/lib/gestao/vendas"
-
-const itemSchema = z.object({
-  produtoId: z.string().nullable().optional(),
-  variacaoId: z.string().nullable().optional(),
-  titulo: z.string().max(120).nullable().optional(),
-  precoUnit: z.number().nullable().optional(),
-  quantidade: z.number().int(),
-  observacao: z.string().max(280).nullable().optional(),
-})
+import { registrarVenda } from "@/lib/gestao/vendas"
+import { descontoSchema, guardPdv, itemSchema, pagamentoSchema, responder } from "@/lib/gestao/pdv-api"
 
 const vendaSchema = z.object({
   origem: z.enum(["BALCAO", "TELEFONE"]),
@@ -19,8 +9,9 @@ const vendaSchema = z.object({
   clienteId: z.string().nullable().optional(),
   clienteNome: z.string().max(120).nullable().optional(),
   clienteWhats: z.string().max(30).nullable().optional(),
-  formaPagamento: z.string(),
-  valorRecebido: z.number().nonnegative().nullable().optional(),
+  pagamentos: z.array(pagamentoSchema).min(1).max(40),
+  desconto: descontoSchema.nullable().optional(),
+  cobrarServico: z.boolean().optional(),
   tipoEntrega: z.enum(["RETIRADA", "ENTREGA"]).optional(),
   endereco: z.string().max(200).nullable().optional(),
   numeroEnd: z.string().max(20).nullable().optional(),
@@ -31,25 +22,12 @@ const vendaSchema = z.object({
   enviarParaFila: z.boolean().optional(),
 })
 
-// Venda manual (balcão/telefone). Permissão vendas:registrar (dono, gerente,
-// atendente) + flag gestao_relatorios — independe de pedido_online.
+// Venda direta do PDV (balcão/telefone). Permissão vendas:registrar (dono,
+// gerente, atendente) + flag gestao_relatorios — independe de pedido_online.
 export async function POST(req: NextRequest) {
-  const ctx = await getComercioCtx()
-  if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
-  const negado = negarSemPermissao(ctx, "vendas:registrar")
-  if (negado) return negado
-  if (!temFeature(ctx.features, "gestao_relatorios")) {
-    return NextResponse.json({ error: "O plano deste comércio não inclui venda manual." }, { status: 403 })
-  }
-
+  const g = await guardPdv("vendas:registrar")
+  if ("resposta" in g) return g.resposta
   const parsed = vendaSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
-
-  try {
-    const venda = await registrarVenda(ctx, parsed.data)
-    return NextResponse.json(venda, { status: 201 })
-  } catch (e) {
-    if (e instanceof ErroVenda) return NextResponse.json({ error: e.message }, { status: e.status })
-    throw e
-  }
+  return responder(() => registrarVenda(g.ctx, parsed.data), 201)
 }

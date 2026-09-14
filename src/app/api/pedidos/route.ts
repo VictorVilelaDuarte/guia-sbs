@@ -206,6 +206,16 @@ export async function POST(req: NextRequest) {
         itens: {
           create: snapshots.map((s) => ({ ...s, precoUnit: deCentavos(centavosDe(s.precoUnit)) })),
         },
+        // Pagamento previsto (fonte única dos relatórios por forma de pagamento).
+        pagamentos: {
+          create: {
+            comercioId: comercio.id,
+            forma: d.formaPagamento,
+            valor: deCentavos(totalC),
+            recebido:
+              d.formaPagamento === "dinheiro" && d.trocoPara != null ? deCentavos(centavosDe(d.trocoPara)) : null,
+          },
+        },
         // Primeiro registro da linha do tempo, na mesma transação da criação.
         historico: {
           create: { status: "AGUARDANDO", origem: "CLIENTE", autorNome: d.clienteNome.trim() },
