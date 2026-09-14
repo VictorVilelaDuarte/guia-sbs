@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 implementada (§12; aguardando merge). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 em produção (`main`, 2026-09-14); Fase 3 em andamento (§13). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
@@ -936,4 +936,45 @@ backfill rodado duas vezes não duplica.
 - Log de auditoria quando admin acessa clientes via "gerenciar" (model próprio, só leitura no admin).
 - Plano sem `gestao_clientes`: página com números reais agregados (clientes no mês, recorrentes) e
   lista borrada com cadeado, no padrão do analytics.
+
+---
+
+## 13. Plano de execução — Fase 3 (vendas e relatórios)
+
+Branch `feat/gestao-fase-3`. Desenho da fase no §Fase 3.
+
+**Decisões de 2026-09-14:**
+1. **Item avulso** na venda manual (nome e preço digitados, fora do cardápio) — permitido.
+2. **Venda sem cliente identificado** ("Cliente balcão") — permitida; cliente é opcional.
+3. **Permissão `vendas:registrar`** para dono, gerente e atendente; relatórios (`vendas:ver`) só dono e gerente.
+4. **Venda manual e relatórios não dependem de `pedido_online`** — liberados por `gestao_relatorios`. Sem
+   pedido online, venda por telefone nasce concluída (não há fila).
+
+### 13.1 PR 1 — Valores dos pedidos em `Decimal` ✅ implementado
+
+| Campo | De → para |
+|---|---|
+| `Pedido.subtotal`, `taxaEntrega`, `total`, `trocoPara` | `Float` → `Decimal(10,2)` |
+| `PedidoItem.precoUnit` | `Float` → `Decimal(10,2)` |
+| `PedidoConfig.pedidoMinimo` | `Float` → `Decimal(10,2)` |
+| `ZonaEntrega.taxa` | `Float` → `Decimal(10,2)` |
+
+- **Migração por SQL explícito, nunca pelo `db:push`:** trocar o tipo pelo push pode recriar a coluna
+  (perda dos valores) ou exigir `--accept-data-loss`. Script `prisma/migrate-dinheiro-decimal.ts`
+  roda `ALTER COLUMN ... TYPE DECIMAL(10,2) USING ROUND(col::numeric, 2)` só nas colunas ainda
+  `double precision` (idempotente) e imprime as somas antes e depois para conferência.
+- **`src/lib/dinheiro.ts`:** conversão `Decimal` ↔ `number` na borda. `Prisma.Decimal` vira **string**
+  no JSON e não atravessa Server → Client — toda resposta de API e prop de Client Component com valor
+  de pedido passa pelo serializador.
+- **Cálculo em centavos inteiros** no checkout (`calcularSubtotal`/`calcularTotal`); preço de
+  `Produto` continua `Float` e é arredondado uma vez, na borda.
+- **Teste em Postgres descartável (Docker)**, não no banco do `.env`: é a primeira mudança da série
+  que não é só aditiva.
+- **Implementação (2026-09-14):** serialização única em `src/lib/pedidos-serializar.ts`. Achado: o
+  TypeScript acusou só as props tipadas — as rotas que devolviam o objeto do Prisma direto
+  (`GET /api/comerciante/pedidos`, `GET /api/pedidos/[token]`, config e zonas) teriam passado a mandar
+  valores como **string** sem erro de compilação. **Compatibilidade testada:** o client anterior
+  (`Float`) lê e grava normalmente nas colunas `DECIMAL` — migrar o banco antes de publicar é seguro.
+- **Deploy:** `npx tsx prisma/migrate-dinheiro-decimal.ts` (com `DIRECT_URL`) → `npm run db:push`
+  (deve dizer "already in sync") → publicar.
 

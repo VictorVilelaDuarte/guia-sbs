@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { clientePodeCancelar } from "@/lib/pedidos"
 import { mudarStatusPedido } from "@/lib/pedidos-historico"
+import { serializarItens, serializarValores } from "@/lib/pedidos-serializar"
 
 // Rota PÚBLICA — o `token` (cuid não-adivinhável) é a credencial de acesso.
 // GET: dados de acompanhamento. PATCH: cliente cancela (só enquanto AGUARDANDO).
@@ -62,7 +63,8 @@ export async function GET(
 
   if (!pedido) return NextResponse.json({ error: "Pedido não encontrado." }, { status: 404 })
 
-  return NextResponse.json(pedido)
+  // Decimal → number (o tracker do cliente faz polling desta rota).
+  return NextResponse.json({ ...serializarValores(pedido), itens: serializarItens(pedido.itens) })
 }
 
 const patchSchema = z.object({ acao: z.literal("cancelar") })

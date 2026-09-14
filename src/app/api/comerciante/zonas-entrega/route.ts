@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { paraNumero } from "@/lib/dinheiro"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
@@ -28,7 +29,7 @@ export async function GET() {
     where: { comercioId: ctx.comercioId },
     orderBy: [{ cidade: "asc" }, { ordem: "asc" }, { nome: "asc" }],
   })
-  return NextResponse.json(zonas)
+  return NextResponse.json(zonas.map((z) => ({ ...z, taxa: paraNumero(z.taxa) })))
 }
 
 export async function PUT(req: NextRequest) {

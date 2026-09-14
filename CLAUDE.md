@@ -222,6 +222,15 @@ Fase 2 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 - **Permissões:** `clientes:ver` (dono, gerente, atendente), `clientes:editar` (dono, gerente). Flag `gestao_clientes` ligada no premium por `prisma/migrate-flag-gestao-clientes.ts`. No mobile, "Clientes" ocupa a vaga de "Produtos" na barra inferior.
 - **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-clientes-pedidos.ts` (backfill idempotente a partir dos pedidos existentes) → `npx tsx prisma/migrate-flag-gestao-clientes.ts` → publicar.
 
+### Dinheiro dos pedidos (`Decimal`)
+
+Fase 3 / PR 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.1). Valores de **pedido** são `Decimal(10,2)`: `Pedido.subtotal/taxaEntrega/total/trocoPara`, `PedidoItem.precoUnit`, `PedidoConfig.pedidoMinimo`, `ZonaEntrega.taxa`. Preço de `Produto`/`CardapioVariacao`/`TipoQuarto` continua `Float` (o valor que conta é o snapshot do pedido).
+
+- **`Prisma.Decimal` vira string no JSON e não atravessa Server → Client.** Toda saída de pedido passa por `src/lib/pedidos-serializar.ts` (`serializarPedidoAdmin`, `serializarItens`, `serializarValores`) ou `paraNumero()` (`src/lib/dinheiro.ts`). Rota nova que devolva pedido/config/zona **tem** que serializar — o TypeScript não acusa quando o objeto vai direto para `NextResponse.json`.
+- **Contas em centavos inteiros:** checkout usa `calcularSubtotalCentavos`/`centavosDe` (`src/lib/pedidos.ts`), `paraCentavos`/`deCentavos` (`src/lib/dinheiro.ts`). Nunca somar/comparar `Decimal` com `>`/`+` nem converter para `number` antes de somar.
+- SQL agregado (`SUM(total)`) soma em `numeric` (exato) e converte com `::float` só no fim.
+- **Troca de tipo de coluna nunca pelo `db:push`** (pode recriar a coluna e perder dados): foi feita por `prisma/migrate-dinheiro-decimal.ts` (`ALTER ... USING ROUND(col::numeric, 2)`, idempotente, confere somas). Testado: o client antigo (`Float`) lê e grava nas colunas `DECIMAL`, então a ordem de deploy é **script → `db:push` → publicar**, sem janela quebrada.
+
 ### Upload de imagens
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:

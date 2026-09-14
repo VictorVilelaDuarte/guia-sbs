@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { temFeature } from "@/lib/plan-features"
 import { parseHorarios, getDiaAtual, estaAbertoAgora } from "@/lib/horarios"
 import { CheckoutForm } from "@/components/public/cardapio/checkout-form"
+import { paraNumero } from "@/lib/dinheiro"
 
 export const viewport: Viewport = {
   userScalable: false,
@@ -63,11 +64,11 @@ export default async function PaginaCheckout({
       comercioId={comercio.id}
       nomeComercio={comercio.nome}
       abertoAgora={abertoAgora}
-      zonas={comercio.zonasEntrega}
+      zonas={comercio.zonasEntrega.map((z) => ({ ...z, taxa: paraNumero(z.taxa) }))}
       config={{
         entregaAtiva: cfg.entregaAtiva,
         retiradaAtiva: cfg.retiradaAtiva,
-        pedidoMinimo: cfg.pedidoMinimo,
+        pedidoMinimo: paraNumero(cfg.pedidoMinimo),
         formasPagamento: cfg.formasPagamento,
         tempoPreparoMin: cfg.tempoPreparoMin,
       }}

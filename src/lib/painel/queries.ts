@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, permissoesCtx, vinculosValidos } from "@/lib/comercio-ctx"
 import { getAnalyticsResumo } from "@/lib/analytics/queries"
-import { historicoPainelSelect } from "@/lib/pedidos-historico"
+import { pedidoAdminInclude, serializarPedidoAdmin } from "@/lib/pedidos-serializar"
+import { paraNumero } from "@/lib/dinheiro"
 import { contagemClientes } from "@/lib/gestao/clientes-dados"
 import type {
   PedidoAdmin,
@@ -121,19 +122,7 @@ export async function getPedidosData(comercioId: string) {
       where: { comercioId },
       orderBy: { createdAt: "desc" },
       take: 200,
-      include: {
-        itens: {
-          select: {
-            id: true,
-            titulo: true,
-            variacaoNome: true,
-            precoUnit: true,
-            quantidade: true,
-            observacao: true,
-          },
-        },
-        historico: historicoPainelSelect,
-      },
+      include: pedidoAdminInclude,
     }),
     prisma.pedidoConfig.findUnique({ where: { comercioId } }),
     prisma.zonaEntrega.findMany({
@@ -147,39 +136,15 @@ export async function getPedidosData(comercioId: string) {
     }),
   ])
 
-  // Serializa para os componentes client (datas → ISO).
-  const pedidosAdmin: PedidoAdmin[] = pedidos.map((p) => ({
-    id: p.id,
-    token: p.token,
-    numero: p.numero,
-    status: p.status,
-    tipoEntrega: p.tipoEntrega,
-    clienteNome: p.clienteNome,
-    clienteWhats: p.clienteWhats,
-    cep: p.cep,
-    endereco: p.endereco,
-    numeroEnd: p.numeroEnd,
-    bairro: p.bairro,
-    complemento: p.complemento,
-    referencia: p.referencia,
-    formaPagamento: p.formaPagamento,
-    trocoPara: p.trocoPara,
-    observacoes: p.observacoes,
-    subtotal: p.subtotal,
-    taxaEntrega: p.taxaEntrega,
-    total: p.total,
-    motivoCancelamento: p.motivoCancelamento,
-    createdAt: p.createdAt.toISOString(),
-    itens: p.itens,
-    historico: p.historico.map((h) => ({ ...h, createdAt: h.createdAt.toISOString() })),
-  }))
+  // Serializa para os componentes client (datas → ISO, Decimal → number).
+  const pedidosAdmin: PedidoAdmin[] = pedidos.map(serializarPedidoAdmin)
 
   const pedidoConfig: PedidoConfigData | null = config
     ? {
         aceitaPedidos: config.aceitaPedidos,
         entregaAtiva: config.entregaAtiva,
         retiradaAtiva: config.retiradaAtiva,
-        pedidoMinimo: config.pedidoMinimo,
+        pedidoMinimo: paraNumero(config.pedidoMinimo),
         tempoPreparoMin: config.tempoPreparoMin,
         formasPagamento: config.formasPagamento,
       }
@@ -191,7 +156,7 @@ export async function getPedidosData(comercioId: string) {
     nome: z.nome,
     cidade: z.cidade,
     uf: z.uf,
-    taxa: z.taxa,
+    taxa: paraNumero(z.taxa),
     ativo: z.ativo,
   }))
 

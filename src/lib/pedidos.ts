@@ -120,20 +120,20 @@ export function grupoDoStatus(status: PedidoStatus): GrupoPedido {
 }
 
 // --- Cálculo de total (fonte única; o servidor é a autoridade) ---
+// Em CENTAVOS inteiros (Fase 3): o preço do produto ainda é Float e é arredondado
+// uma única vez aqui; a soma em centavos é exata e o pedido grava Decimal exato.
 
 export interface ItemCalculo {
-  precoUnit: number
+  precoUnit: number // reais (preço vigente do produto)
   quantidade: number
 }
 
-export function calcularSubtotal(itens: ItemCalculo[]): number {
-  return arredondar(
-    itens.reduce((acc, i) => acc + i.precoUnit * i.quantidade, 0),
-  )
+export function centavosDe(reais: number): number {
+  return Math.round((reais + Number.EPSILON) * 100)
 }
 
-export function calcularTotal(subtotal: number, taxaEntrega: number): number {
-  return arredondar(subtotal + taxaEntrega)
+export function calcularSubtotalCentavos(itens: ItemCalculo[]): number {
+  return itens.reduce((acc, i) => acc + centavosDe(i.precoUnit) * i.quantidade, 0)
 }
 
 // Evita ruído de ponto flutuante (R$) — 2 casas.

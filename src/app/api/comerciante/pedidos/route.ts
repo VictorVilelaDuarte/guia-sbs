@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
-import { historicoPainelSelect } from "@/lib/pedidos-historico"
+import { pedidoAdminInclude, serializarPedidoAdmin } from "@/lib/pedidos-serializar"
 
 // Lista de pedidos do comércio para o painel (consumida por polling).
 // Filtros opcionais: ?desde=ISO (só pedidos atualizados depois) para polling incremental.
@@ -21,20 +21,9 @@ export async function GET(req: NextRequest) {
     },
     orderBy: { createdAt: "desc" },
     take: 200,
-    include: {
-      itens: {
-        select: {
-          id: true,
-          titulo: true,
-          variacaoNome: true,
-          precoUnit: true,
-          quantidade: true,
-          observacao: true,
-        },
-      },
-      historico: historicoPainelSelect,
-    },
+    include: pedidoAdminInclude,
   })
 
-  return NextResponse.json(pedidos)
+  // Decimal → number: sem isso o polling devolveria valores como string.
+  return NextResponse.json(pedidos.map(serializarPedidoAdmin))
 }
