@@ -313,6 +313,10 @@ export function CheckoutForm({ slug, comercioId, nomeComercio, abertoAgora, zona
         {/* Dados do cliente */}
         <section className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
           <h2 className="text-sm font-bold text-stone-900">Seus dados</h2>
+          {/* LGPD: aviso informativo (sem checkbox) — os dados são necessários para o pedido. */}
+          <p className="text-xs text-stone-500">
+            Seus dados ficam com {nomeComercio} para preparar e entregar o seu pedido.
+          </p>
           <Campo label="Nome">
             <input
               className={inputCls}

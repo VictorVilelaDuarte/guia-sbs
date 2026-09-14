@@ -2,8 +2,9 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Cake, ChevronLeft, ChevronRight, MessageCircle, Search, UserX } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { RecursoBloqueado } from "@/components/comerciante/painel/recurso-bloqueado"
 import { ClienteDialog } from "@/components/comerciante/clientes/cliente-dialog"
+import { ClientesPrevia } from "@/components/comerciante/clientes/clientes-previa"
+import { AcessosAdmin } from "@/components/comerciante/clientes/acessos-admin"
 import {
   formatAniversario,
   formatBRL,
@@ -12,7 +13,14 @@ import {
   linkWhatsapp,
 } from "@/components/comerciante/clientes/formato"
 import { getPainelBase } from "@/lib/painel/queries"
-import { listarClientes, type FiltroClientes, type OrdemClientes } from "@/lib/gestao/clientes-dados"
+import {
+  listarAcessosAdmin,
+  listarClientes,
+  registrarAcessoAdmin,
+  resumoClientesPrevia,
+  type FiltroClientes,
+  type OrdemClientes,
+} from "@/lib/gestao/clientes-dados"
 import { temPermissao } from "@/lib/gestao/permissoes"
 import { temFeature } from "@/lib/plan-features"
 import { cn } from "@/lib/utils"
@@ -48,10 +56,11 @@ export default async function GestaoClientesPage({ searchParams }: { searchParam
   if (!temPermissao(base.permissoes, "clientes:ver")) notFound()
 
   if (!temFeature(base.comercio.plan.features, "gestao_clientes")) {
+    // Prévia com números reais e lista fictícia (nenhum dado pessoal no HTML).
     return (
-      <RecursoBloqueado
-        titulo="Clientes"
-        descricao="Veja quem compra com você, quanto cada cliente gasta, quem sumiu e quem faz aniversário no mês."
+      <ClientesPrevia
+        numeros={await resumoClientesPrevia(base.comercio.id)}
+        temPedidoOnline={temFeature(base.comercio.plan.features, "pedido_online")}
       />
     )
   }
@@ -70,6 +79,9 @@ export default async function GestaoClientesPage({ searchParams }: { searchParam
     pagina,
   })
   const podeEditar = temPermissao(base.permissoes, "clientes:editar")
+  await registrarAcessoAdmin(base.ctx, "LISTA")
+  // Transparência para o dono: acessos do admin do guia aos dados dos clientes.
+  const acessos = temPermissao(base.permissoes, "equipe:gerenciar") ? await listarAcessosAdmin(base.comercio.id) : null
 
   return (
     <Card>
@@ -199,6 +211,15 @@ export default async function GestaoClientesPage({ searchParams }: { searchParam
             ) : <span />}
           </div>
         )}
+        {acessos && acessos.length > 0 && (
+          <div className="pt-4">
+            <AcessosAdmin
+              acessos={acessos}
+              descricao="Quando a equipe do guia acessa os dados dos seus clientes para dar suporte, fica registrado aqui."
+            />
+          </div>
+        )}
+
       </CardContent>
     </Card>
   )

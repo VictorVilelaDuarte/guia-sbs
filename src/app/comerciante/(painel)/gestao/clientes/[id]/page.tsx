@@ -4,6 +4,7 @@ import { ChevronLeft, MessageCircle } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RecursoBloqueado } from "@/components/comerciante/painel/recurso-bloqueado"
 import { ClienteDialog } from "@/components/comerciante/clientes/cliente-dialog"
+import { ExcluirCliente } from "@/components/comerciante/clientes/excluir-cliente"
 import {
   formatAniversario,
   formatBRL,
@@ -13,7 +14,7 @@ import {
   linkWhatsapp,
 } from "@/components/comerciante/clientes/formato"
 import { getPainelBase } from "@/lib/painel/queries"
-import { detalheCliente } from "@/lib/gestao/clientes-dados"
+import { detalheCliente, registrarAcessoAdmin } from "@/lib/gestao/clientes-dados"
 import { temPermissao } from "@/lib/gestao/permissoes"
 import { STATUS_LABEL, STATUS_TOM, type StatusTom } from "@/lib/pedidos"
 import { temFeature } from "@/lib/plan-features"
@@ -47,7 +48,9 @@ export default async function GestaoClienteDetalhePage({ params }: { params: Pro
   // Filtra pelo comércio do contexto: cliente de outra loja (inclusive do mesmo dono) = 404.
   const dados = await detalheCliente(base.comercio.id, id)
   if (!dados) notFound()
+  await registrarAcessoAdmin(base.ctx, "DETALHE", id)
   const { cliente, stats, topItens, pedidos } = dados
+  const podeEditar = temPermissao(base.permissoes, "clientes:editar")
   const whats = linkWhatsapp(cliente.whatsapp)
 
   return (
@@ -76,7 +79,7 @@ export default async function GestaoClienteDetalhePage({ params }: { params: Pro
                   <MessageCircle className="h-4 w-4" /> WhatsApp
                 </a>
               )}
-              {temPermissao(base.permissoes, "clientes:editar") && (
+              {podeEditar && (
                 <ClienteDialog
                   cliente={{
                     id: cliente.id,
@@ -164,6 +167,12 @@ export default async function GestaoClienteDetalhePage({ params }: { params: Pro
           )}
         </CardContent>
       </Card>
+
+      {podeEditar && (
+        <div className="flex justify-end">
+          <ExcluirCliente clienteId={cliente.id} nome={cliente.nome} />
+        </div>
+      )}
     </div>
   )
 }

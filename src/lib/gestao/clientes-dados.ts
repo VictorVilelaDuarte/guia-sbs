@@ -1,4 +1,5 @@
-import { Prisma } from "@prisma/client"
+import { Prisma, type AcaoDadosCliente } from "@prisma/client"
+import type { ComercioCtx } from "@/lib/comercio-ctx"
 import { prisma } from "@/lib/prisma"
 import { normalizarWhatsapp } from "@/lib/gestao/clientes"
 
@@ -253,3 +254,109 @@ export async function atualizarCliente(comercioId: string, clienteId: string, d:
     return traduzirUnicidade(e, comercioId, d.whatsapp)
   }
 }
+
+// --- LGPD: exclusão, registro de acesso do admin, prévia do plano grátis --------
+
+const STATUS_EM_ANDAMENTO = ["AGUARDANDO", "ACEITO", "EM_PREPARO", "PRONTO", "SAIU_ENTREGA"] as const
+
+// Exclusão a pedido do titular (decisões de 2026-09-14). Numa transação:
+// - apaga o Cliente;
+// - anonimiza os pedidos dele: nome, WhatsApp, endereço (CEP, rua, número,
+//   complemento, referência) e observações — do pedido e de cada item, que são
+//   texto livre e costumam trazer nome/telefone/endereço;
+// - limpa o nome do cliente no histórico ("Pedido feito pelo cliente").
+// Mantém itens, valores, datas, status e bairro (área de entrega, usada nos
+// relatórios de taxa), para o faturamento continuar correto.
+// Bloqueada com pedido em andamento: anonimizar agora apagaria o endereço de uma
+// entrega que ainda vai acontecer.
+export async function excluirCliente(comercioId: string, clienteId: string) {
+  return prisma.$transaction(async (tx) => {
+    const cliente = await tx.cliente.findFirst({ where: { id: clienteId, comercioId }, select: { id: true } })
+    if (!cliente) throw new ErroCliente("Cliente não encontrado.", 404)
+
+    const emAndamento = await tx.pedido.count({
+      where: { comercioId, clienteId, status: { in: [...STATUS_EM_ANDAMENTO] } },
+    })
+    if (emAndamento > 0) {
+      throw new ErroCliente(
+        "Este cliente tem pedido em andamento. Conclua ou cancele o pedido antes de excluir.",
+        409,
+      )
+    }
+
+    const filtroPedidos = { comercioId, clienteId }
+    await tx.pedidoHistorico.updateMany({
+      where: { origem: "CLIENTE", pedido: filtroPedidos },
+      data: { autorNome: null },
+    })
+    await tx.pedidoItem.updateMany({ where: { pedido: filtroPedidos }, data: { observacao: null } })
+    const { count } = await tx.pedido.updateMany({
+      where: filtroPedidos,
+      data: {
+        clienteNome: "Cliente removido",
+        clienteWhats: "",
+        cep: null,
+        endereco: null,
+        numeroEnd: null,
+        complemento: null,
+        referencia: null,
+        observacoes: null,
+      },
+    })
+    await tx.cliente.delete({ where: { id: clienteId } })
+    return { pedidosAnonimizados: count }
+  })
+}
+
+const JANELA_LISTA_MS = 30 * 60 * 1000
+
+// Registra acesso do admin do guia (via "gerenciar") a dados de clientes. Não faz
+// nada para comerciantes. Abrir a lista registra no máximo uma vez a cada 30 min
+// por admin e loja (a paginação não multiplica linhas); detalhe, cadastro,
+// edição e exclusão sempre registram.
+export async function registrarAcessoAdmin(ctx: ComercioCtx, acao: AcaoDadosCliente, clienteId?: string | null) {
+  if (!ctx.isAdmin) return
+  if (acao === "LISTA") {
+    const recente = await prisma.acessoDadosCliente.findFirst({
+      where: {
+        comercioId: ctx.comercioId,
+        adminId: ctx.userId,
+        acao: "LISTA",
+        createdAt: { gt: new Date(Date.now() - JANELA_LISTA_MS) },
+      },
+      select: { id: true },
+    })
+    if (recente) return
+  }
+  const admin = await prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } })
+  await prisma.acessoDadosCliente.create({
+    data: { comercioId: ctx.comercioId, adminId: ctx.userId, adminNome: admin?.name ?? null, acao, clienteId: clienteId ?? null },
+  })
+}
+
+export async function listarAcessosAdmin(comercioId: string, limite = 10) {
+  return prisma.acessoDadosCliente.findMany({
+    where: { comercioId },
+    orderBy: { createdAt: "desc" },
+    take: limite,
+    select: { id: true, adminNome: true, acao: true, clienteId: true, createdAt: true },
+  })
+}
+
+// Números reais para a prévia do plano grátis. Só agregados — nenhuma linha com
+// nome ou telefone sai daqui (a lista borrada da prévia é fictícia).
+export async function resumoClientesPrevia(comercioId: string) {
+  const [row] = await prisma.$queryRaw<{ total: number; novosMes: number; recorrentes: number; sumidos: number }[]>`
+    ${statsCte(comercioId)}
+    SELECT COUNT(*)::int AS total,
+      COUNT(*) FILTER (
+        WHERE date_trunc('month', c."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${TZ})
+            = date_trunc('month', now() AT TIME ZONE ${TZ})
+      )::int AS "novosMes",
+      COUNT(*) FILTER (WHERE s.pedidos >= 2)::int AS recorrentes,
+      COUNT(*) FILTER (WHERE s."ultimoConcluido" < now() - interval '30 days')::int AS sumidos
+    FROM clientes c LEFT JOIN stats s ON s."clienteId" = c.id
+    WHERE c."comercioId" = ${comercioId}`
+  return row ?? { total: 0, novosMes: 0, recorrentes: 0, sumidos: 0 }
+}
+

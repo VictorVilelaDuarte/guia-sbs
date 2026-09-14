@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 em andamento (§12). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 implementada (§12; aguardando merge). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
@@ -923,8 +923,13 @@ backfill rodado duas vezes não duplica.
 - Menu: item "Clientes" substitui "Produtos" na barra inferior do mobile (conforme §10.3); Produtos
   continua no desktop e no atalho do Resumo.
 
-### 12.3 PR 3 — LGPD e plano grátis
+### 12.3 PR 3 — LGPD e plano grátis ✅ implementado
 
+- **Decisões de 2026-09-14:** exclusão **bloqueada com pedido em andamento**; **dono vê os acessos**
+  do admin; **observações do pedido e dos itens são apagadas** na exclusão. **Achados:** o pedido
+  também guarda endereço (CEP, rua, número, complemento, referência) — anonimizado junto; a lista
+  borrada da prévia usa linhas **fictícias** (blur é CSS, dado real ficaria no HTML); o registro de
+  acesso não guarda nome de cliente (reintroduziria dado excluído).
 - Aviso no checkout: "Seus dados ficam com {loja} para preparar e entregar o pedido."
 - Excluir cliente (`clientes:editar`): apaga o `Cliente` e anonimiza `clienteNome`/`clienteWhats` dos
   pedidos dele numa transação — valores e itens continuam para os relatórios.

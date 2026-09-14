@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
-import { criarCliente } from "@/lib/gestao/clientes-dados"
+import { criarCliente, registrarAcessoAdmin } from "@/lib/gestao/clientes-dados"
 import { camposCliente, guardClientes, respostaErroCliente } from "./_comum"
 
 const createSchema = z.object({ nome: z.string().trim().min(2).max(120), ...camposCliente })
@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const cliente = await criarCliente(g.ctx.comercioId, parsed.data)
+    await registrarAcessoAdmin(g.ctx, "CADASTRO", cliente.id)
     return NextResponse.json(cliente, { status: 201 })
   } catch (e) {
     return respostaErroCliente(e)
