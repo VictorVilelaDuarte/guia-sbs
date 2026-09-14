@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 implementados — §11; aguardando merge). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 em andamento (§12). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
@@ -330,38 +330,42 @@ id de uma loja sem vínculo é ignorado.
 
 Os pedidos já coletam nome e WhatsApp — hoje esse dado morre dentro de cada `Pedido`.
 
+> **Decisões de 2026-09-13 (ajustam o desenho abaixo):** (1) permissões — dono e gerente veem e
+> editam clientes; atendente só vê (já vê nome/WhatsApp nos pedidos); produção não vê; (2) **sem
+> agregados denormalizados** — total gasto, nº de pedidos e último pedido são calculados em SQL a
+> partir dos pedidos (barato no volume de uma loja, nunca desatualiza e não acopla o cliente ao
+> `Float` dos pedidos antes da Fase 3a); (3) checkout com **aviso informativo**, sem checkbox (os
+> dados são necessários para executar o pedido); (4) **cadastro manual de cliente já na Fase 2**.
+> Plano de execução no §12.
+
 ```prisma
 model Cliente {
-  id             String    @id @default(cuid())
-  comercioId     String
-  nome           String
-  whatsapp       String    // normalizado: só dígitos, com DDD
-  email          String?
-  aniversario    DateTime? @db.Date
-  observacoes    String?   @db.Text   // "alérgico a amendoim", "sempre pede sem cebola"
-  tags           String[]
-  // agregados denormalizados — atualizados na mesma transação do pedido
-  totalPedidos   Int       @default(0)
-  totalGasto     Decimal   @default(0) @db.Decimal(10, 2)
-  ultimoPedidoEm DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  comercioId  String
+  nome        String
+  whatsapp    String?   // normalizado (só dígitos, com DDD, sem 55); null = cliente de balcão sem WhatsApp
+  email       String?
+  aniversario DateTime? @db.Date
+  observacoes String?   @db.Text   // "alérgico a amendoim", "sempre pede sem cebola"
+  tags        String[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
   pedidos  Pedido[]
 
-  @@unique([comercioId, whatsapp])
+  @@unique([comercioId, whatsapp])   // Postgres aceita vários null
   @@map("clientes")
 }
 
 // Pedido ganha: clienteId String? (onDelete: SetNull)
 ```
 
-- **Upsert por `(comercioId, whatsapp)`** dentro da transação que já cria o pedido e incrementa
+- **Vínculo por `(comercioId, whatsapp)`** dentro da transação que já cria o pedido e incrementa
   `proximoNumero` em `POST /api/pedidos`. O snapshot `clienteNome`/`clienteWhats` do `Pedido`
   **continua** — o cliente pode ser editado ou excluído, o pedido não.
-- Agregados (`totalPedidos`, `totalGasto`) contam só pedidos `CONCLUIDO`, atualizados na
-  transição de status. Script de backfill a partir dos pedidos existentes.
+- Totais do cliente (pedidos, gasto, último pedido, ticket, itens mais pedidos) **calculados em SQL**
+  sobre os pedidos `CONCLUIDO` do cliente. Script de backfill cria os clientes dos pedidos existentes.
 - Cadastro manual (cliente de balcão), busca, filtro por tag, "clientes sumidos há 30+ dias",
   aniversariantes do mês, botão de WhatsApp.
 - Detalhe do cliente: histórico de pedidos, itens mais pedidos, ticket médio.
@@ -869,3 +873,57 @@ forjado com loja sem vínculo é ignorado; alerta de pedido não dispara ao troc
 
 **Verificação:** pedido criado → aceito por um atendente → cancelado; os três eventos aparecem
 com autor e horário corretos.
+
+---
+
+## 12. Plano de execução — Fase 2 (clientes)
+
+Branch `feat/gestao-fase-2`. Decisões de 2026-09-13 no início da §Fase 2.
+
+### 12.1 PR 1 — Base: model Cliente e vínculo no checkout ✅ implementado
+
+| Arquivo | Mudança |
+|---|---|
+| `prisma/schema.prisma` | `model Cliente` (sem agregados); `Pedido.clienteId String?` (`onDelete: SetNull`) + índice |
+| `src/lib/gestao/clientes.ts` (novo) | `normalizarWhatsapp()` (só dígitos, remove o `55` do país) e `vincularCliente(tx, ...)` |
+| `src/app/api/pedidos/route.ts` | Na transação do checkout: garante o `Cliente` da loja pelo WhatsApp e grava `clienteId` no pedido |
+| `prisma/migrate-clientes-pedidos.ts` (novo) | Backfill: um `Cliente` por loja + WhatsApp a partir dos pedidos existentes (nome do pedido mais recente, `createdAt` = primeiro pedido) e liga `Pedido.clienteId`. Idempotente |
+
+- **Concorrência no checkout:** dois pedidos simultâneos do mesmo WhatsApp novo não podem criar o
+  cliente duas vezes nem abortar a transação. `vincularCliente` usa `createMany({ skipDuplicates })`
+  (`INSERT ... ON CONFLICT DO NOTHING`, seguro dentro da transação) e depois lê o registro — um
+  `upsert` que falhasse por unicidade abortaria a transação inteira do pedido no Postgres.
+- **O cliente é criado para toda loja com pedido online**, com ou sem a flag `gestao_clientes`: o
+  dado já existe no pedido, e o teaser do plano grátis (PR 3) mostra números reais.
+- **Nome:** o cliente nasce com o nome do primeiro pedido e **não é sobrescrito** por pedidos
+  seguintes — a loja pode ter corrigido o nome no cadastro.
+
+**Deploy:** `npm run db:push` → `npx tsx prisma/migrate-clientes-pedidos.ts` → publicar.
+
+**Verificação:** checkout cria o cliente e liga o pedido; segundo pedido do mesmo WhatsApp (com
+formatação diferente: `+55 (12) 99999-0000`) reusa o cliente; pedidos simultâneos do mesmo número
+novo geram um único cliente e nenhum pedido falha; mesmo WhatsApp em outra loja gera outro cliente;
+backfill rodado duas vezes não duplica.
+
+### 12.2 PR 2 — Tela de clientes
+
+- Flag `gestao_clientes` e permissões novas `clientes:ver` (dono, gerente, atendente) e
+  `clientes:editar` (dono, gerente).
+- `/comerciante/gestao/clientes`: lista paginada com busca (nome, WhatsApp), filtros "sumidos há 30+
+  dias" e "aniversariantes do mês", filtro por tag, total de pedidos e gasto calculados.
+- `/comerciante/gestao/clientes/[id]`: dados, observações, tags, aniversário, pedidos, total gasto,
+  ticket médio, itens mais pedidos, botão de WhatsApp.
+- Cadastro manual e edição (sem WhatsApp permitido para cliente de balcão); WhatsApp editado
+  continua único na loja.
+- Menu: item "Clientes" substitui "Produtos" na barra inferior do mobile (conforme §10.3); Produtos
+  continua no desktop e no atalho do Resumo.
+
+### 12.3 PR 3 — LGPD e plano grátis
+
+- Aviso no checkout: "Seus dados ficam com {loja} para preparar e entregar o pedido."
+- Excluir cliente (`clientes:editar`): apaga o `Cliente` e anonimiza `clienteNome`/`clienteWhats` dos
+  pedidos dele numa transação — valores e itens continuam para os relatórios.
+- Log de auditoria quando admin acessa clientes via "gerenciar" (model próprio, só leitura no admin).
+- Plano sem `gestao_clientes`: página com números reais agregados (clientes no mês, recorrentes) e
+  lista borrada com cadeado, no padrão do analytics.
+

@@ -6,6 +6,7 @@ import { FORMA_PAGAMENTO_KEYS, formaPagamentoLabel } from "@/lib/hospedagem"
 import { calcularSubtotal, calcularTotal, type ItemCalculo } from "@/lib/pedidos"
 import { enviarPush, payloadNovoPedido } from "@/lib/push"
 import { parseHorarios, getDiaAtual, estaAbertoAgora } from "@/lib/horarios"
+import { vincularCliente } from "@/lib/gestao/clientes"
 
 // Rota PÚBLICA — sem auth. O servidor é a autoridade: ignora qualquer preço
 // vindo do cliente, recarrega itens do banco e recalcula subtotal/total.
@@ -180,9 +181,17 @@ export async function POST(req: NextRequest) {
     })
     const numero = upd.proximoNumero - 1
 
+    // Cliente da loja pelo WhatsApp (cria no primeiro pedido, reusa nos seguintes).
+    const clienteId = await vincularCliente(tx, {
+      comercioId: comercio.id,
+      nome: d.clienteNome,
+      whatsapp: d.clienteWhats,
+    })
+
     return tx.pedido.create({
       data: {
         comercioId: comercio.id,
+        clienteId,
         numero,
         tipoEntrega: d.tipoEntrega,
         clienteNome: d.clienteNome.trim(),

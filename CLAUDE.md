@@ -202,6 +202,16 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 - Casos que decidem pelo dado: `produtos`/`produtos/[id]` (item com `categoriaCardapioId` → `cardapio:editar`, senão `catalogo:editar`; PATCH só com `disponivel` aceita `itens:disponibilidade`); `upload` (pelo `tipo`).
 - **Interface:** `getPainelBase()` expõe `permissoes`; itens sem permissão **somem** (nav, abas, atalhos, cards) — diferente de feature fora do plano, que mostra cadeado. Página acessada direto sem permissão ⇒ `notFound()`. Quem não tem `vitrine:editar` nem `analytics:ver` não vê o switch de área e entra direto na Gestão. `CardapioManager`/`ProdutosManager` têm `somenteDisponibilidade`.
 
+### Clientes da loja (`Cliente`)
+
+Fase 2 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execução no §12. Cadastro de clientes **por comércio** (nunca da plataforma: mesmo WhatsApp em duas lojas = dois `Cliente`, inclusive para o dono de várias lojas; nunca cruzar com `AnalyticsEvent`).
+
+- **Chave:** `@@unique([comercioId, whatsapp])` com WhatsApp normalizado por `normalizarWhatsapp()` (`src/lib/gestao/clientes.ts`: só dígitos, com DDD, sem o `55`). `whatsapp` é opcional (cliente de balcão).
+- **Checkout:** `POST /api/pedidos` chama `vincularCliente(tx, ...)` **dentro da transação** e grava `Pedido.clienteId`. Usa `createMany({ skipDuplicates })` (ON CONFLICT DO NOTHING) + leitura — **não trocar por `upsert`**: em pedidos simultâneos do mesmo número novo, a violação de unicidade de um upsert aborta a transação do pedido no Postgres. O nome só vale na criação (não sobrescreve correção da loja). O cliente é criado para toda loja, com ou sem flag de plano.
+- **Sem agregados guardados:** total gasto, nº de pedidos e último pedido são calculados em SQL sobre os pedidos (decisão de 2026-09-13).
+- O snapshot `Pedido.clienteNome`/`clienteWhats` continua sendo a verdade do pedido; `clienteId` é `onDelete: SetNull`.
+- **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-clientes-pedidos.ts` (backfill idempotente a partir dos pedidos existentes) → publicar.
+
 ### Upload de imagens
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:
