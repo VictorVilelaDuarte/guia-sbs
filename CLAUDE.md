@@ -193,7 +193,8 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 
 | Permissão | DONO | GERENTE | ATENDENTE | PRODUCAO |
 |---|:-:|:-:|:-:|:-:|
-| `vitrine:editar`, `analytics:ver`, `cardapio:editar`, `catalogo:editar`, `quartos:editar`, `pedidos:configurar`, `vendas:ver` | ✅ | ✅ | | |
+| `vitrine:editar`, `analytics:ver`, `cardapio:editar`, `catalogo:editar`, `quartos:editar`, `pedidos:configurar`, `vendas:ver`, `clientes:editar` | ✅ | ✅ | | |
+| `clientes:ver` | ✅ | ✅ | ✅ | |
 | `itens:disponibilidade` (só o `disponivel` de itens do cardápio/catálogo) | ✅ | ✅ | ✅ | |
 | `pedidos:operar` | ✅ | ✅ | ✅ | ✅ |
 | `equipe:gerenciar` | ✅ | | | |
@@ -201,6 +202,25 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 - **Toda rota de `/api/comerciante/*` chama `getComercioCtx()` e depois `negarSemPermissao(ctx, ...permissões)`** (403; passa se tiver ALGUMA). Admin passa sempre. Rota nova sem guard de permissão é bug.
 - Casos que decidem pelo dado: `produtos`/`produtos/[id]` (item com `categoriaCardapioId` → `cardapio:editar`, senão `catalogo:editar`; PATCH só com `disponivel` aceita `itens:disponibilidade`); `upload` (pelo `tipo`).
 - **Interface:** `getPainelBase()` expõe `permissoes`; itens sem permissão **somem** (nav, abas, atalhos, cards) — diferente de feature fora do plano, que mostra cadeado. Página acessada direto sem permissão ⇒ `notFound()`. Quem não tem `vitrine:editar` nem `analytics:ver` não vê o switch de área e entra direto na Gestão. `CardapioManager`/`ProdutosManager` têm `somenteDisponibilidade`.
+
+### Clientes da loja (`Cliente`)
+
+Fase 2 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execução no §12. Cadastro de clientes **por comércio** (nunca da plataforma: mesmo WhatsApp em duas lojas = dois `Cliente`, inclusive para o dono de várias lojas; nunca cruzar com `AnalyticsEvent`).
+
+- **Chave:** `@@unique([comercioId, whatsapp])` com WhatsApp normalizado por `normalizarWhatsapp()` (`src/lib/gestao/clientes.ts`: só dígitos, com DDD, sem o `55`). `whatsapp` é opcional (cliente de balcão).
+- **Checkout:** `POST /api/pedidos` chama `vincularCliente(tx, ...)` **dentro da transação** e grava `Pedido.clienteId`. Usa `createMany({ skipDuplicates })` (ON CONFLICT DO NOTHING) + leitura — **não trocar por `upsert`**: em pedidos simultâneos do mesmo número novo, a violação de unicidade de um upsert aborta a transação do pedido no Postgres. O nome só vale na criação (não sobrescreve correção da loja). O cliente é criado para toda loja, com ou sem flag de plano.
+- **Sem agregados guardados:** total gasto, nº de pedidos e último pedido são calculados em SQL sobre os pedidos (decisão de 2026-09-13).
+- O snapshot `Pedido.clienteNome`/`clienteWhats` continua sendo a verdade do pedido; `clienteId` é `onDelete: SetNull`.
+- **Tela (PR 2):** `/comerciante/gestao/clientes` (lista) e `/[id]` (detalhe), Server Components com estado na URL (busca por `<form method=get>`, filtros e paginação por link). Consultas em `src/lib/gestao/clientes-dados.ts`: lista numa query SQL com CTE de totais por cliente (ordenar por "maior gasto" funciona entre páginas); busca por nome (`ILIKE`, sem ignorar acento) ou dígitos do WhatsApp normalizados; filtros "sumidos" (último concluído > 30 dias), "aniversariantes do mês" (fuso SP) e tag. **`$queryRaw` não converte lista nula** — coluna `tags` sem default no banco precisa de `COALESCE(c.tags, '{}')`.
+- **Aniversário só dia e mês:** guardado como `@db.Date` com ano fixo 2000 (bissexto, aceita 29/02); a tela nunca mostra ano (`aniversarioParaData`/`aniversarioDaData`).
+- **Escrita:** `POST /api/comerciante/gestao/clientes`, `PATCH` e `DELETE .../[id]` (`clientes:editar` + flag `gestao_clientes`). WhatsApp duplicado → 409 com `clienteExistenteId`.
+- **LGPD (PR 3):**
+  - **Exclusão** (`excluirCliente`): transação que anonimiza os pedidos do cliente — nome ("Cliente removido"), WhatsApp, CEP, endereço, número, complemento, referência, observações do pedido **e dos itens** — limpa `autorNome` do histórico de origem `CLIENTE` e apaga o `Cliente`. Mantém itens, valores, datas, status e bairro. **Bloqueada (409) com pedido em andamento.** Novo pedido do mesmo número cria cadastro novo.
+  - **Registro de acesso do admin** (`AcessoDadosCliente`, só inserção, **sem nome de cliente**): `registrarAcessoAdmin(ctx, acao)` em lista, detalhe, cadastro, edição e exclusão — no-op para comerciante; lista registra no máximo 1× a cada 30 min por admin/loja. Visível para o dono (`equipe:gerenciar`) na tela de Clientes e na edição do comércio no admin.
+  - **Prévia do plano grátis** (`ClientesPrevia`): números reais agregados (`resumoClientesPrevia`) e lista **fictícia** borrada — blur é só CSS, dado real no HTML vazaria pelo inspetor. Nunca renderizar dado pessoal atrás de blur.
+  - Checkout mostra "Seus dados ficam com {loja} para preparar e entregar o seu pedido." (informativo, sem checkbox).
+- **Permissões:** `clientes:ver` (dono, gerente, atendente), `clientes:editar` (dono, gerente). Flag `gestao_clientes` ligada no premium por `prisma/migrate-flag-gestao-clientes.ts`. No mobile, "Clientes" ocupa a vaga de "Produtos" na barra inferior.
+- **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-clientes-pedidos.ts` (backfill idempotente a partir dos pedidos existentes) → `npx tsx prisma/migrate-flag-gestao-clientes.ts` → publicar.
 
 ### Upload de imagens
 
@@ -398,6 +418,7 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 | `qr_code` | QR Code personalizado do perfil |
 | `pedido_online` | Pedido online pelo cardápio (depende de `cardapio`) |
 | `gestao_equipe` | Membros com papéis no painel do comércio (tela de equipe) |
+| `gestao_clientes` | Cadastro de clientes da loja com histórico, filtros e anotações |
 
 A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
 

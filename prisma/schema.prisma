@@ -165,23 +165,25 @@ model Comercio {
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
-  owner              User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  plan               Plan                @relation(fields: [planId], references: [id])
-  tags               Tag[]
-  fotos              Foto[]
-  eventos            Evento[]
-  produtos           Produto[]
-  cardapioCategorias CardapioCategoria[]
-  catalogoCategorias CatalogoCategoria[]
-  subcategorias      Subcategoria[]
-  analyticsEvents    AnalyticsEvent[]
-  hospedagemPerfil   HospedagemPerfil?
-  tiposQuarto        TipoQuarto[]
-  pedidos            Pedido[]
-  pedidoConfig       PedidoConfig?
-  pushSubscriptions  PushSubscription[]
-  zonasEntrega       ZonaEntrega[]
-  membros            ComercioMembro[]
+  owner               User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  plan                Plan                 @relation(fields: [planId], references: [id])
+  tags                Tag[]
+  fotos               Foto[]
+  eventos             Evento[]
+  produtos            Produto[]
+  cardapioCategorias  CardapioCategoria[]
+  catalogoCategorias  CatalogoCategoria[]
+  subcategorias       Subcategoria[]
+  analyticsEvents     AnalyticsEvent[]
+  hospedagemPerfil    HospedagemPerfil?
+  tiposQuarto         TipoQuarto[]
+  pedidos             Pedido[]
+  pedidoConfig        PedidoConfig?
+  pushSubscriptions   PushSubscription[]
+  zonasEntrega        ZonaEntrega[]
+  membros             ComercioMembro[]
+  clientes            Cliente[]
+  acessosDadosCliente AcessoDadosCliente[]
 
   @@index([ownerId])
   @@map("comercios")
@@ -466,13 +468,70 @@ model Pedido {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
+  // Cliente da loja (Fase 2 do módulo de gestão). O snapshot clienteNome/clienteWhats
+  // acima continua sendo a verdade do pedido — o cliente pode ser editado ou excluído.
+  clienteId String?
+
   comercio  Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  cliente   Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   itens     PedidoItem[]
   historico PedidoHistorico[]
 
   @@unique([comercioId, numero])
   @@index([comercioId, status, createdAt])
+  @@index([clienteId, createdAt])
   @@map("pedidos")
+}
+
+// Cliente de UMA loja (docs/modulo-gestao.md, Fase 2). Nunca da plataforma: o mesmo
+// WhatsApp em duas lojas são dois Clientes sem ligação, nem para o dono de várias
+// lojas. Sem agregados guardados — totais saem dos pedidos em SQL (decisão 2026-09-13).
+// Criado no checkout (src/lib/gestao/clientes.ts) ou manualmente (cliente de balcão).
+model Cliente {
+  id          String    @id @default(cuid())
+  comercioId  String
+  nome        String
+  whatsapp    String? // só dígitos com DDD, sem o 55; null = balcão sem WhatsApp
+  email       String?
+  aniversario DateTime? @db.Date
+  observacoes String?   @db.Text
+  tags        String[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  pedidos  Pedido[]
+
+  @@unique([comercioId, whatsapp]) // Postgres aceita vários null
+  @@index([comercioId, nome])
+  @@map("clientes")
+}
+
+enum AcaoDadosCliente {
+  LISTA
+  DETALHE
+  CADASTRO
+  EDICAO
+  EXCLUSAO
+}
+
+// Registro de acesso do ADMIN do guia a dados de clientes de uma loja (LGPD — o
+// admin entra pelo "gerenciar"). Só inserção. Guarda o clienteId, nunca o nome:
+// depois de uma exclusão, o registro não pode reintroduzir o dado apagado.
+// Visível para o dono na tela de Clientes e para o admin na edição do comércio.
+model AcessoDadosCliente {
+  id         String           @id @default(cuid())
+  comercioId String
+  adminId    String // referência fraca (sem FK)
+  adminNome  String? // snapshot
+  acao       AcaoDadosCliente
+  clienteId  String? // referência fraca; cliente pode ter sido excluído
+  createdAt  DateTime         @default(now())
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+
+  @@index([comercioId, createdAt])
+  @@map("acessos_dados_cliente")
 }
 
 // Linha do tempo do pedido: um registro por mudança de status, gravado na MESMA

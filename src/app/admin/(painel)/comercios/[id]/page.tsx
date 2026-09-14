@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { EditarComercioForm } from "@/components/comerciante/editar-comercio-form"
 import { LogoUploader } from "@/components/comerciante/logo-uploader"
+import { AcessosAdmin } from "@/components/comerciante/clientes/acessos-admin"
+import { listarAcessosAdmin } from "@/lib/gestao/clientes-dados"
 
 const statusVariants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   ATIVO: "default",
@@ -21,7 +23,7 @@ export default async function EditarComercioAdminPage({
 }) {
   const { id } = await params
 
-  const [comercio, subcategoriasDisponiveis] = await Promise.all([
+  const [comercio, subcategoriasDisponiveis, acessos] = await Promise.all([
     prisma.comercio.findUnique({
       where: { id },
       include: {
@@ -34,6 +36,7 @@ export default async function EditarComercioAdminPage({
       orderBy: [{ categoria: "asc" }, { ordem: "asc" }, { nome: "asc" }],
       select: { id: true, nome: true, categoria: true },
     }),
+    listarAcessosAdmin(id, 20),
   ])
 
   if (!comercio) notFound()
@@ -102,6 +105,12 @@ export default async function EditarComercioAdminPage({
           />
         </CardContent>
       </Card>
+
+      {/* LGPD: acessos de admins aos dados de clientes desta loja (via "gerenciar"). O dono vê a mesma lista. */}
+      <AcessosAdmin
+        acessos={acessos}
+        descricao="Registro dos acessos de administradores aos dados de clientes desta loja. O dono do comércio também vê esta lista."
+      />
     </div>
   )
 }
