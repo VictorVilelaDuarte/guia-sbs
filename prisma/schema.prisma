@@ -487,6 +487,8 @@ model Pedido {
   // conta salvo pelo PDV (modo, pessoas e itens de cada uma).
   mesa        String?
   divisao     Json?
+  // Quando a venda foi encerrada: concluída (ou recusada/cancelada sem ter sido
+  // concluída). É a data dos relatórios — cancelar venda concluída não a altera.
   fechadaEm   DateTime?
   juntadaEmId String? // comanda que absorveu esta (status CANCELADO)
 
@@ -513,6 +515,7 @@ model Pedido {
   @@index([comercioId, status, createdAt])
   @@index([clienteId, createdAt])
   @@index([comercioId, origem, createdAt])
+  @@index([comercioId, fechadaEm])
   @@map("pedidos")
 }
 

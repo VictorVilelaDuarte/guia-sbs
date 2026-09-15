@@ -237,19 +237,22 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
   }
 }
 
-// "Hoje" é o dia corrente em São Paulo. createdAt é timestamp sem fuso gravado
-// em UTC — mesma conversão dupla documentada em src/lib/analytics/queries.ts.
+// "Hoje" é o dia corrente em São Paulo. As colunas são timestamp sem fuso
+// gravado em UTC — mesma conversão dupla documentada em src/lib/analytics/queries.ts.
 // Agrupar em UTC jogaria os pedidos das 21h às 23h59 no dia seguinte.
+// Pedidos do dia contam pela criação; faturamento e concluídos pela data de
+// encerramento (fechadaEm) — a mesma regra dos relatórios.
 async function pedidosHoje(comercioId: string): Promise<ResumoPedidosHoje> {
+  const hoje = (coluna: Prisma.Sql) =>
+    Prisma.sql`(${coluna} AT TIME ZONE 'UTC' AT TIME ZONE ${TZ})::date = (now() AT TIME ZONE ${TZ})::date`
   const [row] = await prisma.$queryRaw<ResumoPedidosHoje[]>`
     SELECT
-      COUNT(*) FILTER (WHERE status NOT IN ('RECUSADO', 'CANCELADO'))::int AS pedidos,
-      COUNT(*) FILTER (WHERE status = 'CONCLUIDO')::int AS concluidos,
-      COALESCE(SUM(total) FILTER (WHERE status = 'CONCLUIDO'), 0)::float AS faturamento
+      COUNT(*) FILTER (WHERE status NOT IN ('RECUSADO', 'CANCELADO') AND ${hoje(Prisma.sql`"createdAt"`)})::int AS pedidos,
+      COUNT(*) FILTER (WHERE status = 'CONCLUIDO' AND ${hoje(Prisma.sql`"fechadaEm"`)})::int AS concluidos,
+      COALESCE(SUM(total) FILTER (WHERE status = 'CONCLUIDO' AND ${hoje(Prisma.sql`"fechadaEm"`)}), 0)::float AS faturamento
     FROM pedidos
     WHERE "comercioId" = ${comercioId}
-      AND ("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${TZ})::date
-        = (now() AT TIME ZONE ${TZ})::date
+      AND ("createdAt" >= now() - interval '3 days' OR "fechadaEm" >= now() - interval '3 days')
   `
   return row ?? { pedidos: 0, concluidos: 0, faturamento: 0 }
 }

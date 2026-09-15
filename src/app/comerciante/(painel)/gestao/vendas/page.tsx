@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ChevronLeft, ChevronRight, MonitorSmartphone, Printer } from "lucide-react"
+import { BarChart3, ChevronLeft, ChevronRight, MonitorSmartphone, Printer } from "lucide-react"
 import type { OrigemPedido } from "@prisma/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { RecursoBloqueado } from "@/components/comerciante/painel/recurso-bloqueado"
@@ -83,9 +83,16 @@ export default async function VendasPage({ searchParams }: { searchParams: Promi
               {concluidas.length} concluída(s){verValores ? ` · ${brl(totalC)}` : ""}
             </p>
           </div>
-          <AbrirPdvLink className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
-            <MonitorSmartphone className="h-4 w-4" /> Abrir PDV
-          </AbrirPdvLink>
+          <div className="flex flex-wrap items-center gap-2">
+            {verValores && (
+              <Link href="/comerciante/gestao/relatorios" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium hover:bg-accent">
+                <BarChart3 className="h-4 w-4" /> Relatórios
+              </Link>
+            )}
+            <AbrirPdvLink className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
+              <MonitorSmartphone className="h-4 w-4" /> Abrir PDV
+            </AbrirPdvLink>
+          </div>
         </div>
         <div className="flex items-center justify-between text-sm">
           <Link href={url({ dia: somaDias(dia, -1) })} className="inline-flex items-center gap-1 hover:underline"><ChevronLeft className="h-4 w-4" /> Anterior</Link>
@@ -112,7 +119,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Promi
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-1.5">
                     <span className="font-semibold tabular-nums">#{v.numero}</span>
-                    <span className="text-muted-foreground tabular-nums">{hora(v.createdAt)}</span>
+                    <span className="text-muted-foreground tabular-nums">{hora(v.fechadaEm ?? v.createdAt)}</span>
                     <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-700">{ORIGEM_LABEL[v.origem]}</span>
                     <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", TOM_CLS[STATUS_TOM[v.status]])}>{STATUS_LABEL[v.status]}</span>
                   </p>

@@ -10,6 +10,7 @@ import {
   Package,
   ReceiptText,
   Store,
+  BarChart3,
   Briefcase,
   ChefHat,
   Contact,
@@ -84,6 +85,15 @@ const ITENS_GESTAO: ItemGestao[] = [
     feature: "gestao_relatorios",
     permissoes: ["vendas:registrar"],
     // No celular, o PDV abre pelo botão flutuante e a lista vem pelo Resumo.
+    somenteDesktop: true,
+  },
+  {
+    href: "/comerciante/gestao/relatorios",
+    label: "Relatórios",
+    icon: BarChart3,
+    feature: "gestao_relatorios",
+    permissoes: ["vendas:ver"],
+    // No celular, o caminho é o atalho do Resumo.
     somenteDesktop: true,
   },
   {

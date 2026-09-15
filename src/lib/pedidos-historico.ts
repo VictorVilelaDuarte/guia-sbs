@@ -1,6 +1,6 @@
 import type { OrigemHistorico, PedidoStatus } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { exigeMotivo } from "@/lib/pedidos"
+import { exigeMotivo, isStatusTerminal } from "@/lib/pedidos"
 
 // Toda mudança de status de pedido passa por aqui (painel e cliente). Faz duas
 // coisas numa transação só: a mudança e o registro no histórico — nunca existe
@@ -20,9 +20,12 @@ export async function mudarStatusPedido(args: {
 }): Promise<"ok" | "conflito"> {
   const motivo = exigeMotivo(args.para) ? args.motivo : null
   return prisma.$transaction(async (tx) => {
+    // fechadaEm é a data da venda nos relatórios: grava ao encerrar. Cancelar uma
+    // venda já concluída mantém a data da conclusão (o relatório do dia não muda).
+    const encerra = isStatusTerminal(args.para) && args.de !== "CONCLUIDO"
     const r = await tx.pedido.updateMany({
       where: { id: args.pedidoId, status: args.de },
-      data: { status: args.para, motivoCancelamento: motivo },
+      data: { status: args.para, motivoCancelamento: motivo, ...(encerra ? { fechadaEm: new Date() } : {}) },
     })
     if (r.count === 0) return "conflito"
     await tx.pedidoHistorico.create({

@@ -7,6 +7,7 @@ import { temPermissao } from "@/lib/gestao/permissoes"
 import { AbrirPdvLink } from "@/components/comerciante/pdv/abrir-pdv"
 import {
   AlertTriangle,
+  BarChart3,
   BedDouble,
   Contact,
   Users,
@@ -235,6 +236,15 @@ export default async function GestaoResumoPage() {
               icon={Receipt}
               titulo="Vendas"
               detalhe={r.comandasAbertas > 0 ? `Vendas do dia · ${r.comandasAbertas} comanda(s) aberta(s)` : "Vendas do dia, balcão, telefone e comandas"}
+            />
+          )}
+          {verVendas && (
+            <Atalho
+              href="/comerciante/gestao/relatorios"
+              icon={BarChart3}
+              titulo="Relatórios"
+              bloqueado={!temFeature(features, "gestao_relatorios")}
+              detalhe={temFeature(features, "gestao_relatorios") ? "Faturamento, formas de pagamento, itens e equipe" : "Disponível no plano Premium"}
             />
           )}
           {atalhoProducao && (

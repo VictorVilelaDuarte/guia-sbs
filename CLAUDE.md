@@ -250,6 +250,15 @@ Fase 3 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.2 venda manual,
 - **Rotas do PDV** usam `guardPdv(...)` e `responder()` de `src/lib/gestao/pdv-api.ts` (flag `gestao_relatorios` + permissão; `ErroVenda` vira JSON com status).
 - **Deploy:** `npm run db:push` (aditivo: tabela `pedido_pagamentos`, colunas, enums `ABERTA`/`COMANDA`) → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar → `npx tsx prisma/migrate-pagamentos-pedidos.ts` (idempotente; depois de publicar para pegar pedidos criados pelo código antigo).
 
+### Relatórios de vendas
+
+Fase 3 / PR 3 (§13.4 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md)). Tela `/comerciante/gestao/relatorios` (`vendas:ver` + flag `gestao_relatorios`; menu só no desktop, atalho no Resumo e em Vendas). Consultas em `src/lib/gestao/relatorios.ts`, período na URL (`?periodo=hoje|ontem|7d|30d|mes|mes-anterior` ou `?de=&ate=`, máx. 12 meses, sem futuro), gráficos em SVG/HTML puro no servidor (`src/components/comerciante/relatorios/graficos.tsx`).
+
+- **A venda conta na data de encerramento (`Pedido.fechadaEm`)**, não na criação: comanda aberta às 23h e fechada à 1h entra no dia do caixa. `mudarStatusPedido()` grava `fechadaEm` ao entrar em status terminal — **exceto** saindo de `CONCLUIDO` (cancelar venda concluída mantém a data: sai do faturamento daquele dia e aparece nos cancelamentos do mesmo dia). PDV e comandas já gravavam. Pedidos antigos: `prisma/migrate-fechada-em.ts` (usa o histórico). O Resumo (faturamento de hoje) e a lista "Vendas do dia" seguem a mesma regra (`COALESCE(fechadaEm, createdAt)` para vendas em aberto).
+- **Filtro de período em UTC sobre `fechadaEm`** (usa `@@index([comercioId, fechadaEm])`): limites `(dia::timestamp AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'UTC'`; agrupamento converte UTC → SP. Somas em `numeric`, saída em centavos.
+- **Faturamento = `CONCLUIDO`**; fechamento por forma lê `PedidoPagamento` sem estornos e deve bater com o faturamento (a tela avisa se não bater). Comanda juntada (`juntadaEmId`) não entra em cancelamentos. Conversão guia → venda só com `analytics` + `pedido_online`, sempre agregada.
+- **Deploy:** `npm run db:push` (índice) → publicar → `npx tsx prisma/migrate-fechada-em.ts` (idempotente).
+
 ### Upload de imagens
 
 Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, `evento`, `cardapio`, ou omitido para fotos). O storage usa a `SERVICE_ROLE_KEY` diretamente via fetch REST (sem SDK Supabase). Estrutura de paths no bucket `comercios`:

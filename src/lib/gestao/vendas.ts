@@ -355,12 +355,14 @@ export function hojeSP(): string {
 }
 
 export async function listarVendasDoDia(comercioId: string, opts: { dia: string; origem?: OrigemPedido | null }) {
-  // createdAt é timestamp sem fuso gravado em UTC — mesma conversão dupla do resumo.
+  // Data da venda = encerramento (fechadaEm), a mesma regra dos relatórios; venda
+  // em aberto (comanda, fila) aparece no dia em que foi criada. Timestamps sem fuso
+  // gravados em UTC — mesma conversão dupla do resumo.
   const linhas = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM pedidos
     WHERE "comercioId" = ${comercioId}
-      AND ("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${TZ})::date = ${opts.dia}::date
-    ORDER BY "createdAt" DESC LIMIT 300`
+      AND (COALESCE("fechadaEm", "createdAt") AT TIME ZONE 'UTC' AT TIME ZONE ${TZ})::date = ${opts.dia}::date
+    ORDER BY COALESCE("fechadaEm", "createdAt") DESC LIMIT 300`
   const ids = linhas.map((l) => l.id)
   if (ids.length === 0) return []
   return prisma.pedido.findMany({
@@ -368,7 +370,7 @@ export async function listarVendasDoDia(comercioId: string, opts: { dia: string;
     orderBy: { createdAt: "desc" },
     select: {
       id: true, numero: true, origem: true, status: true, tipoEntrega: true, clienteNome: true, mesa: true,
-      formaPagamento: true, total: true, createdAt: true, criadoPorNome: true, motivoCancelamento: true,
+      formaPagamento: true, total: true, createdAt: true, fechadaEm: true, criadoPorNome: true, motivoCancelamento: true,
       pagamentos: { where: { estornadoEm: null }, select: { forma: true } },
     },
   })

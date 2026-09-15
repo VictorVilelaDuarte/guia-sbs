@@ -1051,3 +1051,30 @@ sistema, em tela cheia e aba própria, com os recursos de um caixa profissional.
   registrado); o PDV não funciona offline.
 - **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar →
   `npx tsx prisma/migrate-pagamentos-pedidos.ts`.
+
+### 13.4 PR 3 — Relatórios ✅ implementado
+
+**Decisões de 2026-09-15:**
+1. **A venda conta na data de conclusão** (`fechadaEm`) — o fechamento de caixa bate com o dia. Pedido
+   online passa a gravar a data ao ser concluído/recusado/cancelado; os antigos são preenchidos pelo
+   histórico (`prisma/migrate-fechada-em.ts`).
+2. **Períodos:** atalhos (Hoje, Ontem, 7 dias, 30 dias, Este mês, Mês passado) + período livre, até 12 meses.
+3. **Relatório por atendente:** sim (vendas, valor, descontos e serviço de quem lançou).
+4. **Exportação CSV: fora por agora.**
+5. **Venda cancelada depois de concluída** sai do faturamento e aparece em cancelamentos no dia em que foi
+   concluída, com a data do cancelamento na lista.
+6. **Plano grátis:** cadeado padrão, sem prévia.
+
+**Implementação:**
+- `src/lib/gestao/relatorios.ts`: resumo (faturamento, vendas, ticket, bruto, descontos, serviço, entrega)
+  com comparação ao período anterior de mesmo tamanho; série por dia (por mês acima de 62 dias); por origem;
+  fechamento por forma (com recebido e troco do dinheiro); itens mais vendidos pelo snapshot (avulso
+  marcado); hora do dia e dia da semana; atendentes; entregas por bairro; cancelamentos e recusas (sem
+  comandas juntadas); conversão guia → venda agregada.
+- Filtro sobre `fechadaEm` com limites convertidos para UTC (usa o índice novo `[comercioId, fechadaEm]`).
+- Resumo do dia e lista de vendas alinhados à mesma data.
+- **Testado:** cenário "bate centavo" com balcão (duas formas + troco), telefone com entrega + descontos +
+  serviço, comanda juntada com estorno, venda cancelada, pedido online concluído e recusado, comanda da
+  virada do dia, venda de ontem e pedido antigo sem data — faturamento = soma dos pagamentos = soma manual
+  (R$ 91,95); períodos, permissões e plano; conferência visual no desktop e no celular.
+- **Deploy:** `npm run db:push` → publicar → `npx tsx prisma/migrate-fechada-em.ts`.
