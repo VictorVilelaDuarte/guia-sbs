@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 em produção (`main`, 2026-09-14); Fase 3 em andamento (§13). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 em produção (`main`, 2026-09-14); Fase 3 em produção (`main`, 2026-09-15 — §13). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
