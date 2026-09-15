@@ -10,8 +10,12 @@ import {
   Package,
   ReceiptText,
   Store,
+  BarChart3,
   Briefcase,
+  ChefHat,
   Contact,
+  MonitorSmartphone,
+  Receipt,
   Users,
   type LucideIcon,
 } from "lucide-react"
@@ -19,6 +23,7 @@ import { cn } from "@/lib/utils"
 import { temFeature, type FeatureKey } from "@/lib/plan-features"
 import { temPermissao, type Permissao } from "@/lib/gestao/permissoes"
 import { usePedidosAlerta } from "./pedidos-alerta"
+import { AbrirPdvLink } from "@/components/comerciante/pdv/abrir-pdv"
 
 // Navegação do painel: switch de área (Minha vitrine | Gestão) e itens da área
 // Gestão — abas no desktop, barra inferior no mobile. A configuração vive no
@@ -35,6 +40,9 @@ interface ItemGestao {
   badgePedidos?: boolean
   // Fora da barra inferior do mobile (uso raro; cabem no máximo 5 itens).
   somenteDesktop?: boolean
+  // Na barra inferior só para quem NÃO tem estas permissões (ex.: Produção vai
+  // para a barra da cozinha, mas não empurra itens do dono para fora).
+  mobileSemPermissoes?: Permissao[]
 }
 
 const ITENS_GESTAO: ItemGestao[] = [
@@ -46,6 +54,14 @@ const ITENS_GESTAO: ItemGestao[] = [
     feature: "pedido_online",
     permissoes: ["pedidos:operar"],
     badgePedidos: true,
+  },
+  {
+    href: "/comerciante/gestao/producao",
+    label: "Produção",
+    icon: ChefHat,
+    feature: "gestao_relatorios",
+    permissoes: ["pedidos:operar"],
+    mobileSemPermissoes: ["cardapio:editar", "vendas:registrar"],
   },
   {
     href: "/comerciante/gestao/cardapio",
@@ -60,6 +76,24 @@ const ITENS_GESTAO: ItemGestao[] = [
     icon: Package,
     permissoes: ["catalogo:editar", "itens:disponibilidade"],
     // No celular, Clientes ocupa a vaga; Produtos segue no atalho do Resumo.
+    somenteDesktop: true,
+  },
+  {
+    href: "/comerciante/gestao/vendas",
+    label: "Vendas",
+    icon: Receipt,
+    feature: "gestao_relatorios",
+    permissoes: ["vendas:registrar"],
+    // No celular, o PDV abre pelo botão flutuante e a lista vem pelo Resumo.
+    somenteDesktop: true,
+  },
+  {
+    href: "/comerciante/gestao/relatorios",
+    label: "Relatórios",
+    icon: BarChart3,
+    feature: "gestao_relatorios",
+    permissoes: ["vendas:ver"],
+    // No celular, o caminho é o atalho do Resumo.
     somenteDesktop: true,
   },
   {
@@ -197,7 +231,9 @@ export function GestaoBottomNav(props: NavProps) {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="mx-auto flex max-w-3xl">
-          {itensVisiveis(props).filter((i) => !i.somenteDesktop).map((item) => {
+          {itensVisiveis(props)
+            .filter((i) => !i.somenteDesktop && !(i.mobileSemPermissoes && temPermissao(props.permissoes, ...i.mobileSemPermissoes)))
+            .map((item) => {
             const on = ativo(pathname, item.href)
             const bloqueado = !!item.feature && !temFeature(props.features, item.feature)
             const Icon = item.icon
@@ -229,3 +265,26 @@ export function GestaoBottomNav(props: NavProps) {
     </>
   )
 }
+
+// Botão flutuante do PDV no celular (decisão 2 da Fase 3): a barra inferior já
+// tem 5 itens. Abre o PDV em aba própria. Só na Gestão, para quem vende com a flag.
+export function AbrirPdvFab({ features, permissoes }: { features: unknown; permissoes: readonly Permissao[] }) {
+  const pathname = usePathname()
+  if (
+    !pathname.startsWith("/comerciante/gestao") ||
+    !temFeature(features, "gestao_relatorios") ||
+    !temPermissao(permissoes, "vendas:registrar")
+  ) {
+    return null
+  }
+  return (
+    <AbrirPdvLink
+      aria-label="Abrir PDV"
+      className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg md:hidden"
+      style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <MonitorSmartphone className="h-6 w-6" />
+    </AbrirPdvLink>
+  )
+}
+

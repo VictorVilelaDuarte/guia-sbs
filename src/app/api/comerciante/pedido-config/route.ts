@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { paraNumero } from "@/lib/dinheiro"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
@@ -42,5 +43,5 @@ export async function PUT(req: NextRequest) {
     update: data,
   })
 
-  return NextResponse.json(config)
+  return NextResponse.json({ ...config, pedidoMinimo: paraNumero(config.pedidoMinimo) })
 }

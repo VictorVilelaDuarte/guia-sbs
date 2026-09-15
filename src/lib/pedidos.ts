@@ -13,6 +13,14 @@ export const STATUS_LABEL: Record<PedidoStatus, string> = {
   CONCLUIDO: "Concluído",
   RECUSADO: "Recusado",
   CANCELADO: "Cancelado",
+  ABERTA: "Aberta",
+}
+
+export const ORIGEM_LABEL: Record<"ONLINE" | "BALCAO" | "TELEFONE" | "COMANDA", string> = {
+  ONLINE: "Online",
+  BALCAO: "Balcão",
+  TELEFONE: "Telefone",
+  COMANDA: "Comanda",
 }
 
 // Ação registrada no histórico do pedido (painel): "Aceito por Ana".
@@ -25,6 +33,7 @@ export const HISTORICO_ACAO: Record<PedidoStatus, string> = {
   CONCLUIDO: "Concluído",
   RECUSADO: "Recusado",
   CANCELADO: "Cancelado",
+  ABERTA: "Comanda aberta",
 }
 
 // Mensagem voltada ao cliente na página de acompanhamento (mais calorosa que o label seco).
@@ -37,6 +46,7 @@ export const STATUS_LABEL_CLIENTE: Record<PedidoStatus, string> = {
   CONCLUIDO: "Pedido concluído",
   RECUSADO: "Pedido recusado pela loja",
   CANCELADO: "Pedido cancelado",
+  ABERTA: "Conta aberta",
 }
 
 // Tom para badges (chave de cor; o componente mapeia para classes Tailwind).
@@ -51,6 +61,7 @@ export const STATUS_TOM: Record<PedidoStatus, StatusTom> = {
   CONCLUIDO: "green",
   RECUSADO: "rose",
   CANCELADO: "rose",
+  ABERTA: "amber",
 }
 
 export const STATUS_TERMINAIS: PedidoStatus[] = ["CONCLUIDO", "RECUSADO", "CANCELADO"]
@@ -120,20 +131,31 @@ export function grupoDoStatus(status: PedidoStatus): GrupoPedido {
 }
 
 // --- Cálculo de total (fonte única; o servidor é a autoridade) ---
+// Em CENTAVOS inteiros (Fase 3): o preço do produto ainda é Float e é arredondado
+// uma única vez aqui; a soma em centavos é exata e o pedido grava Decimal exato.
 
 export interface ItemCalculo {
-  precoUnit: number
+  precoUnit: number // reais (preço vigente do produto)
   quantidade: number
 }
 
-export function calcularSubtotal(itens: ItemCalculo[]): number {
-  return arredondar(
-    itens.reduce((acc, i) => acc + i.precoUnit * i.quantidade, 0),
-  )
+export function centavosDe(reais: number): number {
+  return Math.round((reais + Number.EPSILON) * 100)
 }
 
-export function calcularTotal(subtotal: number, taxaEntrega: number): number {
-  return arredondar(subtotal + taxaEntrega)
+export function calcularSubtotalCentavos(itens: ItemCalculo[]): number {
+  return itens.reduce((acc, i) => acc + centavosDe(i.precoUnit) * i.quantidade, 0)
+}
+
+// Preço vigente de um produto sem variação: promoção ativa vence o preço cheio.
+// Usado pelo checkout e pela venda manual (o servidor é a autoridade do preço).
+export function precoEfetivo(p: {
+  preco: number | null
+  precoPromo: number | null
+  promoFim: Date | null
+}): number | null {
+  const promoAtiva = p.precoPromo != null && (!p.promoFim || p.promoFim.getTime() > Date.now())
+  return promoAtiva ? p.precoPromo : p.preco
 }
 
 // Evita ruído de ponto flutuante (R$) — 2 casas.

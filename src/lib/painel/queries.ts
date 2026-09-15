@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, permissoesCtx, vinculosValidos } from "@/lib/comercio-ctx"
 import { getAnalyticsResumo } from "@/lib/analytics/queries"
-import { historicoPainelSelect } from "@/lib/pedidos-historico"
+import { pedidoAdminInclude, serializarPedidoAdmin } from "@/lib/pedidos-serializar"
+import { paraNumero } from "@/lib/dinheiro"
 import { contagemClientes } from "@/lib/gestao/clientes-dados"
 import type {
   PedidoAdmin,
@@ -118,22 +119,10 @@ export async function getCatalogoData(comercioId: string) {
 export async function getPedidosData(comercioId: string) {
   const [pedidos, config, zonas, bairrosCatalogo] = await Promise.all([
     prisma.pedido.findMany({
-      where: { comercioId },
+      where: { comercioId, status: { not: "ABERTA" } }, // comanda aberta vive no PDV
       orderBy: { createdAt: "desc" },
       take: 200,
-      include: {
-        itens: {
-          select: {
-            id: true,
-            titulo: true,
-            variacaoNome: true,
-            precoUnit: true,
-            quantidade: true,
-            observacao: true,
-          },
-        },
-        historico: historicoPainelSelect,
-      },
+      include: pedidoAdminInclude,
     }),
     prisma.pedidoConfig.findUnique({ where: { comercioId } }),
     prisma.zonaEntrega.findMany({
@@ -147,39 +136,15 @@ export async function getPedidosData(comercioId: string) {
     }),
   ])
 
-  // Serializa para os componentes client (datas → ISO).
-  const pedidosAdmin: PedidoAdmin[] = pedidos.map((p) => ({
-    id: p.id,
-    token: p.token,
-    numero: p.numero,
-    status: p.status,
-    tipoEntrega: p.tipoEntrega,
-    clienteNome: p.clienteNome,
-    clienteWhats: p.clienteWhats,
-    cep: p.cep,
-    endereco: p.endereco,
-    numeroEnd: p.numeroEnd,
-    bairro: p.bairro,
-    complemento: p.complemento,
-    referencia: p.referencia,
-    formaPagamento: p.formaPagamento,
-    trocoPara: p.trocoPara,
-    observacoes: p.observacoes,
-    subtotal: p.subtotal,
-    taxaEntrega: p.taxaEntrega,
-    total: p.total,
-    motivoCancelamento: p.motivoCancelamento,
-    createdAt: p.createdAt.toISOString(),
-    itens: p.itens,
-    historico: p.historico.map((h) => ({ ...h, createdAt: h.createdAt.toISOString() })),
-  }))
+  // Serializa para os componentes client (datas → ISO, Decimal → number).
+  const pedidosAdmin: PedidoAdmin[] = pedidos.map(serializarPedidoAdmin)
 
   const pedidoConfig: PedidoConfigData | null = config
     ? {
         aceitaPedidos: config.aceitaPedidos,
         entregaAtiva: config.entregaAtiva,
         retiradaAtiva: config.retiradaAtiva,
-        pedidoMinimo: config.pedidoMinimo,
+        pedidoMinimo: paraNumero(config.pedidoMinimo),
         tempoPreparoMin: config.tempoPreparoMin,
         formasPagamento: config.formasPagamento,
       }
@@ -191,7 +156,7 @@ export async function getPedidosData(comercioId: string) {
     nome: z.nome,
     cidade: z.cidade,
     uf: z.uf,
-    taxa: z.taxa,
+    taxa: paraNumero(z.taxa),
     ativo: z.ativo,
   }))
 
@@ -210,13 +175,15 @@ export async function getQuartosData(comercioId: string) {
 // --- Gestão: resumo do dia -----------------------------------------------------
 
 export interface ResumoPedidosHoje {
-  pedidos: number // exclui recusados e cancelados
+  pedidos: number // exclui recusados e cancelados (todas as origens)
   concluidos: number
-  faturamento: number // soma dos CONCLUIDO
+  faturamento: number // soma dos CONCLUIDO — online, balcão e telefone
 }
 
-export async function getResumoData(comercioId: string, opts: { pedidos: boolean }) {
-  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos, clientes] =
+// opts.pedidos: fila de pedidos online (aguardando/andamento/aceite).
+// opts.vendas: números do dia (pedidos online + venda manual de balcão/telefone).
+export async function getResumoData(comercioId: string, opts: { pedidos: boolean; vendas?: boolean }) {
+  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos, clientes, comandasAbertas] =
     await Promise.all([
       opts.pedidos
         ? prisma.pedido.count({ where: { comercioId, status: "AGUARDANDO" } })
@@ -229,7 +196,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
             },
           })
         : 0,
-      opts.pedidos ? pedidosHoje(comercioId) : null,
+      opts.pedidos || opts.vendas ? pedidosHoje(comercioId) : null,
       opts.pedidos
         ? prisma.pedidoConfig.findUnique({
             where: { comercioId },
@@ -248,6 +215,7 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
       prisma.tipoQuarto.count({ where: { comercioId, ativo: true } }),
       prisma.comercioMembro.count({ where: { comercioId, ativo: true } }),
       contagemClientes(comercioId),
+      opts.vendas ? prisma.pedido.count({ where: { comercioId, origem: "COMANDA", status: "ABERTA" } }) : 0,
     ])
 
   const porTipo = (tipo: "PRODUTO" | "SERVICO") =>
@@ -265,22 +233,26 @@ export async function getResumoData(comercioId: string, opts: { pedidos: boolean
     quartos,
     membrosAtivos,
     clientes,
+    comandasAbertas,
   }
 }
 
-// "Hoje" é o dia corrente em São Paulo. createdAt é timestamp sem fuso gravado
-// em UTC — mesma conversão dupla documentada em src/lib/analytics/queries.ts.
+// "Hoje" é o dia corrente em São Paulo. As colunas são timestamp sem fuso
+// gravado em UTC — mesma conversão dupla documentada em src/lib/analytics/queries.ts.
 // Agrupar em UTC jogaria os pedidos das 21h às 23h59 no dia seguinte.
+// Pedidos do dia contam pela criação; faturamento e concluídos pela data de
+// encerramento (fechadaEm) — a mesma regra dos relatórios.
 async function pedidosHoje(comercioId: string): Promise<ResumoPedidosHoje> {
+  const hoje = (coluna: Prisma.Sql) =>
+    Prisma.sql`(${coluna} AT TIME ZONE 'UTC' AT TIME ZONE ${TZ})::date = (now() AT TIME ZONE ${TZ})::date`
   const [row] = await prisma.$queryRaw<ResumoPedidosHoje[]>`
     SELECT
-      COUNT(*) FILTER (WHERE status NOT IN ('RECUSADO', 'CANCELADO'))::int AS pedidos,
-      COUNT(*) FILTER (WHERE status = 'CONCLUIDO')::int AS concluidos,
-      COALESCE(SUM(total) FILTER (WHERE status = 'CONCLUIDO'), 0)::float AS faturamento
+      COUNT(*) FILTER (WHERE status NOT IN ('RECUSADO', 'CANCELADO') AND ${hoje(Prisma.sql`"createdAt"`)})::int AS pedidos,
+      COUNT(*) FILTER (WHERE status = 'CONCLUIDO' AND ${hoje(Prisma.sql`"fechadaEm"`)})::int AS concluidos,
+      COALESCE(SUM(total) FILTER (WHERE status = 'CONCLUIDO' AND ${hoje(Prisma.sql`"fechadaEm"`)}), 0)::float AS faturamento
     FROM pedidos
     WHERE "comercioId" = ${comercioId}
-      AND ("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE ${TZ})::date
-        = (now() AT TIME ZONE ${TZ})::date
+      AND ("createdAt" >= now() - interval '3 days' OR "fechadaEm" >= now() - interval '3 days')
   `
   return row ?? { pedidos: 0, concluidos: 0, faturamento: 0 }
 }

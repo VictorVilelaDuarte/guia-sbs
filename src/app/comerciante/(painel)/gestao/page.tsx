@@ -4,15 +4,20 @@ import { getPainelBase, getResumoData } from "@/lib/painel/queries"
 import { temFeature } from "@/lib/plan-features"
 import { cn } from "@/lib/utils"
 import { temPermissao } from "@/lib/gestao/permissoes"
+import { AbrirPdvLink } from "@/components/comerciante/pdv/abrir-pdv"
 import {
   AlertTriangle,
+  BarChart3,
   BedDouble,
   Contact,
   Users,
   BookOpen,
+  ChefHat,
   ChevronRight,
   Lock,
+  MonitorSmartphone,
   Package,
+  Receipt,
   ReceiptText,
 } from "lucide-react"
 
@@ -95,21 +100,31 @@ export default async function GestaoResumoPage() {
   const atalhoClientes = temPermissao(permissoes, "clientes:ver")
   const temClientes = temFeature(features, "gestao_clientes")
   const temEquipe = temFeature(features, "gestao_equipe")
-  const r = await getResumoData(base.comercio.id, { pedidos: operaPedidos })
+  // Venda manual/relatórios independem de pedido online (decisão 4 da Fase 3).
+  const registraVendas = temFeature(features, "gestao_relatorios") && temPermissao(permissoes, "vendas:registrar")
+  const atalhoProducao = temFeature(features, "gestao_relatorios") && temPermissao(permissoes, "pedidos:operar")
+  const r = await getResumoData(base.comercio.id, { pedidos: operaPedidos, vendas: registraVendas })
 
   const ticketMedio = r.hoje && r.hoje.concluidos > 0 ? r.hoje.faturamento / r.hoje.concluidos : 0
 
   return (
     <div className="space-y-6">
-      {operaPedidos && r.hoje ? (
+      {(operaPedidos || registraVendas) && r.hoje ? (
         <Card>
           <CardContent className="space-y-4">
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-base font-semibold">Hoje</h2>
-              <span className="text-xs capitalize text-muted-foreground">{dataHoje()}</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-base font-semibold">Hoje</h2>
+                <span className="text-xs capitalize text-muted-foreground">{dataHoje()}</span>
+              </div>
+              {registraVendas && (
+                <AbrirPdvLink className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
+                  <MonitorSmartphone className="h-4 w-4" /> Abrir PDV
+                </AbrirPdvLink>
+              )}
             </div>
 
-            {!r.aceitaPedidos && temPermissao(permissoes, "pedidos:configurar") && (
+            {operaPedidos && !r.aceitaPedidos && temPermissao(permissoes, "pedidos:configurar") && (
               <Link
                 href="/comerciante/gestao/pedidos"
                 className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900"
@@ -122,10 +137,11 @@ export default async function GestaoResumoPage() {
               </Link>
             )}
 
-            <div className={cn("grid grid-cols-2 gap-3", verVendas ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
-              <Numero label="Aguardando" valor={String(r.aguardando)} destaque={r.aguardando > 0} />
-              <Numero label="Em andamento" valor={String(r.andamento)} />
-              <Numero label="Pedidos hoje" valor={String(r.hoje.pedidos)} />
+            <div className={cn("grid grid-cols-2 gap-3", operaPedidos && verVendas ? "sm:grid-cols-4" : "sm:grid-cols-3")}>
+              {operaPedidos && <Numero label="Aguardando" valor={String(r.aguardando)} destaque={r.aguardando > 0} />}
+              {operaPedidos && <Numero label="Em andamento" valor={String(r.andamento)} />}
+              <Numero label={operaPedidos ? "Pedidos hoje" : "Vendas hoje"} valor={String(r.hoje.pedidos)} />
+              {registraVendas && !operaPedidos && <Numero label="Comandas abertas" valor={String(r.comandasAbertas)} />}
               {verVendas && <Numero label="Ticket médio" valor={formatBRL(ticketMedio)} />}
             </div>
 
@@ -134,13 +150,14 @@ export default async function GestaoResumoPage() {
                 <p className="text-xs text-muted-foreground">Faturamento de hoje</p>
                 <p className="mt-1 text-3xl font-bold tabular-nums">{formatBRL(r.hoje.faturamento)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Soma dos {r.hoje.concluidos} pedido(s) concluído(s) feitos hoje pelo cardápio online.
+                  Soma das {r.hoje.concluidos} venda(s) concluída(s) hoje
+                  {registraVendas ? " — online, balcão, telefone e comandas." : " pelo cardápio online."}
                 </p>
               </div>
             )}
           </CardContent>
         </Card>
-      ) : !pedidoOnline && verVendas ? (
+      ) : !pedidoOnline && !registraVendas && verVendas ? (
         // Chamada para o recurso só para quem decide o plano (dono, gerente).
         <Card>
           <CardContent className="flex items-start gap-3">
@@ -212,6 +229,26 @@ export default async function GestaoResumoPage() {
               titulo="Acomodações"
               detalhe={`${r.quartos} tipo(s) de quarto ativo(s)`}
             />
+          )}
+          {registraVendas && (
+            <Atalho
+              href="/comerciante/gestao/vendas"
+              icon={Receipt}
+              titulo="Vendas"
+              detalhe={r.comandasAbertas > 0 ? `Vendas do dia · ${r.comandasAbertas} comanda(s) aberta(s)` : "Vendas do dia, balcão, telefone e comandas"}
+            />
+          )}
+          {verVendas && (
+            <Atalho
+              href="/comerciante/gestao/relatorios"
+              icon={BarChart3}
+              titulo="Relatórios"
+              bloqueado={!temFeature(features, "gestao_relatorios")}
+              detalhe={temFeature(features, "gestao_relatorios") ? "Faturamento, formas de pagamento, itens e equipe" : "Disponível no plano Premium"}
+            />
+          )}
+          {atalhoProducao && (
+            <Atalho href="/comerciante/gestao/producao" icon={ChefHat} titulo="Produção" detalhe="Rodadas das comandas para preparar" />
           )}
           {atalhoEquipe && (
             <Atalho

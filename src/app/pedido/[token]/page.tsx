@@ -2,6 +2,8 @@ import type { Viewport } from "next"
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { PedidoTracker, type PedidoData } from "./pedido-tracker"
+import { paraNumero } from "@/lib/dinheiro"
+import { serializarItens } from "@/lib/pedidos-serializar"
 
 export const viewport: Viewport = {
   userScalable: false,
@@ -61,14 +63,14 @@ export default async function PaginaPedido({
     complemento: pedido.complemento,
     referencia: pedido.referencia,
     formaPagamento: pedido.formaPagamento,
-    trocoPara: pedido.trocoPara,
+    trocoPara: paraNumero(pedido.trocoPara),
     observacoes: pedido.observacoes,
-    subtotal: pedido.subtotal,
-    taxaEntrega: pedido.taxaEntrega,
-    total: pedido.total,
+    subtotal: paraNumero(pedido.subtotal),
+    taxaEntrega: paraNumero(pedido.taxaEntrega),
+    total: paraNumero(pedido.total),
     motivoCancelamento: pedido.motivoCancelamento,
     createdAt: pedido.createdAt.toISOString(),
-    itens: pedido.itens,
+    itens: serializarItens(pedido.itens),
     historico: pedido.historico.map((h) => ({ status: h.status, createdAt: h.createdAt.toISOString() })),
     comercio: pedido.comercio,
   }

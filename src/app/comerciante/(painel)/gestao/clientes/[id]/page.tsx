@@ -19,6 +19,7 @@ import { temPermissao } from "@/lib/gestao/permissoes"
 import { STATUS_LABEL, STATUS_TOM, type StatusTom } from "@/lib/pedidos"
 import { temFeature } from "@/lib/plan-features"
 import { cn } from "@/lib/utils"
+import { paraNumero } from "@/lib/dinheiro"
 
 const TOM_CLS: Record<StatusTom, string> = {
   amber: "bg-amber-100 text-amber-700",
@@ -160,7 +161,7 @@ export default async function GestaoClienteDetalhePage({ params }: { params: Pro
                       {STATUS_LABEL[p.status]}
                     </span>
                   </span>
-                  <span className="tabular-nums">{formatBRL(p.total)}</span>
+                  <span className="tabular-nums">{formatBRL(paraNumero(p.total))}</span>
                 </li>
               ))}
             </ul>

@@ -29,7 +29,12 @@ export async function GET(req: NextRequest) {
     prisma.pedido.count({ where: { comercioId: ctx.comercioId, status: "AGUARDANDO" } }),
     desdeValido
       ? prisma.pedido.count({
-          where: { comercioId: ctx.comercioId, createdAt: { gte: desdeValido, lt: agora } },
+          // Só o que chega para a fila: venda do PDV já concluída e comanda não tocam alerta.
+          where: {
+            comercioId: ctx.comercioId,
+            createdAt: { gte: desdeValido, lt: agora },
+            OR: [{ origem: "ONLINE" }, { status: "AGUARDANDO" }],
+          },
         })
       : 0,
   ])

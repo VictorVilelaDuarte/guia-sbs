@@ -71,6 +71,16 @@ enum PedidoStatus {
   CONCLUIDO // entregue / retirado (terminal)
   RECUSADO // loja recusou (terminal)
   CANCELADO // cliente ou loja cancelou (terminal)
+  ABERTA // comanda de mesa/nome no PDV: recebe itens e pagamentos até fechar
+}
+
+// Por onde a venda entrou (Fase 3). ONLINE = checkout do cardápio; BALCAO e
+// TELEFONE = venda manual registrada no PDV; COMANDA = conta de mesa/nome no PDV.
+enum OrigemPedido {
+  ONLINE
+  BALCAO
+  TELEFONE
+  COMANDA
 }
 
 // Quem causou uma mudança de status do pedido (PedidoHistorico).
@@ -456,30 +466,56 @@ model Pedido {
   complemento String?
   referencia  String?
 
-  formaPagamento String // key de FORMAS_PAGAMENTO (src/lib/hospedagem.ts)
-  trocoPara      Float? // só quando formaPagamento = "dinheiro"
-  observacoes    String? @db.Text
+  formaPagamento String // key de FORMAS_PAGAMENTO (src/lib/hospedagem.ts) ou "multiplas"; o detalhe está em PedidoPagamento
+  trocoPara      Decimal? @db.Decimal(10, 2) // só quando formaPagamento = "dinheiro"
+  observacoes    String?  @db.Text
 
-  subtotal    Float // recalculado no servidor
-  taxaEntrega Float @default(0) // 0 em RETIRADA
-  total       Float
+  // Valores em Decimal(10,2) (Fase 3): somas de caixa exatas. Converter na borda com src/lib/dinheiro.ts.
+  subtotal    Decimal @db.Decimal(10, 2) // recalculado no servidor
+  taxaEntrega Decimal @default(0) @db.Decimal(10, 2) // 0 em RETIRADA
+  total       Decimal @db.Decimal(10, 2)
+
+  // PDV: total = subtotal - desconto + taxaServico + taxaEntrega. subtotal já vem
+  // líquido dos descontos por item. Percentuais guardados para recalcular a
+  // comanda quando os itens mudam (null = valor fixo / não cobra serviço).
+  desconto           Decimal  @default(0) @db.Decimal(10, 2)
+  descontoPercentual Decimal? @db.Decimal(5, 2)
+  taxaServico        Decimal  @default(0) @db.Decimal(10, 2)
+  servicoPercentual  Decimal? @db.Decimal(5, 2)
+
+  // Comanda (origem COMANDA): identificação livre da mesa e plano de divisão da
+  // conta salvo pelo PDV (modo, pessoas e itens de cada uma).
+  mesa        String?
+  divisao     Json?
+  // Quando a venda foi encerrada: concluída (ou recusada/cancelada sem ter sido
+  // concluída). É a data dos relatórios — cancelar venda concluída não a altera.
+  fechadaEm   DateTime?
+  juntadaEmId String? // comanda que absorveu esta (status CANCELADO)
 
   motivoCancelamento String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
+  origem        OrigemPedido @default(ONLINE)
+  // Venda manual: quem registrou (snapshot do nome, como no histórico).
+  criadoPorId   String?
+  criadoPorNome String?
+
   // Cliente da loja (Fase 2 do módulo de gestão). O snapshot clienteNome/clienteWhats
   // acima continua sendo a verdade do pedido — o cliente pode ser editado ou excluído.
   clienteId String?
 
-  comercio  Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
-  cliente   Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
-  itens     PedidoItem[]
-  historico PedidoHistorico[]
+  comercio   Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  cliente    Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  itens      PedidoItem[]
+  historico  PedidoHistorico[]
+  pagamentos PedidoPagamento[]
 
   @@unique([comercioId, numero])
   @@index([comercioId, status, createdAt])
   @@index([clienteId, createdAt])
+  @@index([comercioId, origem, createdAt])
+  @@index([comercioId, fechadaEm])
   @@map("pedidos")
 }
 
@@ -547,6 +583,7 @@ model PedidoHistorico {
   userId    String? // referência fraca (sem FK)
   autorNome String? // snapshot do nome no momento da ação
   motivo    String? // recusa/cancelamento
+  descricao String? // evento sem troca de status (comanda: item lançado, pagamento, transferência)
   createdAt DateTime        @default(now())
 
   pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
@@ -561,13 +598,46 @@ model PedidoItem {
   produtoId    String? // referência fraca (sem FK forte) — só rastreio
   titulo       String // snapshot
   variacaoNome String? // snapshot da variação escolhida
-  precoUnit    Float // snapshot do preço unitário
+  precoUnit    Decimal @db.Decimal(10, 2) // snapshot do preço unitário
   quantidade   Int
   observacao   String?
+  desconto     Decimal @default(0) @db.Decimal(10, 2) // desconto na linha (valor)
+
+  // Comanda: rodada de envio para a produção (null = ainda não enviado).
+  rodada    Int?
+  enviadoEm DateTime?
+  prontoEm  DateTime?
+  createdAt DateTime  @default(now())
 
   pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 
+  @@index([pedidoId])
   @@map("pedido_itens")
+}
+
+// Pagamentos de um pedido (PDV): várias formas na mesma venda, divisão da conta
+// entre pessoas e pagamento parcial de comanda. Fonte única dos relatórios por
+// forma de pagamento — o checkout online grava um pagamento com o total.
+model PedidoPagamento {
+  id               String    @id @default(cuid())
+  pedidoId         String
+  comercioId       String
+  forma            String // key de FORMAS_PAGAMENTO
+  valor            Decimal   @db.Decimal(10, 2) // quanto abate da conta
+  recebido         Decimal?  @db.Decimal(10, 2) // dinheiro entregue (troco = recebido - valor)
+  pagante          String? // "Pessoa 1", "Ana" — divisão da conta
+  userId           String?
+  autorNome        String?
+  estornadoEm      DateTime?
+  estornadoPorNome String?
+  motivoEstorno    String?
+  createdAt        DateTime  @default(now())
+
+  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoId])
+  @@index([comercioId, createdAt])
+  @@map("pedido_pagamentos")
 }
 
 // Config de pedidos do comércio (1:1, criado sob demanda — mesmo padrão de
@@ -579,10 +649,11 @@ model PedidoConfig {
   aceitaPedidos   Boolean  @default(false)
   entregaAtiva    Boolean  @default(true)
   retiradaAtiva   Boolean  @default(true)
-  pedidoMinimo    Float    @default(0)
+  pedidoMinimo    Decimal  @default(0) @db.Decimal(10, 2)
   tempoPreparoMin Int?
   formasPagamento String[]
   proximoNumero   Int      @default(1)
+  taxaServicoPct  Decimal? @db.Decimal(5, 2) // PDV: taxa de serviço sugerida (null = desligada)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -638,7 +709,7 @@ model ZonaEntrega {
   nome       String
   cidade     String
   uf         String
-  taxa       Float
+  taxa       Decimal  @db.Decimal(10, 2)
   ativo      Boolean  @default(true)
   ordem      Int      @default(0)
   createdAt  DateTime @default(now())

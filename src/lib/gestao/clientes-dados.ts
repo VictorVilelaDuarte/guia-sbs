@@ -257,7 +257,7 @@ export async function atualizarCliente(comercioId: string, clienteId: string, d:
 
 // --- LGPD: exclusão, registro de acesso do admin, prévia do plano grátis --------
 
-const STATUS_EM_ANDAMENTO = ["AGUARDANDO", "ACEITO", "EM_PREPARO", "PRONTO", "SAIU_ENTREGA"] as const
+const STATUS_EM_ANDAMENTO = ["AGUARDANDO", "ACEITO", "EM_PREPARO", "PRONTO", "SAIU_ENTREGA", "ABERTA"] as const
 
 // Exclusão a pedido do titular (decisões de 2026-09-14). Numa transação:
 // - apaga o Cliente;

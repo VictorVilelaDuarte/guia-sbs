@@ -3,7 +3,9 @@ import { prisma } from "@/lib/prisma"
 import { z } from "zod"
 import { temFeature } from "@/lib/plan-features"
 import { FORMA_PAGAMENTO_KEYS, formaPagamentoLabel } from "@/lib/hospedagem"
-import { calcularSubtotal, calcularTotal, type ItemCalculo } from "@/lib/pedidos"
+import { calcularSubtotalCentavos, centavosDe, precoEfetivo } from "@/lib/pedidos"
+import { deCentavos, paraCentavos, paraNumero } from "@/lib/dinheiro"
+import type { Prisma } from "@prisma/client"
 import { enviarPush, payloadNovoPedido } from "@/lib/push"
 import { parseHorarios, getDiaAtual, estaAbertoAgora } from "@/lib/horarios"
 import { vincularCliente } from "@/lib/gestao/clientes"
@@ -38,16 +40,6 @@ const createSchema = z.object({
 
 function erro(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status })
-}
-
-// Preço efetivo de um item sem variação — espelha isPromoAtiva do cardápio.
-function precoEfetivo(p: {
-  preco: number | null
-  precoPromo: number | null
-  promoFim: Date | null
-}): number | null {
-  const promoAtiva = p.precoPromo != null && (!p.promoFim || p.promoFim.getTime() > Date.now())
-  return promoAtiva ? p.precoPromo : p.preco
 }
 
 export async function POST(req: NextRequest) {
@@ -94,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   // Entrega: exige endereço (rua + número) e uma zona de entrega válida da loja.
   // A taxa e o bairro vêm da zona (autoridade) — não do que o cliente enviou.
-  let zona: { nome: string; taxa: number } | null = null
+  let zona: { nome: string; taxa: Prisma.Decimal } | null = null
   if (d.tipoEntrega === "ENTREGA") {
     if (!d.endereco?.trim() || !d.numeroEnd?.trim()) {
       return erro("Endereço de entrega incompleto.")
@@ -158,15 +150,17 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const subtotal = calcularSubtotal(snapshots as ItemCalculo[])
-  if (d.tipoEntrega === "ENTREGA" && cfg.pedidoMinimo > 0 && subtotal < cfg.pedidoMinimo) {
-    return erro(`Pedido mínimo para entrega: ${formatBRL(cfg.pedidoMinimo)}.`)
+  // Tudo em centavos inteiros: comparação e soma exatas (Fase 3 — valores Decimal).
+  const subtotalC = calcularSubtotalCentavos(snapshots)
+  const minimoC = paraCentavos(cfg.pedidoMinimo)
+  if (d.tipoEntrega === "ENTREGA" && minimoC > 0 && subtotalC < minimoC) {
+    return erro(`Pedido mínimo para entrega: ${formatBRL(paraNumero(cfg.pedidoMinimo))}.`)
   }
 
-  const taxaEntrega = zona ? zona.taxa : 0
-  const total = calcularTotal(subtotal, taxaEntrega)
+  const taxaC = zona ? paraCentavos(zona.taxa) : 0
+  const totalC = subtotalC + taxaC
 
-  if (d.formaPagamento === "dinheiro" && d.trocoPara != null && d.trocoPara < total) {
+  if (d.formaPagamento === "dinheiro" && d.trocoPara != null && centavosDe(d.trocoPara) < totalC) {
     return erro("O valor do troco é menor que o total do pedido.")
   }
 
@@ -203,12 +197,25 @@ export async function POST(req: NextRequest) {
         complemento: entrega ? d.complemento?.trim() || null : null,
         referencia: entrega ? d.referencia?.trim() || null : null,
         formaPagamento: d.formaPagamento,
-        trocoPara: d.formaPagamento === "dinheiro" ? d.trocoPara ?? null : null,
+        trocoPara:
+          d.formaPagamento === "dinheiro" && d.trocoPara != null ? deCentavos(centavosDe(d.trocoPara)) : null,
         observacoes: d.observacoes?.trim() || null,
-        subtotal,
-        taxaEntrega,
-        total,
-        itens: { create: snapshots },
+        subtotal: deCentavos(subtotalC),
+        taxaEntrega: deCentavos(taxaC),
+        total: deCentavos(totalC),
+        itens: {
+          create: snapshots.map((s) => ({ ...s, precoUnit: deCentavos(centavosDe(s.precoUnit)) })),
+        },
+        // Pagamento previsto (fonte única dos relatórios por forma de pagamento).
+        pagamentos: {
+          create: {
+            comercioId: comercio.id,
+            forma: d.formaPagamento,
+            valor: deCentavos(totalC),
+            recebido:
+              d.formaPagamento === "dinheiro" && d.trocoPara != null ? deCentavos(centavosDe(d.trocoPara)) : null,
+          },
+        },
         // Primeiro registro da linha do tempo, na mesma transação da criação.
         historico: {
           create: { status: "AGUARDANDO", origem: "CLIENTE", autorNome: d.clienteNome.trim() },
@@ -223,7 +230,7 @@ export async function POST(req: NextRequest) {
   try {
     await enviarPush(
       comercio.id,
-      payloadNovoPedido({ numero: pedido.numero, total, tipoEntrega: d.tipoEntrega }),
+      payloadNovoPedido({ numero: pedido.numero, total: totalC / 100, tipoEntrega: d.tipoEntrega }),
     )
   } catch {
     // ignora — o pedido já está salvo; o polling do painel ainda o exibe

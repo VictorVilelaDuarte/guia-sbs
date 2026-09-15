@@ -1,6 +1,6 @@
 # Módulo de Gestão — Plano de Design e Implementação
 
-> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 implementada (§12; aguardando merge). Decisões de
+> **Status:** Fase 0 em produção; Fase 1 em andamento (PRs 1 a 5 em produção — `main`, 2026-09-13); Fase 2 em produção (`main`, 2026-09-14); Fase 3 em produção (`main`, 2026-09-15 — §13). Decisões de
 > produto fechadas (2026-09-12).
 > **Última atualização:** 2026-09-12
 > Documento vivo — atualizar ao fim de cada fase com o que foi efetivamente construído.
@@ -427,7 +427,7 @@ enum OrigemPedido {
 
 A venda manual **reusa tudo** do pedido online: mesmo `PedidoItem` com snapshot, mesma
 numeração, mesma máquina de estados (pode nascer direto em `CONCLUIDO` no balcão), mesmo vínculo
-com `Cliente`. Não é um PDV — é "lançar pedido" com busca de item e cliente, pensado para celular.
+com `Cliente`. ~~Não é um PDV~~ — **revisto em 2026-09-14: virou o PDV completo em tela cheia** (§13.3).
 
 > Venda que nasce `CONCLUIDO` **passa pelo aceite** para efeito de estoque (decisão 5): a função
 > de criação aplica a baixa como se tivesse havido o `ACEITO`. Senão, venda de balcão nunca
@@ -937,3 +937,144 @@ backfill rodado duas vezes não duplica.
 - Plano sem `gestao_clientes`: página com números reais agregados (clientes no mês, recorrentes) e
   lista borrada com cadeado, no padrão do analytics.
 
+---
+
+## 13. Plano de execução — Fase 3 (vendas e relatórios)
+
+Branch `feat/gestao-fase-3`. Desenho da fase no §Fase 3.
+
+**Decisões de 2026-09-14:**
+1. **Item avulso** na venda manual (nome e preço digitados, fora do cardápio) — permitido.
+2. **Venda sem cliente identificado** ("Cliente balcão") — permitida; cliente é opcional.
+3. **Permissão `vendas:registrar`** para dono, gerente e atendente; relatórios (`vendas:ver`) só dono e gerente.
+4. **Venda manual e relatórios não dependem de `pedido_online`** — liberados por `gestao_relatorios`. Sem
+   pedido online, venda por telefone nasce concluída (não há fila).
+
+### 13.1 PR 1 — Valores dos pedidos em `Decimal` ✅ implementado
+
+| Campo | De → para |
+|---|---|
+| `Pedido.subtotal`, `taxaEntrega`, `total`, `trocoPara` | `Float` → `Decimal(10,2)` |
+| `PedidoItem.precoUnit` | `Float` → `Decimal(10,2)` |
+| `PedidoConfig.pedidoMinimo` | `Float` → `Decimal(10,2)` |
+| `ZonaEntrega.taxa` | `Float` → `Decimal(10,2)` |
+
+- **Migração por SQL explícito, nunca pelo `db:push`:** trocar o tipo pelo push pode recriar a coluna
+  (perda dos valores) ou exigir `--accept-data-loss`. Script `prisma/migrate-dinheiro-decimal.ts`
+  roda `ALTER COLUMN ... TYPE DECIMAL(10,2) USING ROUND(col::numeric, 2)` só nas colunas ainda
+  `double precision` (idempotente) e imprime as somas antes e depois para conferência.
+- **`src/lib/dinheiro.ts`:** conversão `Decimal` ↔ `number` na borda. `Prisma.Decimal` vira **string**
+  no JSON e não atravessa Server → Client — toda resposta de API e prop de Client Component com valor
+  de pedido passa pelo serializador.
+- **Cálculo em centavos inteiros** no checkout (`calcularSubtotal`/`calcularTotal`); preço de
+  `Produto` continua `Float` e é arredondado uma vez, na borda.
+- **Teste em Postgres descartável (Docker)**, não no banco do `.env`: é a primeira mudança da série
+  que não é só aditiva.
+- **Implementação (2026-09-14):** serialização única em `src/lib/pedidos-serializar.ts`. Achado: o
+  TypeScript acusou só as props tipadas — as rotas que devolviam o objeto do Prisma direto
+  (`GET /api/comerciante/pedidos`, `GET /api/pedidos/[token]`, config e zonas) teriam passado a mandar
+  valores como **string** sem erro de compilação. **Compatibilidade testada:** o client anterior
+  (`Float`) lê e grava normalmente nas colunas `DECIMAL` — migrar o banco antes de publicar é seguro.
+- **Deploy:** `npx tsx prisma/migrate-dinheiro-decimal.ts` (com `DIRECT_URL`) → `npm run db:push`
+  (deve dizer "already in sync") → publicar.
+
+### 13.2 PR 2 — Venda manual (balcão e telefone) ✅ implementado
+
+**Decisões de 2026-09-14:**
+1. **Cancelar venda manual concluída** — permitido para dono e gerente (`vendas:cancelar`), com motivo
+   obrigatório registrado no histórico. Venda que foi para a fila segue o fluxo normal de pedidos.
+2. **"Nova venda" no celular** é botão flutuante (acima da barra inferior, só dentro da Gestão).
+3. **Desconto** fica para depois.
+
+- **Modelo:** venda manual é um `Pedido` com `origem` (`ONLINE` | `BALCAO` | `TELEFONE`, default
+  `ONLINE`) e autor (`criadoPorId`/`criadoPorNome`, snapshot). Mesma numeração, itens, histórico e
+  relatórios dos pedidos online — uma única fonte de faturamento. Mudança só aditiva (`db:push`).
+- **Regras** (`registrarVenda` em `src/lib/gestao/vendas.ts`): preço sempre do servidor (catálogo com
+  promoção vigente, variação obrigatória quando o produto tem); item avulso com nome e preço digitados
+  (`produtoId` nulo); entrega só no telefone, com taxa da zona; "valor recebido" só em dinheiro e ≥ total.
+  Nasce `CONCLUIDO`; vai para a fila (`AGUARDANDO`) só por telefone, com "Enviar para a fila" marcado e
+  loja com `pedido_online`.
+- **Cliente:** cadastro criado/vinculado **só com WhatsApp** (`vincularCliente`). Nome sem WhatsApp fica
+  apenas no pedido — criar `Cliente` por nome duplicaria cadastros a cada venda. Sem nome: "Cliente balcão".
+- **Numeração em loja sem pedido online:** o `PedidoConfig` é criado sob demanda com
+  `createMany({ skipDuplicates })` e `aceitaPedidos: false` — dá o contador sem ligar o pedido online.
+- **Telas:** `/comerciante/gestao/vendas` (vendas do dia, navegação por dia, filtro de origem; valores
+  só com `vendas:ver`) e `/vendas/nova` (mobile-first, sem barra inferior). Pedidos ganham selo e filtro
+  de origem; o Resumo soma todas as origens e mostra "Nova venda".
+- **APIs:** `POST /api/comerciante/gestao/vendas` (`vendas:registrar`), `POST .../vendas/[id]/cancelar`
+  (`vendas:cancelar`; 409 para pedido online ou não concluído), `GET .../clientes/busca?q=`
+  (autocomplete; vazio sem `gestao_clientes`). Todas exigem a flag `gestao_relatorios`.
+- **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar.
+
+### 13.3 PDV em tela cheia, pagamentos, divisão e comandas ✅ implementado
+
+Mudança de escopo pedida em 2026-09-14: a tela de lançamento dentro do painel vira o **PDV**, núcleo do
+sistema, em tela cheia e aba própria, com os recursos de um caixa profissional.
+
+**Decisões de 2026-09-14:**
+1. **Comandas e mesas entram agora** — mesa/nome digitado, sem cadastro de mapa de mesas.
+2. **Divisão da conta nos três modos:** igual, por itens e por valor.
+3. **Pagamento parcial só em comanda** (venda rápida fecha na hora).
+4. **Desconto agora** — por item e na conta, R$ ou %, permissão `vendas:desconto` (dono e gerente);
+   taxa de serviço opcional com percentual por loja.
+5. **Controle de caixa (abertura, sangria, fechamento) fica para depois.**
+6. **Cupom para imprimir** pela impressão do navegador (80mm), com "não é documento fiscal".
+7. **`/gestao/vendas/nova` removida** — redireciona para o PDV; a lista de Vendas segue no painel.
+8. PR 2 commitado como base; os três pacotes (tela, pagamentos, comandas) implementados em sequência.
+
+**Desenho:**
+- **Tela:** `/comerciante/pdv`, fora do shell do painel, aberta por link com `target` de nome fixo
+  (clicar de novo traz a mesma aba). Só no navegador (`ssr: false`): rascunho da venda no
+  `localStorage`, atalhos (`/`, `F2`, `F4`), botão de tela cheia. Computador: grade de produtos + conta ao
+  lado; celular: produtos ⇄ conta pela barra inferior.
+- **Totais em módulo puro** (`src/lib/gestao/totais.ts`) compartilhado pela tela e pelo servidor — o
+  servidor continua a autoridade. Serviço incide sobre o consumo já com desconto.
+- **`PedidoPagamento`** como fonte única dos relatórios por forma de pagamento: várias formas, troco por
+  pagamento, pessoa (`pagante`) e estorno (nunca apaga). O checkout online grava um pagamento com o total
+  e `prisma/migrate-pagamentos-pedidos.ts` cria o dos pedidos antigos (soma conferida).
+- **Divisão em módulo puro** (`src/lib/gestao/divisao.ts`): rateio por maiores restos, soma sempre
+  exata; por itens aceita parte compartilhada e separação por unidade, e distribui desconto/serviço/entrega
+  na proporção do consumo. O servidor não precisa conhecer a divisão — só confere que os pagamentos
+  fecham; na comanda o plano fica em `Pedido.divisao` para sobreviver a recarga e a outro aparelho.
+- **Comanda = `Pedido` `COMANDA`/`ABERTA`.** Cada ação trava a linha (`SELECT … FOR UPDATE`) e recalcula
+  os totais; nunca deixa o total abaixo do já pago. Uma comanda aberta por mesa (lock consultivo por
+  loja+mesa). Rodadas para a produção (`rodada`, `enviadoEm`, `prontoEm`) e tela **Produção** para a
+  cozinha. Juntar move itens e pagamentos e encerra a origem com `juntadaEmId`. Eventos sem troca de status
+  (item lançado, pagamento, transferência) em `PedidoHistorico.descricao`.
+- **Permissões finas no servidor:** desconto → `vendas:desconto`; reduzir/tirar item enviado, estornar e
+  cancelar comanda com itens → `vendas:cancelar` + motivo.
+- **Testado:** 88 cenários automáticos (cálculo, permissões, concorrência de dois caixas recebendo o mesmo
+  saldo e de duas pessoas abrindo a mesma mesa, juntar/transferir, cupom, telas) + conferência visual em
+  navegador headless (desktop e celular).
+- **Limitações conhecidas:** a produção mostra só as rodadas das comandas (pedido online segue na fila de
+  Pedidos); renomear a pessoa depois de ela pagar desfaz o vínculo "pago" na divisão (o pagamento continua
+  registrado); o PDV não funciona offline.
+- **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar →
+  `npx tsx prisma/migrate-pagamentos-pedidos.ts`.
+
+### 13.4 PR 3 — Relatórios ✅ implementado
+
+**Decisões de 2026-09-15:**
+1. **A venda conta na data de conclusão** (`fechadaEm`) — o fechamento de caixa bate com o dia. Pedido
+   online passa a gravar a data ao ser concluído/recusado/cancelado; os antigos são preenchidos pelo
+   histórico (`prisma/migrate-fechada-em.ts`).
+2. **Períodos:** atalhos (Hoje, Ontem, 7 dias, 30 dias, Este mês, Mês passado) + período livre, até 12 meses.
+3. **Relatório por atendente:** sim (vendas, valor, descontos e serviço de quem lançou).
+4. **Exportação CSV: fora por agora.**
+5. **Venda cancelada depois de concluída** sai do faturamento e aparece em cancelamentos no dia em que foi
+   concluída, com a data do cancelamento na lista.
+6. **Plano grátis:** cadeado padrão, sem prévia.
+
+**Implementação:**
+- `src/lib/gestao/relatorios.ts`: resumo (faturamento, vendas, ticket, bruto, descontos, serviço, entrega)
+  com comparação ao período anterior de mesmo tamanho; série por dia (por mês acima de 62 dias); por origem;
+  fechamento por forma (com recebido e troco do dinheiro); itens mais vendidos pelo snapshot (avulso
+  marcado); hora do dia e dia da semana; atendentes; entregas por bairro; cancelamentos e recusas (sem
+  comandas juntadas); conversão guia → venda agregada.
+- Filtro sobre `fechadaEm` com limites convertidos para UTC (usa o índice novo `[comercioId, fechadaEm]`).
+- Resumo do dia e lista de vendas alinhados à mesma data.
+- **Testado:** cenário "bate centavo" com balcão (duas formas + troco), telefone com entrega + descontos +
+  serviço, comanda juntada com estorno, venda cancelada, pedido online concluído e recusado, comanda da
+  virada do dia, venda de ontem e pedido antigo sem data — faturamento = soma dos pagamentos = soma manual
+  (R$ 91,95); períodos, permissões e plano; conferência visual no desktop e no celular.
+- **Deploy:** `npm run db:push` → publicar → `npx tsx prisma/migrate-fechada-em.ts`.

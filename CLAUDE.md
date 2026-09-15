@@ -110,6 +110,8 @@ src/app/comerciante/
   gestao/pedidos          — PedidosManager + PedidoConfigForm + ZonasEntregaManager (feature pedido_online)
   gestao/acomodacoes      — QuartosManager (categoria HOSPEDAGEM; fora dela, 404)
   gestao/equipe           — EquipeManager (equipe:gerenciar; feature gestao_equipe, senão cadeado)
+  gestao/vendas           — vendas do dia (gestao_relatorios); gestao/producao — rodadas das comandas
+  ../pdv/                 — PDV em tela cheia, FORA do (painel) (ver seção PDV)
 ```
 
 > Os arquivos acima (exceto `trocar-senha/`) vivem em `src/app/comerciante/(painel)/`. O route group
@@ -194,7 +196,8 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 | Permissão | DONO | GERENTE | ATENDENTE | PRODUCAO |
 |---|:-:|:-:|:-:|:-:|
 | `vitrine:editar`, `analytics:ver`, `cardapio:editar`, `catalogo:editar`, `quartos:editar`, `pedidos:configurar`, `vendas:ver`, `clientes:editar` | ✅ | ✅ | | |
-| `clientes:ver` | ✅ | ✅ | ✅ | |
+| `vendas:cancelar` (cancelar venda, estornar pagamento, tirar item já enviado), `vendas:desconto` | ✅ | ✅ | | |
+| `clientes:ver`, `vendas:registrar` | ✅ | ✅ | ✅ | |
 | `itens:disponibilidade` (só o `disponivel` de itens do cardápio/catálogo) | ✅ | ✅ | ✅ | |
 | `pedidos:operar` | ✅ | ✅ | ✅ | ✅ |
 | `equipe:gerenciar` | ✅ | | | |
@@ -221,6 +224,40 @@ Fase 2 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
   - Checkout mostra "Seus dados ficam com {loja} para preparar e entregar o seu pedido." (informativo, sem checkbox).
 - **Permissões:** `clientes:ver` (dono, gerente, atendente), `clientes:editar` (dono, gerente). Flag `gestao_clientes` ligada no premium por `prisma/migrate-flag-gestao-clientes.ts`. No mobile, "Clientes" ocupa a vaga de "Produtos" na barra inferior.
 - **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-clientes-pedidos.ts` (backfill idempotente a partir dos pedidos existentes) → `npx tsx prisma/migrate-flag-gestao-clientes.ts` → publicar.
+
+### Dinheiro dos pedidos (`Decimal`)
+
+Fase 3 / PR 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.1). Valores de **pedido** são `Decimal(10,2)`: `Pedido.subtotal/taxaEntrega/total/trocoPara`, `PedidoItem.precoUnit`, `PedidoConfig.pedidoMinimo`, `ZonaEntrega.taxa`. Preço de `Produto`/`CardapioVariacao`/`TipoQuarto` continua `Float` (o valor que conta é o snapshot do pedido).
+
+- **`Prisma.Decimal` vira string no JSON e não atravessa Server → Client.** Toda saída de pedido passa por `src/lib/pedidos-serializar.ts` (`serializarPedidoAdmin`, `serializarItens`, `serializarValores`) ou `paraNumero()` (`src/lib/dinheiro.ts`). Rota nova que devolva pedido/config/zona **tem** que serializar — o TypeScript não acusa quando o objeto vai direto para `NextResponse.json`.
+- **Contas em centavos inteiros:** checkout usa `calcularSubtotalCentavos`/`centavosDe` (`src/lib/pedidos.ts`), `paraCentavos`/`deCentavos` (`src/lib/dinheiro.ts`). Nunca somar/comparar `Decimal` com `>`/`+` nem converter para `number` antes de somar.
+- SQL agregado (`SUM(total)`) soma em `numeric` (exato) e converte com `::float` só no fim.
+- **Troca de tipo de coluna nunca pelo `db:push`** (pode recriar a coluna e perder dados): foi feita por `prisma/migrate-dinheiro-decimal.ts` (`ALTER ... USING ROUND(col::numeric, 2)`, idempotente, confere somas). Testado: o client antigo (`Float`) lê e grava nas colunas `DECIMAL`, então a ordem de deploy é **script → `db:push` → publicar**, sem janela quebrada.
+
+### PDV — venda rápida, comandas e produção
+
+Fase 3 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.2 venda manual, §13.3 PDV). Toda venda é um **`Pedido`**: `origem` `ONLINE` (checkout), `BALCAO`/`TELEFONE` (venda rápida) ou `COMANDA` (mesa/nome), com autor em `criadoPorId`/`criadoPorNome` — mesma numeração, histórico e faturamento.
+
+- **Tela cheia fora do painel:** `/comerciante/pdv` (layout próprio em `src/app/comerciante/pdv/`, sem o shell do `(painel)`), aberta sempre em **aba própria** por `AbrirPdvLink` (`target="pdv"` com nome fixo — reaproveita a aba). Renderiza só no navegador (`pdv-cliente.tsx`, `dynamic` com `ssr: false`): rascunho da venda no `localStorage`, atalhos (`/` busca, `F2` receber, `F4` desconto), tela cheia. `/comerciante/gestao/vendas/nova` redireciona para o PDV. Componentes em `src/components/comerciante/pdv/`.
+- **Totais** (`src/lib/gestao/totais.ts`, sem runtime, usado pela tela e pelo servidor): `subtotal = Σ(preço × qtd − desconto da linha)`; `total = subtotal − desconto + taxaServico + taxaEntrega`. Serviço incide sobre `subtotal − desconto`. Campos em `Pedido` (`desconto`, `descontoPercentual`, `taxaServico`, `servicoPercentual`) e `PedidoItem.desconto`. Percentuais ficam guardados para a comanda recalcular quando os itens mudam.
+- **Pagamentos** (`PedidoPagamento`): várias formas na mesma venda, `recebido` (dinheiro; troco = recebido − valor), `pagante` (divisão), estorno com `estornadoEm`/motivo (nunca apagar). **Fonte única dos relatórios por forma de pagamento** — o checkout online também grava um pagamento; `Pedido.formaPagamento` vira resumo (`"multiplas"` → `FORMA_MULTIPLAS`). Venda rápida exige pagamentos = total exato. Pedidos antigos: `prisma/migrate-pagamentos-pedidos.ts`.
+- **Divisão da conta** (`src/lib/gestao/divisao.ts`, sem runtime): igual (centavos que sobram → primeira pessoa), por itens (linha inteira ou por unidade, parte compartilhada dividida igualmente; desconto/serviço/entrega rateados na proporção do consumo) e por valor. Rateio por maiores restos — soma sempre exata. O servidor não valida a divisão (só que os pagamentos fecham); na comanda o plano é salvo em `Pedido.divisao`.
+- **Comandas** (`src/lib/gestao/comandas.ts`): `status ABERTA` + `origem COMANDA`, `mesa` livre (uma comanda aberta por mesa, com `pg_advisory_xact_lock`). **Toda mudança trava a linha do pedido (`SELECT … FOR UPDATE`) e chama `recalcular()`**, que recusa (409) deixar o total abaixo do já pago. Itens entram como pendentes na tela e são lançados ("Lançar" / "Lançar e enviar p/ produção" → `rodada`, `enviadoEm`). Pagamento parcial por pessoa; fecha quando o saldo zera (`fechadaEm`, `CONCLUIDO`). Transferir mesa, juntar (itens e pagamentos passam; a origem vira `CANCELADO` com `juntadaEmId`), cancelar (vazia: qualquer um; com itens: `vendas:cancelar` + motivo, sem pagamento ativo). Eventos sem troca de status vão para `PedidoHistorico.descricao`. API: `GET/POST /api/comerciante/gestao/comandas` e `GET/POST .../comandas/[id]` com `{ acao }` (lancar, enviar, alterarItem, removerItem, atualizar, pagar, estornar, fechar, cancelar, juntar).
+- **Comanda aberta não é pedido da fila:** `GET /api/comerciante/pedidos` e `getPedidosData` excluem `ABERTA`; o alerta de "novos" só conta `ONLINE` ou `AGUARDANDO` (venda do PDV não apita).
+- **Produção:** `/comerciante/gestao/producao` (`pedidos:operar` + flag) lista rodadas enviadas e não prontas (`prontoEm`), com polling e bipe; `POST /api/comerciante/gestao/producao` marca a rodada pronta. Na barra inferior só para quem não tem `cardapio:editar`/`vendas:registrar` (`mobileSemPermissoes`).
+- **Regras sensíveis:** desconto (item ou conta) exige `vendas:desconto`; reduzir/tirar item já enviado e estornar pagamento exigem `vendas:cancelar` + motivo — checados em `vendas.ts`/`comandas.ts`, não só na tela. Cliente só é criado/vinculado com WhatsApp. Loja sem pedido online ganha `PedidoConfig` sob demanda (`proximoNumero`, `aceitaPedidos: false`), onde também fica `taxaServicoPct` (`PATCH /api/comerciante/gestao/pdv`, `pedidos:configurar`).
+- **Cupom não fiscal 80mm:** `/comerciante/pdv/cupom/[id]` (`?imprimir=1` abre a impressão; `?tipo=conferencia` para comanda, com a divisão por pessoa). NFC-e fica no roadmap fiscal.
+- **Rotas do PDV** usam `guardPdv(...)` e `responder()` de `src/lib/gestao/pdv-api.ts` (flag `gestao_relatorios` + permissão; `ErroVenda` vira JSON com status).
+- **Deploy:** `npm run db:push` (aditivo: tabela `pedido_pagamentos`, colunas, enums `ABERTA`/`COMANDA`) → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar → `npx tsx prisma/migrate-pagamentos-pedidos.ts` (idempotente; depois de publicar para pegar pedidos criados pelo código antigo).
+
+### Relatórios de vendas
+
+Fase 3 / PR 3 (§13.4 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md)). Tela `/comerciante/gestao/relatorios` (`vendas:ver` + flag `gestao_relatorios`; menu só no desktop, atalho no Resumo e em Vendas). Consultas em `src/lib/gestao/relatorios.ts`, período na URL (`?periodo=hoje|ontem|7d|30d|mes|mes-anterior` ou `?de=&ate=`, máx. 12 meses, sem futuro), gráficos em SVG/HTML puro no servidor (`src/components/comerciante/relatorios/graficos.tsx`).
+
+- **A venda conta na data de encerramento (`Pedido.fechadaEm`)**, não na criação: comanda aberta às 23h e fechada à 1h entra no dia do caixa. `mudarStatusPedido()` grava `fechadaEm` ao entrar em status terminal — **exceto** saindo de `CONCLUIDO` (cancelar venda concluída mantém a data: sai do faturamento daquele dia e aparece nos cancelamentos do mesmo dia). PDV e comandas já gravavam. Pedidos antigos: `prisma/migrate-fechada-em.ts` (usa o histórico). O Resumo (faturamento de hoje) e a lista "Vendas do dia" seguem a mesma regra (`COALESCE(fechadaEm, createdAt)` para vendas em aberto).
+- **Filtro de período em UTC sobre `fechadaEm`** (usa `@@index([comercioId, fechadaEm])`): limites `(dia::timestamp AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'UTC'`; agrupamento converte UTC → SP. Somas em `numeric`, saída em centavos.
+- **Faturamento = `CONCLUIDO`**; fechamento por forma lê `PedidoPagamento` sem estornos e deve bater com o faturamento (a tela avisa se não bater). Comanda juntada (`juntadaEmId`) não entra em cancelamentos. Conversão guia → venda só com `analytics` + `pedido_online`, sempre agregada.
+- **Deploy:** `npm run db:push` (índice) → publicar → `npx tsx prisma/migrate-fechada-em.ts` (idempotente).
 
 ### Upload de imagens
 
@@ -419,6 +456,7 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 | `pedido_online` | Pedido online pelo cardápio (depende de `cardapio`) |
 | `gestao_equipe` | Membros com papéis no painel do comércio (tela de equipe) |
 | `gestao_clientes` | Cadastro de clientes da loja com histórico, filtros e anotações |
+| `gestao_relatorios` | PDV (venda rápida, comandas, produção) e relatórios de vendas |
 
 A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
 
