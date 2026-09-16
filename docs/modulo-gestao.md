@@ -525,7 +525,9 @@ específica e a menos reaproveitável.
 
 ## 6. Roadmap futuro (fora da v1)
 
-Listado para não se perder, **sem desenho ainda**. Cada item só entra em planejamento quando a
+Listado para não se perder, **sem desenho ainda**. Ideias de evolução do que já existe (caixa,
+complementos, fidelidade, antifraude, integração Guia × Gestão e outras), com esforço e decisões em
+aberto, ficam no banco de ideias [`docs/gestao-ideias.md`](gestao-ideias.md). Cada item só entra em planejamento quando a
 fase de que depende estiver em produção e houver demanda real.
 
 | Área | Depende de | Nota |
