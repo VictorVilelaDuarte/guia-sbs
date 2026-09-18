@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BellRing, Check, ChefHat, Clock, Plus, ReceiptText, Send } from "lucide-react"
+import { BellRing, Check, ChefHat, Clock, Hand, Plus, ReceiptText, Send } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { ComandaResumo } from "@/lib/gestao/comandas"
+import type { SolicitacaoPainel } from "@/lib/gestao/comandas"
 import type { ChamadoPainel } from "@/lib/gestao/mesas"
 import { cn } from "@/lib/utils"
 import { rotuloMesa } from "@/lib/gestao/mesas-link"
@@ -24,12 +25,14 @@ function tempo(min: number) {
 export function ComandasGrid({
   comandas,
   chamados,
+  solicitacoes,
   onAtenderChamado,
   onAbrir,
   onNova,
 }: {
   comandas: ComandaResumo[]
   chamados: ChamadoPainel[]
+  solicitacoes: SolicitacaoPainel[]
   onAtenderChamado: (id: string) => void
   onAbrir: (id: string) => void
   onNova: () => void
@@ -42,6 +45,26 @@ export function ComandasGrid({
 
   return (
     <div className="h-full overflow-y-auto p-3 sm:p-4">
+      {solicitacoes.length > 0 && (
+        <ul className="mb-3 space-y-2">
+          {solicitacoes.map((s) => (
+            <li key={s.pedidoId} className="flex flex-wrap items-center gap-2 rounded-2xl bg-violet-50 px-3 py-2.5 ring-1 ring-violet-200">
+              <Hand className="h-5 w-5 text-violet-700" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">
+                  {s.mesa ? rotuloMesa(s.mesa) : s.clienteNome} pediu {s.itens} item(ns) pelo QR
+                </span>
+                <span className="block text-xs text-stone-600">
+                  {minutosDesde(s.desde, agora)} min{s.pedidoPor ? ` · ${s.pedidoPor}` : ""} · confirme para entrar na conta
+                </span>
+              </span>
+              <button type="button" onClick={() => onAbrir(s.pedidoId)} className="flex h-10 items-center gap-1.5 rounded-xl bg-stone-900 px-3 text-sm font-semibold text-white">
+                Ver pedido
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {chamados.length > 0 && (
         <ul className="mb-3 space-y-2">
           {chamados.map((ch) => (
@@ -99,6 +122,11 @@ export function ComandasGrid({
                   {c.naoEnviados > 0 && (
                     <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
                       <Send className="h-2.5 w-2.5" /> {c.naoEnviados} sem enviar
+                    </span>
+                  )}
+                  {c.aguardandoAprovacao > 0 && (
+                    <span className="flex items-center gap-0.5 rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800">
+                      <Hand className="h-2.5 w-2.5" /> {c.aguardandoAprovacao} do cliente
                     </span>
                   )}
                   {c.naProducao > 0 && (

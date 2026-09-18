@@ -1,10 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BellRing, Check, ChefHat, Loader2, ReceiptText, RefreshCw, UtensilsCrossed } from "lucide-react"
-import type { ContaDaMesa } from "@/lib/gestao/mesas"
+import { BellRing, Check, ChefHat, Loader2, Plus, ReceiptText, RefreshCw, UtensilsCrossed } from "lucide-react"
+import type { CardapioDaMesa, ContaDaMesa } from "@/lib/gestao/mesas"
 import { rotuloMesa } from "@/lib/gestao/mesas-link"
 import { cn } from "@/lib/utils"
+import { PedidoSheet } from "./pedido-sheet"
 
 const POLL_MS = 12000
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
@@ -12,16 +13,19 @@ const hora = (iso: string) =>
   new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(new Date(iso))
 
 const ESTADO: Record<string, { label: string; cls: string }> = {
+  aguardando: { label: "confirmando", cls: "bg-amber-100 text-amber-800" },
   producao: { label: "na cozinha", cls: "bg-sky-100 text-sky-800" },
   pronto: { label: "pronto", cls: "bg-emerald-100 text-emerald-800" },
 }
 
 // Página que o cliente vê ao escanear o QR da mesa: a conta em tempo real,
 // "chamar o garçom" e "pedir a conta". Sem login e sem dado de outras pessoas.
-export function MesaCliente({ inicial, token }: { inicial: ContaDaMesa; token: string }) {
+export function MesaCliente({ inicial, cardapio, token }: { inicial: ContaDaMesa; cardapio: CardapioDaMesa | null; token: string }) {
   const [conta, setConta] = useState(inicial)
   const [enviando, setEnviando] = useState<null | "GARCOM" | "CONTA">(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [pedindo, setPedindo] = useState(false)
+  const [meuNome, setMeuNome] = useState("")
 
   useEffect(() => {
     const t = setInterval(async () => {
@@ -51,6 +55,9 @@ export function MesaCliente({ inicial, token }: { inicial: ContaDaMesa; token: s
 
   const c = conta.comanda
   const chamado = conta.chamadoPendente
+  // Pedir exige cardápio liberado e, sem conta aberta, que a loja deixe o cliente abrir.
+  const podePedir = conta.permite.pedido && !!cardapio && (!!c || conta.permite.abrirConta)
+  const aguardando = c?.itens.filter((i) => i.estado === "aguardando") ?? []
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-stone-50 text-stone-900">
@@ -73,14 +80,27 @@ export function MesaCliente({ inicial, token }: { inicial: ContaDaMesa; token: s
       </header>
 
       <main className="flex-1 space-y-4 p-4">
-        {conta.loja.temCardapio && (
-          <a
-            href={`/vitrine/${conta.loja.slug}/cardapio?src=qr`}
-            className="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200"
+        {podePedir ? (
+          <button
+            type="button"
+            onClick={() => setPedindo(true)}
+            className="flex w-full items-center justify-between rounded-2xl bg-stone-900 p-4 text-left font-semibold text-white"
           >
-            <span className="font-semibold">Ver o cardápio</span>
-            <span className="text-sm text-stone-500">abrir →</span>
-          </a>
+            <span className="flex items-center gap-2">
+              <Plus className="h-5 w-5" /> Fazer pedido pelo celular
+            </span>
+            <span className="text-sm font-normal opacity-80">cardápio →</span>
+          </button>
+        ) : (
+          conta.loja.temCardapio && (
+            <a
+              href={`/vitrine/${conta.loja.slug}/cardapio?src=qr`}
+              className="flex items-center justify-between rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200"
+            >
+              <span className="font-semibold">Ver o cardápio</span>
+              <span className="text-sm text-stone-500">abrir →</span>
+            </a>
+          )
         )}
 
         {c ? (
@@ -138,11 +158,20 @@ export function MesaCliente({ inicial, token }: { inicial: ContaDaMesa; token: s
             <ReceiptText className="mx-auto h-8 w-8 text-stone-300" />
             <p className="mt-2 font-semibold">Nenhuma conta aberta nesta mesa</p>
             <p className="mt-1 text-sm text-stone-600">
-              {conta.permite.chamarGarcom ? "Chame o atendente para começar o seu pedido." : "Fale com o atendente para começar o seu pedido."}
+              {podePedir
+                ? "Faça o seu pedido pelo celular ou chame o atendente."
+                : conta.permite.chamarGarcom
+                  ? "Chame o atendente para começar o seu pedido."
+                  : "Fale com o atendente para começar o seu pedido."}
             </p>
           </section>
         )}
 
+        {aguardando.length > 0 && (
+          <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {aguardando.reduce((a, i) => a + i.quantidade, 0)} item(ns) esperando o atendente confirmar. Eles entram na conta depois da confirmação.
+          </p>
+        )}
         {chamado && (
           <p className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <BellRing className="h-4 w-4 shrink-0" />
@@ -155,6 +184,21 @@ export function MesaCliente({ inicial, token }: { inicial: ContaDaMesa; token: s
           </p>
         )}
       </main>
+
+      {pedindo && cardapio && (
+        <PedidoSheet
+          cardapio={cardapio}
+          token={token}
+          nomeSalvo={meuNome}
+          onFechar={() => setPedindo(false)}
+          onEnviado={(nova, nome) => {
+            setConta(nova)
+            setMeuNome(nome)
+            setPedindo(false)
+            setAviso("Pedido enviado! O atendente vai confirmar em instantes.")
+          }}
+        />
+      )}
 
       {(conta.permite.chamarGarcom || conta.permite.pedirConta) && (
         <footer className="sticky bottom-0 grid gap-2 border-t border-stone-200 bg-white p-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>

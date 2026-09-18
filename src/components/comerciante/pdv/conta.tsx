@@ -13,11 +13,12 @@ export interface LinhaConta {
   quantidade: number
   observacao: string | null
   descontoC: number
-  estado?: "novo" | "lancado" | "producao" | "pronto"
+  estado?: "novo" | "aguardando" | "lancado" | "producao" | "pronto"
 }
 
 const ESTADO: Record<NonNullable<LinhaConta["estado"]>, { label: string; cls: string } | null> = {
   novo: { label: "a lançar", cls: "bg-amber-100 text-amber-800" },
+  aguardando: { label: "pedido do cliente", cls: "bg-violet-100 text-violet-800" },
   lancado: null,
   producao: { label: "na produção", cls: "bg-sky-100 text-sky-800" },
   pronto: { label: "pronto", cls: "bg-emerald-100 text-emerald-800" },
@@ -41,6 +42,7 @@ export function Conta({
   onDesconto,
   onServico,
   servicoAtivo,
+  avisos,
   rodape,
 }: {
   cabecalho: ReactNode
@@ -59,11 +61,14 @@ export function Conta({
   onDesconto?: () => void
   onServico?: () => void
   servicoAtivo?: boolean
+  avisos?: ReactNode
   rodape: ReactNode
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
       <div className="border-b border-stone-200 p-3">{cabecalho}</div>
+
+      {avisos}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {linhas.length === 0 ? (

@@ -1,12 +1,14 @@
 import type { TipoChamado } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import type { ComercioCtx } from "@/lib/comercio-ctx"
-import { paraCentavos, paraNumero } from "@/lib/dinheiro"
+import { deCentavos, paraCentavos, paraNumero } from "@/lib/dinheiro"
+import { centavosDe, precoEfetivo } from "@/lib/pedidos"
+import { normalizarWhatsapp, vincularCliente } from "@/lib/gestao/clientes"
 import { calcularDivisao, type PlanoDivisao } from "@/lib/gestao/divisao"
 export { linkDaMesa } from "@/lib/gestao/mesas-link"
 import { novoToken } from "@/lib/gestao/mesas-token"
 export { novoToken }
-import { ErroVenda, autorNomeDe } from "@/lib/gestao/vendas"
+import { autorNomeDe, ErroVenda, proximoNumero } from "@/lib/gestao/vendas"
 import { temFeature } from "@/lib/plan-features"
 
 // Mesas com QR Code (docs/gestao-ideias.md 5.2). O QR é fixo e aponta para
@@ -105,16 +107,6 @@ export async function excluirMesa(ctx: ComercioCtx, id: string) {
   return listarMesas(ctx.comercioId)
 }
 
-// Mesa cadastrada com este nome (usado ao abrir comanda pelo PDV, para o QR
-// daquela mesa passar a mostrar a conta).
-export async function mesaPorNome(comercioId: string, nome: string | null | undefined) {
-  if (!nome) return null
-  return prisma.mesa.findFirst({
-    where: { comercioId, nome: { equals: nomeNormalizado(nome), mode: "insensitive" } },
-    select: { id: true },
-  })
-}
-
 // ---- página pública da mesa ---------------------------------------------------------
 
 export interface ContaDaMesa {
@@ -124,7 +116,7 @@ export interface ContaDaMesa {
   comanda: null | {
     numero: number
     abertaEm: string
-    itens: { id: string; titulo: string; variacaoNome: string | null; quantidade: number; valor: number; observacao: string | null; estado: "lancado" | "producao" | "pronto" }[]
+    itens: { id: string; titulo: string; variacaoNome: string | null; quantidade: number; valor: number; observacao: string | null; estado: "aguardando" | "lancado" | "producao" | "pronto" }[]
     subtotal: number
     desconto: number
     taxaServico: number
@@ -162,7 +154,7 @@ export async function contaDaMesa(token: string): Promise<ContaDaMesa | null> {
     orderBy: { createdAt: "desc" },
     select: {
       id: true, numero: true, createdAt: true, subtotal: true, desconto: true, taxaServico: true, servicoPercentual: true, total: true, divisao: true,
-      itens: { orderBy: { createdAt: "asc" }, select: { id: true, titulo: true, variacaoNome: true, quantidade: true, precoUnit: true, desconto: true, observacao: true, enviadoEm: true, prontoEm: true } },
+      itens: { orderBy: { createdAt: "asc" }, select: { id: true, titulo: true, variacaoNome: true, quantidade: true, precoUnit: true, desconto: true, observacao: true, enviadoEm: true, prontoEm: true, solicitadoEm: true, aprovadoEm: true } },
       pagamentos: { where: { estornadoEm: null }, select: { valor: true } },
     },
   })
@@ -183,7 +175,7 @@ export async function contaDaMesa(token: string): Promise<ContaDaMesa | null> {
   if (comanda && plano?.pessoas?.length && plano.pessoas.length > 1 && totalC > 0) {
     const r = calcularDivisao(plano, {
       totalC,
-      linhas: comanda.itens.map((i) => ({
+      linhas: comanda.itens.filter((i) => !i.solicitadoEm || i.aprovadoEm).map((i) => ({
         chave: i.id,
         valorC: paraCentavos(i.precoUnit) * i.quantidade - paraCentavos(i.desconto),
         quantidade: i.quantidade,
@@ -212,7 +204,7 @@ export async function contaDaMesa(token: string): Promise<ContaDaMesa | null> {
             quantidade: i.quantidade,
             valor: (paraCentavos(i.precoUnit) * i.quantidade - paraCentavos(i.desconto)) / 100,
             observacao: i.observacao,
-            estado: i.prontoEm ? "pronto" : i.enviadoEm ? "producao" : "lancado",
+            estado: i.solicitadoEm && !i.aprovadoEm ? "aguardando" : i.prontoEm ? "pronto" : i.enviadoEm ? "producao" : "lancado",
           })),
           subtotal: paraNumero(comanda.subtotal),
           desconto: paraNumero(comanda.desconto),
@@ -289,4 +281,189 @@ export async function atenderChamado(ctx: ComercioCtx, id: string) {
   if (!chamado) throw new ErroVenda("Chamado não encontrado.", 404)
   await prisma.chamadoMesa.update({ where: { id }, data: { atendidoEm: new Date(), atendidoPorNome: await autorNomeDe(ctx) } })
   return chamadosPendentes(ctx.comercioId)
+}
+
+// ---- cardápio e pedido pelo QR --------------------------------------------------------
+
+const MAX_LINHAS_PEDIDO = 20
+const MAX_QTD_ITEM = 10
+const MAX_PEDIDOS_JANELA = 5 // por mesa, a cada 5 minutos
+const JANELA_MIN = 5
+
+export interface CardapioDaMesa {
+  categorias: {
+    nome: string
+    itens: { id: string; titulo: string; descricao: string | null; preco: number | null; variacoes: { id: string; nome: string; preco: number }[] }[]
+  }[]
+}
+
+// Cardápio que o cliente vê na mesa: só itens do cardápio digital, disponíveis.
+export async function cardapioDaMesa(token: string): Promise<CardapioDaMesa | null> {
+  const mesa = await prisma.mesa.findUnique({
+    where: { token },
+    select: { ativa: true, comercioId: true, comercio: { select: { status: true, plan: { select: { features: true } }, pedidoConfig: { select: { mesaQrPedido: true } } } } },
+  })
+  if (!mesa || !mesa.ativa || mesa.comercio.status !== "ATIVO") return null
+  if (!temFeature(mesa.comercio.plan.features, "cardapio")) return null
+
+  const categorias = await prisma.cardapioCategoria.findMany({
+    where: { comercioId: mesa.comercioId },
+    orderBy: { ordem: "asc" },
+    select: {
+      nome: true,
+      produtos: {
+        where: { disponivel: true },
+        orderBy: [{ ordem: "asc" }, { titulo: "asc" }],
+        select: { id: true, titulo: true, descricao: true, preco: true, precoPromo: true, promoFim: true, variacoes: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true } } },
+      },
+    },
+  })
+  return {
+    categorias: categorias
+      .map((c) => ({
+        nome: c.nome,
+        itens: c.produtos
+          .map((p) => ({
+            id: p.id,
+            titulo: p.titulo,
+            descricao: p.descricao,
+            preco: p.variacoes.length > 0 ? null : precoEfetivo(p),
+            variacoes: p.variacoes,
+          }))
+          .filter((i) => i.variacoes.length > 0 || i.preco != null),
+      }))
+      .filter((c) => c.itens.length > 0),
+  }
+}
+
+export interface PedidoDaMesaInput {
+  nome: string
+  whatsapp?: string | null
+  itens: { produtoId: string; variacaoId?: string | null; quantidade: number; observacao?: string | null }[]
+}
+
+// Pedido feito pelo cliente no QR. Nada entra no total até o atendente aprovar
+// (docs/modulo-gestao.md §14, decisão 3). Abre a comanda se a loja permitir.
+export async function pedirNaMesa(token: string, input: PedidoDaMesaInput) {
+  const mesa = await prisma.mesa.findUnique({
+    where: { token },
+    select: {
+      id: true, nome: true, ativa: true, comercioId: true,
+      comercio: { select: { status: true, plan: { select: { features: true } }, pedidoConfig: { select: { mesaQrPedido: true, mesaQrAbrirConta: true, taxaServicoPct: true } } } },
+    },
+  })
+  if (!mesa || !mesa.ativa || mesa.comercio.status !== "ATIVO") throw new ErroVenda("Mesa não encontrada.", 404)
+  if (!temFeature(mesa.comercio.plan.features, "gestao_relatorios")) throw new ErroVenda("Mesa não encontrada.", 404)
+  const cfg = mesa.comercio.pedidoConfig
+  if (!(cfg?.mesaQrPedido ?? true)) throw new ErroVenda("Peça ao atendente — a loja não recebe pedidos pelo QR.", 403)
+
+  const nome = input.nome?.trim().slice(0, 60)
+  if (!nome || nome.length < 2) throw new ErroVenda("Informe o seu nome para o atendente saber quem pediu.")
+  const whatsapp = normalizarWhatsapp(input.whatsapp)
+  if (whatsapp && (whatsapp.length < 10 || whatsapp.length > 11)) throw new ErroVenda("WhatsApp inválido — informe o DDD e o número.")
+  if (input.itens.length === 0) throw new ErroVenda("Escolha ao menos um item.")
+  if (input.itens.length > MAX_LINHAS_PEDIDO) throw new ErroVenda("Muitos itens de uma vez. Peça em partes ou chame o atendente.")
+
+  // Preço e disponibilidade sempre do banco — o celular do cliente nunca manda valor.
+  const ids = [...new Set(input.itens.map((i) => i.produtoId))]
+  const produtos = await prisma.produto.findMany({
+    where: { id: { in: ids }, comercioId: mesa.comercioId, disponivel: true, categoriaCardapioId: { not: null } },
+    include: { variacoes: true },
+  })
+  const mapa = new Map(produtos.map((p) => [p.id, p]))
+  const linhas = input.itens.map((item) => {
+    if (!Number.isInteger(item.quantidade) || item.quantidade < 1 || item.quantidade > MAX_QTD_ITEM) {
+      throw new ErroVenda(`Quantidade inválida (máximo ${MAX_QTD_ITEM} por item).`)
+    }
+    const p = mapa.get(item.produtoId)
+    if (!p) throw new ErroVenda("Um dos itens saiu do cardápio. Atualize a página.")
+    if (p.variacoes.length > 0) {
+      const v = p.variacoes.find((x) => x.id === item.variacaoId)
+      if (!v) throw new ErroVenda(`Escolha uma opção para "${p.titulo}".`)
+      return { produtoId: p.id, titulo: p.titulo, variacaoNome: v.nome, precoC: centavosDe(v.preco), quantidade: item.quantidade, observacao: item.observacao?.trim().slice(0, 140) || null }
+    }
+    const preco = precoEfetivo(p)
+    if (preco == null) throw new ErroVenda(`"${p.titulo}" está sem preço.`)
+    return { produtoId: p.id, titulo: p.titulo, variacaoNome: null, precoC: centavosDe(preco), quantidade: item.quantidade, observacao: item.observacao?.trim().slice(0, 140) || null }
+  })
+
+  const servicoPct = cfg?.taxaServicoPct != null ? paraNumero(cfg.taxaServicoPct) : null
+
+  await prisma.$transaction(async (tx) => {
+    // Trava a mesa: dois celulares pedindo juntos não abrem duas comandas.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${mesa.comercioId}:mesa:${mesa.id}`}))`
+    let comanda = await tx.pedido.findFirst({
+      where: { comercioId: mesa.comercioId, status: "ABERTA", mesaId: mesa.id },
+      select: { id: true, clienteId: true },
+    })
+    if (!comanda) {
+      if (!(cfg?.mesaQrAbrirConta ?? true)) throw new ErroVenda("Chame o atendente para abrir a conta da mesa.", 409)
+      const numero = await proximoNumero(tx, mesa.comercioId)
+      const criada = await tx.pedido.create({
+        data: {
+          comercioId: mesa.comercioId,
+          numero,
+          origem: "COMANDA",
+          status: "ABERTA",
+          tipoEntrega: "RETIRADA",
+          mesa: mesa.nome,
+          mesaId: mesa.id,
+          clienteNome: nome,
+          clienteWhats: whatsapp ?? "",
+          formaPagamento: "",
+          subtotal: 0,
+          total: 0,
+          servicoPercentual: servicoPct,
+          criadoPorNome: `${nome} (pelo QR)`,
+          historico: { create: { status: "ABERTA", origem: "CLIENTE", autorNome: nome, descricao: `Conta aberta pelo cliente na ${mesa.nome}` } },
+        },
+        select: { id: true, clienteId: true },
+      })
+      comanda = criada
+    }
+
+    // Antiabuso: fila de aprovação curta e poucas rodadas por janela de tempo.
+    const [pendentes, recentes] = await Promise.all([
+      tx.pedidoItem.count({ where: { pedidoId: comanda.id, solicitadoEm: { not: null }, aprovadoEm: null } }),
+      tx.pedidoItem.groupBy({
+        by: ["solicitadoPor"],
+        where: { pedidoId: comanda.id, solicitadoEm: { gt: new Date(Date.now() - JANELA_MIN * 60000) } },
+        _count: { _all: true },
+      }),
+    ])
+    if (pendentes >= MAX_LINHAS_PEDIDO) throw new ErroVenda("Você já tem itens esperando o atendente confirmar.", 429)
+    if (recentes.reduce((a, r) => a + r._count._all, 0) >= MAX_LINHAS_PEDIDO * MAX_PEDIDOS_JANELA) {
+      throw new ErroVenda("Muitos pedidos seguidos. Chame o atendente.", 429)
+    }
+
+    const agora = new Date()
+    await tx.pedidoItem.createMany({
+      data: linhas.map((l) => ({
+        pedidoId: comanda!.id,
+        produtoId: l.produtoId,
+        titulo: l.titulo,
+        variacaoNome: l.variacaoNome,
+        precoUnit: deCentavos(l.precoC),
+        quantidade: l.quantidade,
+        observacao: l.observacao,
+        solicitadoPor: nome,
+        solicitadoEm: agora,
+      })),
+    })
+    if (whatsapp && !comanda.clienteId) {
+      const clienteId = await vincularCliente(tx, { comercioId: mesa.comercioId, nome, whatsapp })
+      if (clienteId) await tx.pedido.update({ where: { id: comanda.id }, data: { clienteId } })
+    }
+    await tx.pedidoHistorico.create({
+      data: {
+        pedidoId: comanda.id,
+        status: "ABERTA",
+        origem: "CLIENTE",
+        autorNome: nome,
+        descricao: `${nome} pediu ${linhas.reduce((a, l) => a + l.quantidade, 0)} item(ns) pelo QR — aguardando confirmação`,
+      },
+    })
+  })
+
+  return contaDaMesa(token)
 }

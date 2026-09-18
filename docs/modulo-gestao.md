@@ -1110,8 +1110,17 @@ Escolhido em 2026-09-18 como próximo passo, antes de adicionais, importação d
 - **Testado:** 38 cenários (cadastro, permissões, plano, conta pública, divisão, chamados, configuração,
   transferência, mesa inativa, troca de token e telas) + conferência visual no celular e na impressão.
 
-### 14.2 PR B — Pedido pelo QR com aprovação (a fazer)
+### 14.2 PR B — Pedido pelo QR com aprovação ✅ implementado
 
-- Itens solicitados pelo cliente entram na comanda **sem contar no total** até o atendente aprovar.
-- Abertura da conta pelo próprio cliente quando a mesa está livre (se a loja permitir).
-- Limites antiabuso (itens por minuto, teto por pedido) e botão para desligar o pedido por QR na hora.
+- O cliente escolhe no cardápio da mesa, informa o nome (WhatsApp opcional) e envia. Os itens entram na
+  comanda como **solicitação**: não contam no total, não vão para a produção e **não deixam fechar a conta**
+  até o atendente confirmar. Recusar apaga o item e registra no histórico com o motivo.
+- Conta aberta pelo próprio cliente quando a mesa está livre (se a loja permitir), em nome dele.
+- Preço e disponibilidade sempre do banco (só cardápio digital disponível); limites de 20 linhas por
+  pedido, 10 por item e teto por janela de 5 minutos; lock por mesa impede dois celulares abrirem
+  duas contas.
+- PDV: um polling só (`{ chamados, solicitacoes }`) com bipe, aviso na aba Comandas e painel de
+  confirmação dentro da comanda ("Confirmar tudo" ou item a item).
+- **Testado:** 28 cenários (abertura pelo cliente, validações, aprovação/recusa, segundo cliente na mesma
+  conta, configuração da loja, bloqueio do fechamento com pedido pendente e dois celulares simultâneos)
+  + conferência visual no celular e no PDV.

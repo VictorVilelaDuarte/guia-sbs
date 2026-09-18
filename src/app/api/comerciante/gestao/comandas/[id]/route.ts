@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import {
   alterarItem,
+  aprovarSolicitacao,
   atualizarComanda,
   cancelarComanda,
   detalheComanda,
@@ -10,6 +11,7 @@ import {
   fecharComanda,
   juntarComandas,
   lancarItens,
+  recusarSolicitacao,
   registrarPagamentoComanda,
   removerItem,
 } from "@/lib/gestao/comandas"
@@ -51,6 +53,9 @@ const acaoSchema = z.discriminatedUnion("acao", [
   z.object({ acao: z.literal("fechar") }),
   z.object({ acao: z.literal("cancelar"), motivo: z.string().max(280).nullable().optional() }),
   z.object({ acao: z.literal("juntar"), origemId: z.string() }),
+  // pedidos feitos pelo cliente no QR da mesa
+  z.object({ acao: z.literal("aprovarPedido"), itemId: z.string().nullable().optional() }),
+  z.object({ acao: z.literal("recusarPedido"), itemId: z.string(), motivo: z.string().max(280).nullable().optional() }),
 ])
 
 export async function POST(req: NextRequest, { params }: Params) {
@@ -84,6 +89,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         return cancelarComanda(ctx, id, a.motivo)
       case "juntar":
         return juntarComandas(ctx, id, a.origemId)
+      case "aprovarPedido":
+        return aprovarSolicitacao(ctx, id, a.itemId ?? null)
+      case "recusarPedido":
+        return recusarSolicitacao(ctx, id, a.itemId, a.motivo)
     }
   })
 }

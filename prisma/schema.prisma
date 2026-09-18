@@ -613,6 +613,12 @@ model PedidoItem {
   observacao   String?
   desconto     Decimal @default(0) @db.Decimal(10, 2) // desconto na linha (valor)
 
+  // Pedido feito pelo cliente no QR da mesa: fica na comanda SEM contar no total
+  // até o atendente aprovar (solicitadoEm sem aprovadoEm = aguardando).
+  solicitadoPor String?
+  solicitadoEm  DateTime?
+  aprovadoEm    DateTime?
+
   // Comanda: rodada de envio para a produção (null = ainda não enviado).
   rodada    Int?
   enviadoEm DateTime?

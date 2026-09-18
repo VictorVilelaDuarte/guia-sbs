@@ -5,7 +5,6 @@ import { deCentavos, paraCentavos, paraNumero } from "@/lib/dinheiro"
 import { formaPagamentoLabel } from "@/lib/hospedagem"
 import { centavosDe } from "@/lib/pedidos"
 import { vincularCliente, normalizarWhatsapp } from "@/lib/gestao/clientes"
-import { mesaPorNome } from "@/lib/gestao/mesas"
 import { calcularTotais, type DescontoConta } from "@/lib/gestao/totais"
 import {
   autorNomeDe,
@@ -70,6 +69,12 @@ async function travarMesa(tx: Tx, comercioId: string, mesa: string) {
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${comercioId}:${mesa.toLowerCase()}`}))`
 }
 
+// Mesa cadastrada com este nome (o QR dela passa a mostrar a conta).
+async function mesaPorNome(tx: Tx, comercioId: string, nome: string | null | undefined) {
+  if (!nome) return null
+  return tx.mesa.findFirst({ where: { comercioId, nome: { equals: nome, mode: "insensitive" } }, select: { id: true } })
+}
+
 async function comandaAbertaNaMesa(tx: Tx, comercioId: string, mesa: string, exceto?: string) {
   return tx.pedido.findFirst({
     where: {
@@ -106,7 +111,8 @@ async function recalcular(tx: Tx, pedidoId: string) {
       desconto: true,
       descontoPercentual: true,
       servicoPercentual: true,
-      itens: { select: { precoUnit: true, quantidade: true, desconto: true } },
+      // Item pedido pelo cliente no QR só entra no total depois de aprovado.
+      itens: { where: { OR: [{ solicitadoEm: null }, { aprovadoEm: { not: null } }] }, select: { precoUnit: true, quantidade: true, desconto: true } },
       pagamentos: { where: { estornadoEm: null }, select: { valor: true } },
     },
   })
@@ -169,7 +175,7 @@ export async function abrirComanda(
     }
     const numero = await proximoNumero(tx, comercioId)
     // Mesa do cadastro (QR): a conta passa a aparecer no celular de quem escanear.
-    const cadastro = await mesaPorNome(comercioId, mesa)
+    const cadastro = await mesaPorNome(tx, comercioId, mesa)
     let clienteId = cliente?.id ?? null
     if (!cliente && whats) clienteId = await vincularCliente(tx, { comercioId, nome: nome ?? `Mesa ${mesa}`, whatsapp: whats })
     const p = await tx.pedido.create({
@@ -242,7 +248,10 @@ export async function enviarParaProducao(ctx: ComercioCtx, id: string) {
     const p = await travar(tx, ctx, id)
     const max = await tx.pedidoItem.aggregate({ where: { pedidoId: id }, _max: { rodada: true } })
     const rodada = (max._max.rodada ?? 0) + 1
-    const r = await tx.pedidoItem.updateMany({ where: { pedidoId: id, enviadoEm: null }, data: { rodada, enviadoEm: new Date() } })
+    const r = await tx.pedidoItem.updateMany({
+      where: { pedidoId: id, enviadoEm: null, OR: [{ solicitadoEm: null }, { aprovadoEm: { not: null } }] },
+      data: { rodada, enviadoEm: new Date() },
+    })
     if (r.count === 0) throw new ErroVenda("Não há itens novos para enviar.", 409)
     await registrar(tx, ctx, autorNome, id, p.status, `Enviou ${r.count} item(ns) para a produção (rodada ${rodada})`)
   })
@@ -340,7 +349,7 @@ export async function atualizarComanda(
             throw new ErroVenda(`A mesa ${mesa} já tem a comanda #${outra.numero} aberta — junte as comandas.`, 409, { comandaId: outra.id })
           }
         }
-        const cadastro = mesa ? await mesaPorNome(comercioId, mesa) : null
+        const cadastro = mesa ? await mesaPorNome(tx, comercioId, mesa) : null
         data.mesa = mesa
         // Transferiu de mesa: o QR da mesa nova passa a mostrar esta conta, e o da antiga para.
         data.mesaRef = cadastro ? { connect: { id: cadastro.id } } : { disconnect: true }
@@ -375,6 +384,9 @@ export async function atualizarComanda(
 async function fecharTx(tx: Tx, ctx: ComercioCtx, autorNome: string | null, id: string) {
   const t = await recalcular(tx, id)
   if (t.itens === 0) throw new ErroVenda("Comanda sem itens — cancele em vez de fechar.", 409)
+  // Pedido feito pelo QR não pode ficar órfão: o cliente acha que pediu.
+  const pendentes = await tx.pedidoItem.count({ where: { pedidoId: id, solicitadoEm: { not: null }, aprovadoEm: null } })
+  if (pendentes > 0) throw new ErroVenda("Confirme ou recuse o pedido feito pelo cliente antes de fechar.", 409)
   if (t.saldoC > 0) throw new ErroVenda(`Falta receber ${brl(t.saldoC)}.`, 409)
   const pagamentos = await tx.pedidoPagamento.findMany({ where: { pedidoId: id, estornadoEm: null }, select: { forma: true } })
   await tx.pedido.update({
@@ -497,7 +509,7 @@ export async function detalheComanda(comercioId: string, id: string) {
       subtotal: true, desconto: true, descontoPercentual: true, taxaServico: true, servicoPercentual: true, total: true, divisao: true,
       itens: {
         orderBy: { createdAt: "asc" },
-        select: { id: true, produtoId: true, titulo: true, variacaoNome: true, precoUnit: true, quantidade: true, observacao: true, desconto: true, rodada: true, enviadoEm: true, prontoEm: true },
+        select: { id: true, produtoId: true, titulo: true, variacaoNome: true, precoUnit: true, quantidade: true, observacao: true, desconto: true, rodada: true, enviadoEm: true, prontoEm: true, solicitadoPor: true, solicitadoEm: true, aprovadoEm: true },
       },
       pagamentos: {
         orderBy: { createdAt: "asc" },
@@ -530,6 +542,8 @@ export async function detalheComanda(comercioId: string, id: string) {
       desconto: paraNumero(i.desconto),
       enviadoEm: i.enviadoEm?.toISOString() ?? null,
       prontoEm: i.prontoEm?.toISOString() ?? null,
+      solicitadoEm: i.solicitadoEm?.toISOString() ?? null,
+      aprovadoEm: i.aprovadoEm?.toISOString() ?? null,
     })),
     pagamentos: p.pagamentos.map((x) => ({
       ...x,
@@ -550,7 +564,7 @@ export async function listarComandasAbertas(comercioId: string) {
     orderBy: { createdAt: "asc" },
     select: {
       id: true, numero: true, mesa: true, clienteNome: true, total: true, createdAt: true,
-      itens: { select: { quantidade: true, enviadoEm: true, prontoEm: true } },
+      itens: { select: { quantidade: true, enviadoEm: true, prontoEm: true, solicitadoEm: true, aprovadoEm: true } },
       pagamentos: { where: { estornadoEm: null }, select: { valor: true } },
     },
   })
@@ -565,8 +579,9 @@ export async function listarComandasAbertas(comercioId: string) {
       pago: pagoC / 100,
       createdAt: c.createdAt.toISOString(),
       itens: c.itens.reduce((a, i) => a + i.quantidade, 0),
-      naoEnviados: c.itens.filter((i) => !i.enviadoEm).length,
+      naoEnviados: c.itens.filter((i) => !i.enviadoEm && !(i.solicitadoEm && !i.aprovadoEm)).length,
       naProducao: c.itens.filter((i) => i.enviadoEm && !i.prontoEm).length,
+      aguardandoAprovacao: c.itens.filter((i) => i.solicitadoEm && !i.aprovadoEm).length,
     }
   })
 }
@@ -617,3 +632,63 @@ export async function marcarRodadaPronta(ctx: ComercioCtx, pedidoId: string, rod
     await registrar(tx, ctx, autorNome, pedidoId, p.status, `Rodada ${rodada} pronta`)
   })
 }
+
+// ---- pedidos feitos pelo cliente no QR da mesa ----------------------------------------
+
+// Aprova o que o cliente pediu: o item passa a contar no total e segue o fluxo
+// normal (lançado → enviar para a produção).
+export async function aprovarSolicitacao(ctx: ComercioCtx, id: string, itemId: string | null) {
+  const autorNome = await autorNomeDe(ctx)
+  await prisma.$transaction(async (tx) => {
+    const p = await travar(tx, ctx, id)
+    const r = await tx.pedidoItem.updateMany({
+      where: { pedidoId: id, solicitadoEm: { not: null }, aprovadoEm: null, ...(itemId ? { id: itemId } : {}) },
+      data: { aprovadoEm: new Date() },
+    })
+    if (r.count === 0) throw new ErroVenda("Nada para aprovar — o pedido já foi tratado.", 409)
+    await recalcular(tx, id)
+    await registrar(tx, ctx, autorNome, id, p.status, `Aprovou ${r.count} item(ns) pedido(s) pelo cliente na mesa`)
+  })
+  return detalheComanda(ctx.comercioId, id)
+}
+
+// Recusa: o item sai da comanda (nunca entrou no total) e fica no histórico.
+export async function recusarSolicitacao(ctx: ComercioCtx, id: string, itemId: string, motivo?: string | null) {
+  const autorNome = await autorNomeDe(ctx)
+  await prisma.$transaction(async (tx) => {
+    const p = await travar(tx, ctx, id)
+    const item = await tx.pedidoItem.findFirst({ where: { id: itemId, pedidoId: id, solicitadoEm: { not: null }, aprovadoEm: null } })
+    if (!item) throw new ErroVenda("Pedido do cliente não encontrado.", 404)
+    await tx.pedidoItem.delete({ where: { id: itemId } })
+    await registrar(tx, ctx, autorNome, id, p.status, `Recusou ${item.quantidade}× ${item.titulo} pedido pelo cliente`, motivo?.trim().slice(0, 280) || null)
+  })
+  return detalheComanda(ctx.comercioId, id)
+}
+
+// Solicitações esperando o atendente, para o aviso do PDV.
+export async function solicitacoesPendentes(comercioId: string) {
+  const itens = await prisma.pedidoItem.findMany({
+    where: { solicitadoEm: { not: null }, aprovadoEm: null, pedido: { comercioId, status: "ABERTA" } },
+    orderBy: { solicitadoEm: "asc" },
+    take: 100,
+    select: { id: true, titulo: true, quantidade: true, solicitadoPor: true, solicitadoEm: true, pedido: { select: { id: true, numero: true, mesa: true, clienteNome: true } } },
+  })
+  const porComanda = new Map<string, { pedidoId: string; numero: number; mesa: string | null; clienteNome: string; desde: string; itens: number; pedidoPor: string | null }>()
+  for (const i of itens) {
+    const atual = porComanda.get(i.pedido.id)
+    if (atual) atual.itens += i.quantidade
+    else
+      porComanda.set(i.pedido.id, {
+        pedidoId: i.pedido.id,
+        numero: i.pedido.numero,
+        mesa: i.pedido.mesa,
+        clienteNome: i.pedido.clienteNome,
+        desde: i.solicitadoEm!.toISOString(),
+        itens: i.quantidade,
+        pedidoPor: i.solicitadoPor,
+      })
+  }
+  return [...porComanda.values()]
+}
+
+export type SolicitacaoPainel = Awaited<ReturnType<typeof solicitacoesPendentes>>[number]

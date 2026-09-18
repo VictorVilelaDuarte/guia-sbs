@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   Ban,
   BellRing,
+  Check,
+  Hand,
   CheckCircle2,
   ChefHat,
   Combine,
@@ -22,7 +24,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import type { ComandaDetalhe, ComandaResumo } from "@/lib/gestao/comandas"
+import type { ComandaDetalhe, ComandaResumo, SolicitacaoPainel } from "@/lib/gestao/comandas"
 import type { ChamadoPainel } from "@/lib/gestao/mesas"
 import { rotuloMesa } from "@/lib/gestao/mesas-link"
 import { beep } from "@/components/comerciante/pedidos/beep"
@@ -61,6 +63,7 @@ interface Props {
   comandasIniciais: ComandaResumo[]
   mesas: { nome: string; area: string | null }[]
   chamadosIniciais: ChamadoPainel[]
+  solicitacoesIniciais: SolicitacaoPainel[]
   temPedidoOnline: boolean
   buscaClientes: boolean
   podeDesconto: boolean
@@ -143,7 +146,8 @@ export function PdvApp(props: Props) {
   const [pendentes, setPendentes] = useState<LinhaPdv[]>([])
   const [ocupado, setOcupado] = useState(false)
   const [chamados, setChamados] = useState<ChamadoPainel[]>(props.chamadosIniciais)
-  const chamadosVistos = useRef(new Set(props.chamadosIniciais.map((c) => c.id)))
+  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoPainel[]>(props.solicitacoesIniciais)
+  const avisosVistos = useRef(new Set([...props.chamadosIniciais.map((c) => c.id), ...props.solicitacoesIniciais.map((s) => `${s.pedidoId}:${s.itens}`)]))
 
   const atualizarLista = useCallback(async () => {
     const r = await fetch("/api/comerciante/gestao/comandas", { cache: "no-store" }).catch(() => null)
@@ -163,18 +167,21 @@ export function PdvApp(props: Props) {
     const t = setInterval(async () => {
       const r = await fetch("/api/comerciante/gestao/chamados", { cache: "no-store" }).catch(() => null)
       if (!r?.ok) return
-      const lista: ChamadoPainel[] = await r.json()
-      if (lista.some((c) => !chamadosVistos.current.has(c.id))) beep()
-      chamadosVistos.current = new Set(lista.map((c) => c.id))
-      setChamados(lista)
+      const avisos: { chamados: ChamadoPainel[]; solicitacoes: SolicitacaoPainel[] } = await r.json()
+      const chaves = [...avisos.chamados.map((c) => c.id), ...avisos.solicitacoes.map((s) => `${s.pedidoId}:${s.itens}`)]
+      if (chaves.some((k) => !avisosVistos.current.has(k))) beep()
+      avisosVistos.current = new Set(chaves)
+      setChamados(avisos.chamados)
+      setSolicitacoes(avisos.solicitacoes)
     }, POLL_MS)
     return () => clearInterval(t)
   }, [])
 
   async function atenderChamado(id: string) {
-    const r = await enviarJson<ChamadoPainel[]>("/api/comerciante/gestao/chamados", { id })
+    const r = await enviarJson<{ chamados: ChamadoPainel[]; solicitacoes: SolicitacaoPainel[] }>("/api/comerciante/gestao/chamados", { id })
     if (!r.ok) return toast.error(r.erro)
-    setChamados(r.data)
+    setChamados(r.data.chamados)
+    setSolicitacoes(r.data.solicitacoes)
   }
 
   // Polling: vários aparelhos (caixa e garçons) lançam na mesma comanda.
@@ -280,6 +287,8 @@ export function PdvApp(props: Props) {
   })
   const pendentesC = pendentes.reduce((a, l) => a + valorLinhaC(l), 0)
 
+  const solicitadosNaComanda = comanda?.itens.filter((i) => i.solicitadoEm && !i.aprovadoEm) ?? []
+
   const linhasComanda: LinhaConta[] = useMemo(() => {
     if (!comanda) return []
     const salvas: LinhaConta[] = comanda.itens.map((i) => ({
@@ -290,7 +299,7 @@ export function PdvApp(props: Props) {
       quantidade: i.quantidade,
       observacao: i.observacao,
       descontoC: centavos(i.desconto),
-      estado: i.prontoEm ? "pronto" : i.enviadoEm ? "producao" : "lancado",
+      estado: i.solicitadoEm && !i.aprovadoEm ? "aguardando" : i.prontoEm ? "pronto" : i.enviadoEm ? "producao" : "lancado",
     }))
     return [...salvas, ...pendentes.map((l) => ({ ...l, estado: "novo" as const }))]
   }, [comanda, pendentes])
@@ -493,7 +502,13 @@ export function PdvApp(props: Props) {
       }
       linhas={linhasComanda}
       vazio="Toque nos produtos para lançar na comanda."
-      onLinha={setEditando}
+      onLinha={(chave) => {
+        // Item pedido pelo cliente só vira item da conta depois de aprovado.
+        if (comanda.itens.some((i) => i.id === chave && i.solicitadoEm && !i.aprovadoEm)) {
+          return toast.info("Confirme ou recuse o pedido do cliente primeiro.")
+        }
+        setEditando(chave)
+      }}
       onQtd={mudarQtd(setPendentes)}
       subtotalC={centavos(comanda.subtotal)}
       descontoC={centavos(comanda.desconto)}
@@ -505,6 +520,57 @@ export function PdvApp(props: Props) {
       pagoC={centavos(comanda.pago)}
       extraC={pendentesC}
       onDesconto={podeDesconto ? () => setDlg("desconto") : undefined}
+      avisos={
+        solicitadosNaComanda.length > 0 ? (
+          <div className="space-y-2 border-b border-violet-200 bg-violet-50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-violet-900">
+                <Hand className="h-4 w-4" /> Pedido do cliente
+                {solicitadosNaComanda[0].solicitadoPor ? ` · ${solicitadosNaComanda[0].solicitadoPor}` : ""}
+              </p>
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={async () => {
+                  setOcupado(true)
+                  try { await acaoComanda({ acao: "aprovarPedido" }, "Pedido confirmado e lançado na conta.") } finally { setOcupado(false) }
+                }}
+                className="h-9 rounded-lg bg-violet-700 px-3 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                Confirmar tudo
+              </button>
+            </div>
+            <ul className="space-y-1 text-sm">
+              {solicitadosNaComanda.map((i) => (
+                <li key={i.id} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="font-medium tabular-nums">{i.quantidade}×</span> {i.titulo}
+                    {i.variacaoNome && <span className="text-stone-500"> · {i.variacaoNome}</span>}
+                    {i.observacao && <span className="block text-xs italic text-stone-500">↳ {i.observacao}</span>}
+                  </span>
+                  <span className="tabular-nums text-stone-600">{brl(centavos(i.precoUnit) * i.quantidade)}</span>
+                  <button
+                    type="button"
+                    aria-label={`Confirmar ${i.titulo}`}
+                    onClick={() => acaoComanda({ acao: "aprovarPedido", itemId: i.id })}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-emerald-700 ring-1 ring-stone-300"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Recusar ${i.titulo}`}
+                    onClick={() => acaoComanda({ acao: "recusarPedido", itemId: i.id }, "Pedido recusado.")}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-rose-700 ring-1 ring-stone-300"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null
+      }
       rodape={
         pendentes.length > 0 ? (
           <div className="flex gap-2">
@@ -562,13 +628,13 @@ export function PdvApp(props: Props) {
           </button>
         </nav>
         <div className="flex items-center gap-1">
-          {chamados.length > 0 && (
+          {chamados.length + solicitacoes.length > 0 && (
             <button
               type="button"
               onClick={() => { setAba("comandas"); setComanda(null) }}
               className="flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 text-xs font-bold text-stone-900"
             >
-              <BellRing className="h-4 w-4" /> {chamados.length}
+              <BellRing className="h-4 w-4" /> {chamados.length + solicitacoes.length}
             </button>
           )}
           {props.isAdmin && <ShieldCheck className="h-4 w-4 text-amber-400" aria-label="Modo administrador" />}
@@ -591,6 +657,7 @@ export function PdvApp(props: Props) {
         <main className="min-h-0 flex-1">
           <ComandasGrid
             comandas={comandas}
+            solicitacoes={solicitacoes}
             chamados={chamados}
             onAtenderChamado={atenderChamado}
             onAbrir={abrirComandaExistente}
