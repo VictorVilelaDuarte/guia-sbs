@@ -90,6 +90,12 @@ enum OrigemHistorico {
   ADMIN // admin do guia pelo "gerenciar"
 }
 
+// Chamado feito pelo cliente na página da mesa (QR Code).
+enum TipoChamado {
+  GARCOM // "preciso de atendimento"
+  CONTA // "quero fechar a conta"
+}
+
 enum TipoEntrega {
   ENTREGA
   RETIRADA
@@ -193,6 +199,8 @@ model Comercio {
   zonasEntrega        ZonaEntrega[]
   membros             ComercioMembro[]
   clientes            Cliente[]
+  mesas               Mesa[]
+  chamadosMesa        ChamadoMesa[]
   acessosDadosCliente AcessoDadosCliente[]
 
   @@index([ownerId])
@@ -485,7 +493,8 @@ model Pedido {
 
   // Comanda (origem COMANDA): identificação livre da mesa e plano de divisão da
   // conta salvo pelo PDV (modo, pessoas e itens de cada uma).
-  mesa        String?
+  mesa        String? // snapshot do nome da mesa (identificação livre continua valendo)
+  mesaId      String? // mesa cadastrada, quando a comanda veio do QR ou foi aberta por uma do cadastro
   divisao     Json?
   // Quando a venda foi encerrada: concluída (ou recusada/cancelada sem ter sido
   // concluída). É a data dos relatórios — cancelar venda concluída não a altera.
@@ -507,6 +516,7 @@ model Pedido {
 
   comercio   Comercio          @relation(fields: [comercioId], references: [id], onDelete: Cascade)
   cliente    Cliente?          @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  mesaRef    Mesa?             @relation(fields: [mesaId], references: [id], onDelete: SetNull)
   itens      PedidoItem[]
   historico  PedidoHistorico[]
   pagamentos PedidoPagamento[]
@@ -640,6 +650,47 @@ model PedidoPagamento {
   @@map("pedido_pagamentos")
 }
 
+// Mesa do salão com QR Code próprio (docs/gestao-ideias.md 5.2). O QR é fixo e
+// leva para /mesa/[token]: o cliente vê a conta da mesa, chama o garçom e pede.
+model Mesa {
+  id         String   @id @default(cuid())
+  comercioId String
+  nome       String // "4", "Varanda 2" — o que vai impresso no QR
+  area       String? // "Salão", "Varanda", "Deck"
+  token      String   @unique // segredo do QR (não é o id: pode ser trocado sem perder a mesa)
+  ativa      Boolean  @default(true)
+  ordem      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  comercio Comercio      @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  pedidos  Pedido[]
+  chamados ChamadoMesa[]
+
+  @@unique([comercioId, nome])
+  @@index([comercioId, ordem])
+  @@map("mesas")
+}
+
+// "Chame o garçom" e "peça a conta" feitos pelo cliente na página da mesa.
+model ChamadoMesa {
+  id              String      @id @default(cuid())
+  comercioId      String
+  mesaId          String
+  pedidoId        String? // comanda aberta no momento do chamado (referência fraca)
+  tipo            TipoChamado
+  observacao      String?
+  atendidoEm      DateTime?
+  atendidoPorNome String?
+  createdAt       DateTime    @default(now())
+
+  comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  mesa     Mesa     @relation(fields: [mesaId], references: [id], onDelete: Cascade)
+
+  @@index([comercioId, atendidoEm, createdAt])
+  @@map("chamados_mesa")
+}
+
 // Config de pedidos do comércio (1:1, criado sob demanda — mesmo padrão de
 // HospedagemPerfil). aceitaPedidos liga/desliga independente de aberto/fechado.
 // proximoNumero é o contador de `numero`, incrementado em transação ao criar.
@@ -654,8 +705,14 @@ model PedidoConfig {
   formasPagamento String[]
   proximoNumero   Int      @default(1)
   taxaServicoPct  Decimal? @db.Decimal(5, 2) // PDV: taxa de serviço sugerida (null = desligada)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+
+  // QR na mesa: o que o cliente pode fazer na página pública da mesa
+  mesaQrAbrirConta   Boolean  @default(true) // abrir a comanda quando a mesa está livre
+  mesaQrPedido       Boolean  @default(true) // pedir itens (sempre com aprovação do garçom)
+  mesaQrChamarGarcom Boolean  @default(true)
+  mesaQrPedirConta   Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   comercio Comercio @relation(fields: [comercioId], references: [id], onDelete: Cascade)
 

@@ -6,6 +6,7 @@ import { temFeature } from "@/lib/plan-features"
 import { paraNumero } from "@/lib/dinheiro"
 import { precoEfetivo } from "@/lib/pedidos"
 import { listarComandasAbertas } from "@/lib/gestao/comandas"
+import { chamadosPendentes, listarMesas } from "@/lib/gestao/mesas"
 import { PdvCliente } from "@/components/comerciante/pdv/pdv-cliente"
 import type { ItemCatalogoPdv } from "@/components/comerciante/pdv/tipos"
 
@@ -16,7 +17,7 @@ export default async function PdvPage() {
   // O layout já mostrou a tela de bloqueio; aqui só não carrega nada.
   if (!temPermissao(permissoes, "vendas:registrar") || !temFeature(comercio.plan.features, "gestao_relatorios")) return null
 
-  const [produtos, zonas, config, comandas, usuario] = await Promise.all([
+  const [produtos, zonas, config, comandas, usuario, mesas, chamados] = await Promise.all([
     prisma.produto.findMany({
       where: { comercioId: comercio.id },
       orderBy: [{ ordem: "asc" }, { titulo: "asc" }],
@@ -35,6 +36,8 @@ export default async function PdvPage() {
     prisma.pedidoConfig.findUnique({ where: { comercioId: comercio.id }, select: { taxaServicoPct: true } }),
     listarComandasAbertas(comercio.id),
     prisma.user.findUnique({ where: { id: ctx.userId }, select: { name: true } }),
+    listarMesas(comercio.id),
+    chamadosPendentes(comercio.id),
   ])
 
   // Grupos na ordem do painel: categorias do cardápio, depois as do catálogo,
@@ -68,6 +71,8 @@ export default async function PdvPage() {
       zonas={zonas.map((z) => ({ ...z, taxa: paraNumero(z.taxa) }))}
       servicoPct={config?.taxaServicoPct != null ? paraNumero(config.taxaServicoPct) : null}
       comandasIniciais={comandas}
+      mesas={mesas.filter((m) => m.ativa).map((m) => ({ nome: m.nome, area: m.area }))}
+      chamadosIniciais={chamados}
       temPedidoOnline={temFeature(comercio.plan.features, "pedido_online")}
       buscaClientes={temFeature(comercio.plan.features, "gestao_clientes") && temPermissao(permissoes, "clientes:ver")}
       podeDesconto={temPermissao(permissoes, "vendas:desconto")}

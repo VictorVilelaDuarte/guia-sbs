@@ -5,6 +5,7 @@ import { deCentavos, paraCentavos, paraNumero } from "@/lib/dinheiro"
 import { formaPagamentoLabel } from "@/lib/hospedagem"
 import { centavosDe } from "@/lib/pedidos"
 import { vincularCliente, normalizarWhatsapp } from "@/lib/gestao/clientes"
+import { mesaPorNome } from "@/lib/gestao/mesas"
 import { calcularTotais, type DescontoConta } from "@/lib/gestao/totais"
 import {
   autorNomeDe,
@@ -167,6 +168,8 @@ export async function abrirComanda(
       }
     }
     const numero = await proximoNumero(tx, comercioId)
+    // Mesa do cadastro (QR): a conta passa a aparecer no celular de quem escanear.
+    const cadastro = await mesaPorNome(comercioId, mesa)
     let clienteId = cliente?.id ?? null
     if (!cliente && whats) clienteId = await vincularCliente(tx, { comercioId, nome: nome ?? `Mesa ${mesa}`, whatsapp: whats })
     const p = await tx.pedido.create({
@@ -177,6 +180,7 @@ export async function abrirComanda(
         status: "ABERTA",
         tipoEntrega: "RETIRADA",
         mesa,
+        mesaId: cadastro?.id ?? null,
         clienteId,
         clienteNome: cliente?.nome ?? nome ?? `Mesa ${mesa}`,
         clienteWhats: cliente?.whatsapp ?? whats ?? "",
@@ -336,7 +340,10 @@ export async function atualizarComanda(
             throw new ErroVenda(`A mesa ${mesa} já tem a comanda #${outra.numero} aberta — junte as comandas.`, 409, { comandaId: outra.id })
           }
         }
+        const cadastro = mesa ? await mesaPorNome(comercioId, mesa) : null
         data.mesa = mesa
+        // Transferiu de mesa: o QR da mesa nova passa a mostrar esta conta, e o da antiga para.
+        data.mesaRef = cadastro ? { connect: { id: cadastro.id } } : { disconnect: true }
         await registrar(tx, ctx, autorNome, id, p.status, p.mesa ? `Transferida da mesa ${p.mesa} para ${mesa ? `a mesa ${mesa}` : "sem mesa"}` : `Levada para a mesa ${mesa}`)
       }
     }

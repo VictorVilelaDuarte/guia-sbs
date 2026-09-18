@@ -15,6 +15,7 @@
  */
 
 import { Prisma, PrismaClient } from "@prisma/client"
+import { novoToken } from "../src/lib/gestao/mesas-token"
 import bcrypt from "bcryptjs"
 
 const prisma = new PrismaClient()
@@ -220,6 +221,18 @@ async function main() {
     },
   })
 
+  // Mesas do salão com QR Code
+  await prisma.mesa.createMany({
+    data: MESAS.map((nome, ordem) => ({
+      comercioId: comercio.id,
+      nome,
+      area: nome.startsWith("Varanda") ? "Varanda" : "Salão",
+      token: novoToken(),
+      ordem,
+    })),
+  })
+  const mesasCadastradas = new Map((await prisma.mesa.findMany({ where: { comercioId: comercio.id }, select: { id: true, nome: true } })).map((m) => [m.nome, m.id]))
+
   const zonas = await Promise.all(
     [
       ["Centro", 500],
@@ -366,6 +379,7 @@ async function main() {
         status: opts.status,
         tipoEntrega: zona ? "ENTREGA" : "RETIRADA",
         mesa: opts.mesa ?? null,
+        mesaId: opts.mesa ? mesasCadastradas.get(opts.mesa) ?? null : null,
         clienteId: cliente?.id ?? null,
         clienteNome: cliente?.nome ?? (opts.mesa ? `Mesa ${opts.mesa}` : "Cliente balcão"),
         clienteWhats: cliente?.whatsapp ?? "",

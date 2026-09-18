@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { Check, ChefHat, Clock } from "lucide-react"
 import { toast } from "sonner"
 import type { RodadaProducao } from "@/lib/gestao/comandas"
+import { rotuloMesa } from "@/lib/gestao/mesas-link"
 import { beep } from "@/components/comerciante/pedidos/beep"
 import { cn } from "@/lib/utils"
 
@@ -43,7 +44,7 @@ export function ProducaoBoard({ iniciais }: { iniciais: RodadaProducao[] }) {
     const data = await res?.json().catch(() => ({}))
     if (!res?.ok) return toast.error(data?.error ?? "Não foi possível marcar como pronto.")
     setRodadas((rs) => rs.filter((x) => !(x.pedidoId === r.pedidoId && x.rodada === r.rodada)))
-    toast.success(`${r.mesa ? `Mesa ${r.mesa}` : r.clienteNome} — rodada ${r.rodada} pronta.`)
+    toast.success(`${r.mesa ? rotuloMesa(r.mesa) : r.clienteNome} — rodada ${r.rodada} pronta.`)
   }
 
   if (rodadas.length === 0) {
@@ -64,7 +65,7 @@ export function ProducaoBoard({ iniciais }: { iniciais: RodadaProducao[] }) {
           <div key={`${r.pedidoId}:${r.rodada}`} className="flex flex-col rounded-xl bg-background p-4 ring-1 ring-foreground/10">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-lg font-bold">{r.mesa ? `Mesa ${r.mesa}` : r.clienteNome}</p>
+                <p className="text-lg font-bold">{r.mesa ? rotuloMesa(r.mesa) : r.clienteNome}</p>
                 <p className="text-xs text-muted-foreground">#{r.numero} · rodada {r.rodada}</p>
               </div>
               <span className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold", min >= 20 ? "bg-rose-100 text-rose-700" : min >= 10 ? "bg-amber-100 text-amber-800" : "bg-stone-100 text-stone-700")}>

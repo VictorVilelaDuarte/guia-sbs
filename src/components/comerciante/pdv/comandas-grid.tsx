@@ -1,10 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ChefHat, Clock, Plus, Send } from "lucide-react"
+import { BellRing, Check, ChefHat, Clock, Plus, ReceiptText, Send } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { ComandaResumo } from "@/lib/gestao/comandas"
+import type { ChamadoPainel } from "@/lib/gestao/mesas"
 import { cn } from "@/lib/utils"
+import { rotuloMesa } from "@/lib/gestao/mesas-link"
 import { brl, centavos } from "./tipos"
 
 function minutosDesde(iso: string, agora: number) {
@@ -21,10 +23,14 @@ function tempo(min: number) {
 // o que está na produção, e há quanto tempo a mesa está aberta.
 export function ComandasGrid({
   comandas,
+  chamados,
+  onAtenderChamado,
   onAbrir,
   onNova,
 }: {
   comandas: ComandaResumo[]
+  chamados: ChamadoPainel[]
+  onAtenderChamado: (id: string) => void
   onAbrir: (id: string) => void
   onNova: () => void
 }) {
@@ -36,6 +42,33 @@ export function ComandasGrid({
 
   return (
     <div className="h-full overflow-y-auto p-3 sm:p-4">
+      {chamados.length > 0 && (
+        <ul className="mb-3 space-y-2">
+          {chamados.map((ch) => (
+            <li
+              key={ch.id}
+              className={cn(
+                "flex flex-wrap items-center gap-2 rounded-2xl px-3 py-2.5 ring-1",
+                ch.tipo === "CONTA" ? "bg-emerald-50 ring-emerald-200" : "bg-amber-50 ring-amber-200",
+              )}
+            >
+              {ch.tipo === "CONTA" ? <ReceiptText className="h-5 w-5 text-emerald-700" /> : <BellRing className="h-5 w-5 text-amber-700" />}
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">
+                  {rotuloMesa(ch.mesa)} {ch.tipo === "CONTA" ? "pediu a conta" : "chamou o atendente"}
+                </span>
+                <span className="block text-xs text-stone-600">
+                  {minutosDesde(ch.criadoEm, agora)} min{ch.area ? ` · ${ch.area}` : ""}
+                  {ch.observacao ? ` · ${ch.observacao}` : ""}
+                </span>
+              </span>
+              <button type="button" onClick={() => onAtenderChamado(ch.id)} className="flex h-10 items-center gap-1.5 rounded-xl bg-stone-900 px-3 text-sm font-semibold text-white">
+                <Check className="h-4 w-4" /> Atendi
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         <button
           type="button"
@@ -55,7 +88,7 @@ export function ComandasGrid({
               className="flex min-h-[120px] flex-col justify-between rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-stone-200 hover:ring-stone-400"
             >
               <div>
-                <p className="text-lg font-bold leading-tight">{c.mesa ? `Mesa ${c.mesa}` : c.clienteNome}</p>
+                <p className="text-lg font-bold leading-tight">{c.mesa ? rotuloMesa(c.mesa) : c.clienteNome}</p>
                 <p className="truncate text-xs text-stone-500">
                   #{c.numero}
                   {c.mesa && c.clienteNome !== `Mesa ${c.mesa}` ? ` · ${c.clienteNome}` : ""}
@@ -102,6 +135,7 @@ export function AbrirComandaDialog({
   onAbrir,
   titulo = "Abrir comanda",
   inicial,
+  mesasLivres = [],
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
@@ -109,6 +143,7 @@ export function AbrirComandaDialog({
   onAbrir: (d: { mesa: string; nome: string; cobrarServico: boolean }) => Promise<void>
   titulo?: string
   inicial?: { mesa: string; nome: string }
+  mesasLivres?: string[]
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,17 +151,18 @@ export function AbrirComandaDialog({
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
         </DialogHeader>
-        {open && <FormComanda servicoPct={servicoPct} onAbrir={onAbrir} inicial={inicial} editar={!!inicial} />}
+        {open && <FormComanda servicoPct={servicoPct} onAbrir={onAbrir} inicial={inicial} editar={!!inicial} mesasLivres={mesasLivres} />}
       </DialogContent>
     </Dialog>
   )
 }
 
-function FormComanda({ servicoPct, onAbrir, inicial, editar }: {
+function FormComanda({ servicoPct, onAbrir, inicial, editar, mesasLivres }: {
   servicoPct: number | null
   onAbrir: (d: { mesa: string; nome: string; cobrarServico: boolean }) => Promise<void>
   inicial?: { mesa: string; nome: string }
   editar: boolean
+  mesasLivres: string[]
 }) {
   const [mesa, setMesa] = useState(inicial?.mesa ?? "")
   const [nome, setNome] = useState(inicial?.nome ?? "")
@@ -148,6 +184,15 @@ function FormComanda({ servicoPct, onAbrir, inicial, editar }: {
       }}
     >
       <input autoFocus value={mesa} onChange={(e) => setMesa(e.target.value)} placeholder="Mesa (ex.: 4, Varanda 2)" maxLength={20} className={cn(campo, "text-lg font-semibold")} />
+      {mesasLivres.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {mesasLivres.slice(0, 12).map((m) => (
+            <button key={m} type="button" onClick={() => setMesa(m)} className={cn("rounded-full px-3 py-1.5 text-sm font-medium ring-1", mesa === m ? "bg-stone-900 text-white ring-stone-900" : "bg-white ring-stone-300")}>
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
       <input value={nome} onChange={(e) => setNome(e.target.value)} placeholder={editar ? "Nome da comanda" : "Nome do cliente (opcional com mesa)"} maxLength={60} className={campo} />
       {!editar && servicoPct != null && (
         <label className="flex items-center gap-2 text-sm">

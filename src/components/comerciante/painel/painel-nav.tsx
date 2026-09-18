@@ -15,6 +15,7 @@ import {
   ChefHat,
   Contact,
   MonitorSmartphone,
+  QrCode,
   Receipt,
   Users,
   type LucideIcon,
@@ -85,6 +86,14 @@ const ITENS_GESTAO: ItemGestao[] = [
     feature: "gestao_relatorios",
     permissoes: ["vendas:registrar"],
     // No celular, o PDV abre pelo botão flutuante e a lista vem pelo Resumo.
+    somenteDesktop: true,
+  },
+  {
+    href: "/comerciante/gestao/mesas",
+    label: "Mesas",
+    icon: QrCode,
+    feature: "gestao_relatorios",
+    permissoes: ["pedidos:configurar"],
     somenteDesktop: true,
   },
   {

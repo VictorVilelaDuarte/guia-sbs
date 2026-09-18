@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowLeft,
   Ban,
+  BellRing,
   CheckCircle2,
   ChefHat,
   Combine,
@@ -22,6 +23,9 @@ import {
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { ComandaDetalhe, ComandaResumo } from "@/lib/gestao/comandas"
+import type { ChamadoPainel } from "@/lib/gestao/mesas"
+import { rotuloMesa } from "@/lib/gestao/mesas-link"
+import { beep } from "@/components/comerciante/pedidos/beep"
 import type { PlanoDivisao } from "@/lib/gestao/divisao"
 import { calcularTotais, valorLinhaC, MAX_PERCENTUAL_SERVICO } from "@/lib/gestao/totais"
 import { cn } from "@/lib/utils"
@@ -55,6 +59,8 @@ interface Props {
   zonas: ZonaPdv[]
   servicoPct: number | null
   comandasIniciais: ComandaResumo[]
+  mesas: { nome: string; area: string | null }[]
+  chamadosIniciais: ChamadoPainel[]
   temPedidoOnline: boolean
   buscaClientes: boolean
   podeDesconto: boolean
@@ -136,6 +142,8 @@ export function PdvApp(props: Props) {
   const [comanda, setComanda] = useState<ComandaDetalhe | null>(null)
   const [pendentes, setPendentes] = useState<LinhaPdv[]>([])
   const [ocupado, setOcupado] = useState(false)
+  const [chamados, setChamados] = useState<ChamadoPainel[]>(props.chamadosIniciais)
+  const chamadosVistos = useRef(new Set(props.chamadosIniciais.map((c) => c.id)))
 
   const atualizarLista = useCallback(async () => {
     const r = await fetch("/api/comerciante/gestao/comandas", { cache: "no-store" }).catch(() => null)
@@ -148,6 +156,26 @@ export function PdvApp(props: Props) {
     const c: ComandaDetalhe = await r.json()
     return c
   }, [])
+
+  // Chamados das mesas (QR): valem para quem está no PDV mesmo fora da aba de
+  // comandas — por isso o polling é separado, com bipe quando chega um novo.
+  useEffect(() => {
+    const t = setInterval(async () => {
+      const r = await fetch("/api/comerciante/gestao/chamados", { cache: "no-store" }).catch(() => null)
+      if (!r?.ok) return
+      const lista: ChamadoPainel[] = await r.json()
+      if (lista.some((c) => !chamadosVistos.current.has(c.id))) beep()
+      chamadosVistos.current = new Set(lista.map((c) => c.id))
+      setChamados(lista)
+    }, POLL_MS)
+    return () => clearInterval(t)
+  }, [])
+
+  async function atenderChamado(id: string) {
+    const r = await enviarJson<ChamadoPainel[]>("/api/comerciante/gestao/chamados", { id })
+    if (!r.ok) return toast.error(r.erro)
+    setChamados(r.data)
+  }
 
   // Polling: vários aparelhos (caixa e garçons) lançam na mesma comanda.
   useEffect(() => {
@@ -451,7 +479,7 @@ export function PdvApp(props: Props) {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-bold">{comanda.mesa ? `Mesa ${comanda.mesa}` : comanda.clienteNome}</p>
+            <p className="truncate text-base font-bold">{comanda.mesa ? rotuloMesa(comanda.mesa) : comanda.clienteNome}</p>
             <p className="truncate text-xs text-stone-500">
               #{comanda.numero}
               {comanda.mesa && comanda.clienteNome !== `Mesa ${comanda.mesa}` ? ` · ${comanda.clienteNome}` : ""}
@@ -534,6 +562,15 @@ export function PdvApp(props: Props) {
           </button>
         </nav>
         <div className="flex items-center gap-1">
+          {chamados.length > 0 && (
+            <button
+              type="button"
+              onClick={() => { setAba("comandas"); setComanda(null) }}
+              className="flex items-center gap-1 rounded-lg bg-amber-500 px-2 py-1 text-xs font-bold text-stone-900"
+            >
+              <BellRing className="h-4 w-4" /> {chamados.length}
+            </button>
+          )}
           {props.isAdmin && <ShieldCheck className="h-4 w-4 text-amber-400" aria-label="Modo administrador" />}
           {props.podeConfigurar && (
             <button type="button" aria-label="Configurar PDV" onClick={() => setDlg("config")} className="rounded-lg p-2 text-stone-300 hover:bg-stone-800 hover:text-white">
@@ -552,7 +589,13 @@ export function PdvApp(props: Props) {
       {/* Corpo */}
       {mostrandoGrid ? (
         <main className="min-h-0 flex-1">
-          <ComandasGrid comandas={comandas} onAbrir={abrirComandaExistente} onNova={() => setDlg("abrir")} />
+          <ComandasGrid
+            comandas={comandas}
+            chamados={chamados}
+            onAtenderChamado={atenderChamado}
+            onAbrir={abrirComandaExistente}
+            onNova={() => setDlg("abrir")}
+          />
         </main>
       ) : (
         <main className="flex min-h-0 flex-1">
@@ -570,7 +613,7 @@ export function PdvApp(props: Props) {
         <div className="flex border-t border-stone-200 bg-white lg:hidden" style={{ paddingBottom: telaMobile === "produtos" ? "env(safe-area-inset-bottom)" : undefined }}>
           {telaMobile === "produtos" ? (
             <button type="button" onClick={() => setTelaMobile("conta")} className="m-2 flex h-12 flex-1 items-center justify-between rounded-xl bg-stone-900 px-4 font-semibold text-white">
-              <span>{aba === "comandas" && comanda ? (comanda.mesa ? `Mesa ${comanda.mesa}` : comanda.clienteNome) : "Ver conta"} · {qtdConta} item(ns)</span>
+              <span>{aba === "comandas" && comanda ? (comanda.mesa ? rotuloMesa(comanda.mesa) : comanda.clienteNome) : "Ver conta"} · {qtdConta} item(ns)</span>
               <span className="tabular-nums">{brl(totalMobileC)}</span>
             </button>
           ) : (
@@ -627,7 +670,7 @@ export function PdvApp(props: Props) {
           open
           onOpenChange={(o) => !o && setDlg(null)}
           modo={aba === "venda" ? "venda" : "comanda"}
-          titulo={aba === "venda" ? "Receber venda" : `Receber · ${comanda!.mesa ? `Mesa ${comanda!.mesa}` : comanda!.clienteNome}`}
+          titulo={aba === "venda" ? "Receber venda" : `Receber · ${comanda!.mesa ? rotuloMesa(comanda!.mesa) : comanda!.clienteNome}`}
           totalC={aba === "venda" ? totaisVenda.totalC : centavos(comanda!.total)}
           pagamentosComanda={
             comanda && aba === "comandas"
@@ -657,6 +700,7 @@ export function PdvApp(props: Props) {
         open={dlg === "abrir"}
         onOpenChange={(o) => setDlg(o ? "abrir" : null)}
         servicoPct={servicoPct}
+        mesasLivres={props.mesas.filter((m) => !comandas.some((c) => c.mesa?.toLowerCase() === m.nome.toLowerCase())).map((m) => m.nome)}
         onAbrir={async (d) => {
           const r = await enviarJson<ComandaDetalhe>("/api/comerciante/gestao/comandas", { mesa: d.mesa || null, nome: d.nome || null, cobrarServico: d.cobrarServico })
           if (!r.ok) {

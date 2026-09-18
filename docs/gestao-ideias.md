@@ -210,7 +210,9 @@ Ideias que sistemas de PDV comuns não conseguem oferecer, porque não têm um g
   sessão gravada no próprio pedido no checkout, sem identificar a pessoa)?
 
 ### 5.2 QR na mesa ligado à comanda
-**Esforço:** G · **Depende de:** comandas, mapa de mesas (2.3), cardápio público
+**Esforço:** G · **Depende de:** comandas, cardápio público · **🚧 em implementação (2026-09-18)** —
+PR A (mesas, QR, conta pública e chamados) já em `main`; ver §14 do [`modulo-gestao.md`](modulo-gestao.md).
+O cadastro de mesas saiu daqui, então o item 2.3 (mapa) ficou menor.
 
 - **Proposta:** QR Code por mesa; o cliente abre o cardápio da vitrine já na mesa e pode (a) acompanhar
   a conta e a divisão no celular, (b) chamar o garçom / pedir a conta, (c) pedir itens que entram na

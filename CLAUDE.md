@@ -250,6 +250,18 @@ Fase 3 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.2 venda manual,
 - **Rotas do PDV** usam `guardPdv(...)` e `responder()` de `src/lib/gestao/pdv-api.ts` (flag `gestao_relatorios` + permissão; `ErroVenda` vira JSON com status).
 - **Deploy:** `npm run db:push` (aditivo: tabela `pedido_pagamentos`, colunas, enums `ABERTA`/`COMANDA`) → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar → `npx tsx prisma/migrate-pagamentos-pedidos.ts` (idempotente; depois de publicar para pegar pedidos criados pelo código antigo).
 
+### QR na mesa (`Mesa`, `ChamadoMesa`)
+
+Item 5.2 do [`docs/gestao-ideias.md`](docs/gestao-ideias.md), plano no §14 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md). Cada mesa tem um QR fixo que leva para **`/mesa/[token]`** (página pública, `noindex`, fora do route group `(public)`): o cliente vê a conta da mesa em tempo real, chama o atendente e pede a conta.
+
+- **`Mesa`** (`comercioId`, `nome`, `area`, `token`, `ativa`): o `token` é o segredo do QR, não o id — trocá-lo (botão "gerar QR novo") invalida o adesivo antigo sem apagar a mesa nem o histórico. Cadastro em `/comerciante/gestao/mesas` (`pedidos:configurar`); folha para imprimir em `/mesas/qr` (QR gerado no servidor com `qrcode`, em SVG).
+- **`Pedido.mesaId`** liga a comanda à mesa cadastrada; `Pedido.mesa` continua sendo o snapshot do nome (mesa digitada livre segue funcionando). Abrir comanda ou transferir de mesa no PDV religa o vínculo — o QR da mesa nova passa a mostrar a conta e o da antiga para.
+- **Tudo que a página pública mostra sai de `contaDaMesa()`** (`src/lib/gestao/mesas.ts`): itens, totais, o que já foi pago e a divisão por pessoa (calculada com o mesmo `calcularDivisao` do PDV). **Nunca** WhatsApp do cliente, endereço, autor do lançamento ou outra comanda. Rota nova da mesa deve passar por essa função, não montar payload próprio.
+- **Chamados** (`ChamadoMesa`, tipo `GARCOM`/`CONTA`): repetir o toque em menos de 2 minutos não gera chamado novo. Aparecem no PDV com bipe (polling em `/api/comerciante/gestao/chamados`, independente da aba) e são baixados com "Atendi".
+- **Configuração por loja** em `PedidoConfig`: `mesaQrAbrirConta`, `mesaQrPedido`, `mesaQrChamarGarcom`, `mesaQrPedirConta` (`PATCH /api/comerciante/gestao/pdv`). Ver a conta é sempre permitido; o resto a loja liga e desliga, e vale na hora — a API também recusa o que está desligado.
+- **Rótulo:** `rotuloMesa()` (`src/lib/gestao/mesas-link.ts`, sem runtime) — "4" vira "Mesa 4" e "Varanda 2" fica como está.
+- **Deploy:** `npm run db:push` (aditivo: `mesas`, `chamados_mesa`, `Pedido.mesaId`, flags no `PedidoConfig`) → publicar. O link do QR usa `NEXT_PUBLIC_SITE_URL` — **gerar os QR só depois do domínio de produção definido**, senão os adesivos apontam para o endereço errado.
+
 ### Relatórios de vendas
 
 Fase 3 / PR 3 (§13.4 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md)). Tela `/comerciante/gestao/relatorios` (`vendas:ver` + flag `gestao_relatorios`; menu só no desktop, atalho no Resumo e em Vendas). Consultas em `src/lib/gestao/relatorios.ts`, período na URL (`?periodo=hoje|ontem|7d|30d|mes|mes-anterior` ou `?de=&ate=`, máx. 12 meses, sem futuro), gráficos em SVG/HTML puro no servidor (`src/components/comerciante/relatorios/graficos.tsx`).

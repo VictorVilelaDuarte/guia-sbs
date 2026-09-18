@@ -17,6 +17,7 @@ import {
   Lock,
   MonitorSmartphone,
   Package,
+  QrCode,
   Receipt,
   ReceiptText,
 } from "lucide-react"
@@ -103,6 +104,7 @@ export default async function GestaoResumoPage() {
   // Venda manual/relatórios independem de pedido online (decisão 4 da Fase 3).
   const registraVendas = temFeature(features, "gestao_relatorios") && temPermissao(permissoes, "vendas:registrar")
   const atalhoProducao = temFeature(features, "gestao_relatorios") && temPermissao(permissoes, "pedidos:operar")
+  const atalhoMesas = temFeature(features, "gestao_relatorios") && temPermissao(permissoes, "pedidos:configurar")
   const r = await getResumoData(base.comercio.id, { pedidos: operaPedidos, vendas: registraVendas })
 
   const ticketMedio = r.hoje && r.hoje.concluidos > 0 ? r.hoje.faturamento / r.hoje.concluidos : 0
@@ -249,6 +251,9 @@ export default async function GestaoResumoPage() {
           )}
           {atalhoProducao && (
             <Atalho href="/comerciante/gestao/producao" icon={ChefHat} titulo="Produção" detalhe="Rodadas das comandas para preparar" />
+          )}
+          {atalhoMesas && (
+            <Atalho href="/comerciante/gestao/mesas" icon={QrCode} titulo="Mesas e QR Code" detalhe="O cliente vê a conta e chama o atendente pelo celular" />
           )}
           {atalhoEquipe && (
             <Atalho

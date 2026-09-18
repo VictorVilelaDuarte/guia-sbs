@@ -1080,3 +1080,38 @@ sistema, em tela cheia e aba própria, com os recursos de um caixa profissional.
   virada do dia, venda de ontem e pedido antigo sem data — faturamento = soma dos pagamentos = soma manual
   (R$ 91,95); períodos, permissões e plano; conferência visual no desktop e no celular.
 - **Deploy:** `npm run db:push` → publicar → `npx tsx prisma/migrate-fechada-em.ts`.
+
+---
+
+## 14. QR na mesa (item 5.2 do banco de ideias)
+
+Escolhido em 2026-09-18 como próximo passo, antes de adicionais, importação de cardápio e mapa de mesas.
+
+**Decisões de 2026-09-18:**
+1. **Cadastro de mesas entra agora** (nome, área, QR, ativa) — o item 17 (mapa de mesas) depois só
+   acrescenta o visual com status e tempo de ocupação.
+2. **O cliente pode abrir a conta da mesa pelo QR**, configurável por loja, ligado por padrão.
+3. **Todo pedido feito pelo QR passa por aprovação do atendente.**
+4. **Sem pagamento pelo celular.** "Pedir a conta" é um aviso à equipe — e é **configurável por loja**,
+   assim como "chamar o atendente".
+5. **Nome obrigatório para pedir**, WhatsApp opcional (vira cadastro de cliente como hoje).
+6. **QR fixo simples**, protegido por: pedido só com comanda aberta (ou aberta pelo próprio cliente,
+   se a loja permitir), limite de repetição, aprovação obrigatória e botão para desligar na hora.
+7. **Plano:** `gestao_relatorios` + `cardapio` para o menu; não exige `pedido_online`.
+
+### 14.1 PR A — Mesas, QR, conta pública e chamados ✅ implementado
+
+- Models `Mesa` e `ChamadoMesa`; `Pedido.mesaId`; quatro chaves de configuração no `PedidoConfig`.
+- Página pública `/mesa/[token]` (`noindex`, sem login), alimentada só por `contaDaMesa()` — nenhum dado
+  interno da loja sai por ali (coberto por teste).
+- Cadastro em `/comerciante/gestao/mesas` + folha de impressão dos QR (SVG gerado no servidor).
+- Chamados no PDV com bipe e "Atendi"; repetição em menos de 2 minutos não duplica.
+- Transferir a comanda de mesa move o QR junto; "gerar QR novo" invalida o adesivo antigo.
+- **Testado:** 38 cenários (cadastro, permissões, plano, conta pública, divisão, chamados, configuração,
+  transferência, mesa inativa, troca de token e telas) + conferência visual no celular e na impressão.
+
+### 14.2 PR B — Pedido pelo QR com aprovação (a fazer)
+
+- Itens solicitados pelo cliente entram na comanda **sem contar no total** até o atendente aprovar.
+- Abertura da conta pelo próprio cliente quando a mesa está livre (se a loja permitir).
+- Limites antiabuso (itens por minuto, teto por pedido) e botão para desligar o pedido por QR na hora.
