@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trackCtx } from "@/lib/analytics/track";
 import type { AddCarrinho } from "@/lib/carrinho";
+import type { GrupoComplementoPublico } from "./types";
 
 const DIAMOND = "✦";
 
@@ -27,6 +28,7 @@ export interface ProdutoSheet {
   destaque: boolean;
   imagens: string[];
   variacoes: Variacao[];
+  complementos?: GrupoComplementoPublico[];
   categoriaNome: string;
 }
 
@@ -66,6 +68,8 @@ export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props
   const [variacaoSel, setVariacaoSel] = useState<string | null>(null);
   const [quantidade, setQuantidade] = useState(1);
   const [observacao, setObservacao] = useState("");
+  // Complementos escolhidos: opcaoId → quantidade
+  const [complSel, setComplSel] = useState<Record<string, number>>({});
 
   // Arrastar para fechar
   const [dragOffset, setDragOffset] = useState(0);
@@ -188,10 +192,35 @@ export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props
     variacoes.length > 0
       ? (variacoes.find((v) => v.id === variacaoSel)?.preco ?? null)
       : precoFinal;
-  const totalLinha = precoUnitSel != null ? precoUnitSel * quantidade : null;
+  // Complementos: preço entra no valor unitário e a escolha vai para o carrinho.
+  const grupos = displayed.complementos ?? [];
+  const complementosEscolhidos = grupos.flatMap((g) =>
+    g.opcoes
+      .filter((o) => (complSel[o.id] ?? 0) > 0)
+      .map((o) => ({ opcaoId: o.id, nome: o.nome, precoUnit: o.preco, quantidade: complSel[o.id] })),
+  );
+  const extraComplementos = complementosEscolhidos.reduce((a, c) => a + c.precoUnit * c.quantidade, 0);
+  const escolhidosNoGrupo = (g: (typeof grupos)[number]) =>
+    g.opcoes.reduce((a, o) => a + (complSel[o.id] ?? 0), 0);
+  const grupoFaltando = grupos.find((g) => escolhidosNoGrupo(g) < g.minimo);
+  const precoComExtras = precoUnitSel != null ? precoUnitSel + extraComplementos : null;
+  const totalLinha = precoComExtras != null ? precoComExtras * quantidade : null;
+
+  function mudarComplemento(
+    grupo: (typeof grupos)[number],
+    opcao: (typeof grupos)[number]["opcoes"][number],
+    delta: number,
+  ) {
+    setComplSel((atual) => {
+      const novo = Math.min(Math.max((atual[opcao.id] ?? 0) + delta, 0), opcao.quantidadeMax);
+      const outros = grupo.opcoes.reduce((a, o) => a + (o.id === opcao.id ? 0 : atual[o.id] ?? 0), 0);
+      if (outros + novo > grupo.maximo) return atual;
+      return { ...atual, [opcao.id]: novo };
+    });
+  }
 
   const handleAdd = () => {
-    if (!onAddToCart || precoUnitSel == null) return;
+    if (!onAddToCart || precoComExtras == null || grupoFaltando) return;
     const variacao = variacoes.find((v) => v.id === variacaoSel) ?? null;
     onAddToCart({
       produtoId: displayed.id,
@@ -199,9 +228,10 @@ export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props
       imagem: imagens[0] ?? null,
       variacaoId: variacoes.length > 0 ? (variacao?.id ?? null) : null,
       variacaoNome: variacoes.length > 0 ? (variacao?.nome ?? null) : null,
-      precoUnit: precoUnitSel,
+      precoUnit: precoComExtras,
       quantidade,
       observacao: observacao.trim() || null,
+      complementos: complementosEscolhidos,
     });
     onClose();
   };
@@ -472,6 +502,69 @@ export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props
             ) : null}
           </div>
 
+          {/* Modo pedido: complementos */}
+          {modoPedido && grupos.length > 0 && (
+            <div className="mt-5 space-y-4">
+              {grupos.map((g) => (
+                <div key={g.id}>
+                  <p className="mb-1.5 flex items-baseline justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">{g.nome}</span>
+                    <span className="text-xs text-stone-400">
+                      {g.minimo > 0
+                        ? `escolha ${g.minimo === g.maximo ? g.minimo : `${g.minimo} a ${g.maximo}`}`
+                        : `até ${g.maximo}`}
+                    </span>
+                  </p>
+                  <div className="divide-y divide-stone-100 rounded-xl border border-stone-200">
+                    {g.opcoes.map((o) => {
+                      const qtd = complSel[o.id] ?? 0;
+                      return (
+                        <div key={o.id} className="flex items-center gap-2 px-3 py-2.5">
+                          <span className="min-w-0 flex-1 text-sm text-stone-700">
+                            {o.nome}
+                            <span className="ml-1.5 text-xs text-stone-400">
+                              {o.preco > 0 ? `+ ${formatBRL(o.preco)}` : "grátis"}
+                            </span>
+                          </span>
+                          {qtd > 0 || o.quantidadeMax > 1 ? (
+                            <span className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                aria-label={`Diminuir ${o.nome}`}
+                                onClick={() => mudarComplemento(g, o, -1)}
+                                disabled={qtd === 0}
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 text-stone-700 disabled:opacity-40"
+                              >
+                                <Minus className="h-3.5 w-3.5" />
+                              </button>
+                              <span className="w-4 text-center text-sm font-semibold tabular-nums">{qtd}</span>
+                              <button
+                                type="button"
+                                aria-label={`Aumentar ${o.nome}`}
+                                onClick={() => mudarComplemento(g, o, 1)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 text-stone-700"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => mudarComplemento(g, o, 1)}
+                              className="rounded-full border border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-700 active:bg-stone-100"
+                            >
+                              Escolher
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Modo pedido: quantidade + observação */}
           {modoPedido && (
             <div className="mt-5 space-y-4">
@@ -526,10 +619,10 @@ export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props
             <button
               type="button"
               onClick={handleAdd}
-              disabled={precoUnitSel == null}
+              disabled={precoComExtras == null || !!grupoFaltando}
               className="flex w-full items-center justify-between rounded-2xl bg-stone-900 px-5 py-3.5 font-semibold text-white transition-colors hover:bg-stone-800 active:bg-black disabled:opacity-50"
             >
-              <span>Adicionar</span>
+              <span>{grupoFaltando ? `Escolha em "${grupoFaltando.nome}"` : "Adicionar"}</span>
               {totalLinha != null && <span>{formatBRL(totalLinha)}</span>}
             </button>
           </div>

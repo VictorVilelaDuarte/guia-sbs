@@ -158,6 +158,8 @@ export function CheckoutForm({ slug, comercioId, nomeComercio, abertoAgora, zona
             variacaoId: i.variacaoId,
             quantidade: i.quantidade,
             observacao: i.observacao,
+            // O servidor recalcula o preço pelo cadastro (ver /api/pedidos).
+            complementos: (i.complementos ?? []).map((c) => ({ opcaoId: c.opcaoId, quantidade: c.quantidade })),
           })),
         }),
       });
@@ -245,6 +247,11 @@ export function CheckoutForm({ slug, comercioId, nomeComercio, abertoAgora, zona
                   <p className="truncate text-sm font-medium text-stone-800">{i.titulo}</p>
                   {i.variacaoNome && (
                     <p className="text-xs text-stone-500">{i.variacaoNome}</p>
+                  )}
+                  {(i.complementos ?? []).length > 0 && (
+                    <p className="text-xs text-stone-500">
+                      + {i.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)).join(", ")}
+                    </p>
                   )}
                   {i.observacao && (
                     <p className="truncate text-xs text-stone-400">{i.observacao}</p>

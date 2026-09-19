@@ -1156,8 +1156,17 @@ Escolhido em 2026-09-19, depois do QR na mesa.
   R$ 84,00), regras (obrigatório, limite da opção, limite do grupo, opção de outro produto, opção
   indisponível), comanda e cozinha, e a garantia de que editar o grupo **não** muda venda já registrada.
 
-### 15.2 PR B — Cardápio online, checkout, QR e relatórios (a fazer)
+### 15.2 PR B — Cardápio online, checkout, QR e relatórios ✅ implementado
 
-- Complementos no cardápio público e no checkout do pedido online.
-- Complementos no pedido feito pelo QR da mesa.
-- Bloco "adicionais mais vendidos" nos relatórios.
+- **Cardápio público:** a escolha entra no bottom sheet do produto (com a variação), com passo de
+  quantidade, preço ao vivo e botão travado enquanto falta escolha obrigatória.
+- **Carrinho:** a linha guarda os complementos e a assinatura entra no `uid` — o mesmo item com
+  escolhas diferentes vira linha separada. O checkout envia só `{ opcaoId, quantidade }`.
+- **`/api/pedidos`** valida pelo mesmo `resolverComplementos()` do PDV e soma o preço pelo cadastro;
+  o cliente nunca manda valor.
+- **QR da mesa:** mesma escolha na tela do cliente; o item continua esperando confirmação do atendente,
+  e o preço com complementos entra na conta só depois dela.
+- **Relatórios:** bloco "Adicionais mais vendidos" (quantidade e valor por opção, com o grupo).
+- **Testado:** 18 cenários — cardápio online, checkout (pizza 50 + catupiry 8 + 2× bacon 12, ×2 = R$ 140,00),
+  recusa de grupo obrigatório vazio e de complemento em produto que não usa o grupo, fila e tela de
+  pedidos, pedido pelo QR com aprovação, cozinha e relatório (4× bacon = R$ 24,00).

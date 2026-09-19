@@ -79,8 +79,9 @@ como o estoque vai ser desenhado.
 ## 2. Operação de salão e cozinha
 
 ### 2.1 Adicionais e complementos
-**Esforço:** M · **Depende de:** cardápio, PDV, checkout online · **🚧 em implementação (2026-09-19)** —
-PR A (modelo, cadastro, PDV e cozinha) pronto; ver §15 do [`modulo-gestao.md`](modulo-gestao.md).
+**Esforço:** M · **Depende de:** cardápio, PDV, checkout online · **✅ implementado (2026-09-19)** —
+PR A (modelo, cadastro, PDV e cozinha) e PR B (cardápio online, checkout, QR e relatórios); ver §15 do
+[`modulo-gestao.md`](modulo-gestao.md).
 
 - **Problema:** hoje só existem variação (um preço por opção) e observação livre. "Borda recheada +R$ 8",
   "adicional de queijo", "ponto da carne", "sem cebola" viram texto solto — sem preço, sem relatório,

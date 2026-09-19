@@ -122,7 +122,21 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
           produtos: {
             where: { disponivel: true },
             orderBy: { ordem: "asc" },
-            include: { variacoes: { orderBy: { ordem: "asc" } } },
+            include: {
+              variacoes: { orderBy: { ordem: "asc" } },
+              complementos: {
+                orderBy: { ordem: "asc" },
+                where: { grupo: { ativo: true } },
+                select: {
+                  grupo: {
+                    select: {
+                      id: true, nome: true, minimo: true, maximo: true,
+                      opcoes: { where: { disponivel: true }, orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true, quantidadeMax: true } },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -182,6 +196,7 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
             nome: v.nome,
             preco: v.preco,
           })),
+          complementos: p.complementos.map((c) => c.grupo).filter((g) => g.opcoes.length > 0),
         })),
       }))}
     />

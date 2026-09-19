@@ -253,6 +253,21 @@ export async function itensMaisVendidos(comercioId: string, p: Periodo, limite =
   return linhas.map((l) => ({ titulo: l.titulo, variacao: l.variacao, avulso: l.avulso, quantidade: l.quantidade, valorC: c(l.valor) }))
 }
 
+// Complementos mais vendidos no período (item 2.1 do banco de ideias).
+export async function complementosMaisVendidos(comercioId: string, p: Periodo, limite = 10) {
+  const linhas = await prisma.$queryRaw<{ grupo: string; nome: string; quantidade: number; valor: unknown }[]>`
+    SELECT c."grupoNome" AS grupo, c.nome, SUM(c.quantidade * pi.quantidade)::int AS quantidade,
+           SUM(c."precoUnit" * c.quantidade * pi.quantidade) * 100 AS valor
+    FROM pedido_item_complementos c
+    JOIN pedido_itens pi ON pi.id = c."pedidoItemId"
+    JOIN pedidos v ON v.id = pi."pedidoId"
+    WHERE v."comercioId" = ${comercioId} AND v.status = 'CONCLUIDO' AND ${limites(p)}
+    GROUP BY 1, 2
+    ORDER BY valor DESC, quantidade DESC
+    LIMIT ${limite}`
+  return linhas.map((l) => ({ grupo: l.grupo, nome: l.nome, quantidade: l.quantidade, valorC: c(l.valor) }))
+}
+
 export async function vendasPorHorario(comercioId: string, p: Periodo) {
   const linhas = await prisma.$queryRaw<{ tipo: string; n: number; vendas: number; faturamento: unknown }[]>`
     WITH v AS (

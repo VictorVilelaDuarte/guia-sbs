@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import {
   ATALHOS,
   cancelamentos,
+  complementosMaisVendidos,
   conversaoGuia,
   diasNoPeriodo,
   entregasPorBairro,
@@ -86,13 +87,14 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const anterior = periodoAnterior(periodo)
   const id = base.comercio.id
 
-  const [resumo, resumoAnt, serie, origens, formas, itens, horarios, atendentes, entregas, cancel, conversao] = await Promise.all([
+  const [resumo, resumoAnt, serie, origens, formas, itens, complementos, horarios, atendentes, entregas, cancel, conversao] = await Promise.all([
     resumoVendas(id, periodo),
     resumoVendas(id, anterior),
     serieFaturamento(id, periodo),
     vendasPorOrigem(id, periodo),
     fechamentoPorForma(id, periodo),
     itensMaisVendidos(id, periodo),
+    complementosMaisVendidos(id, periodo),
     vendasPorHorario(id, periodo),
     vendasPorAtendente(id, periodo),
     entregasPorBairro(id, periodo),
@@ -257,6 +259,29 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
               />
             </CardContent>
           </Card>
+
+          {complementos.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Adicionais mais vendidos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <BarrasLista
+                  linhas={complementos.map((x, idx) => ({
+                    chave: `${idx}`,
+                    rotulo: (
+                      <>
+                        <span className="font-medium">{x.nome}</span>
+                        <span className="text-muted-foreground"> · {x.grupo}</span>
+                      </>
+                    ),
+                    valorC: x.valorC,
+                    detalhe: `${x.quantidade} un.`,
+                  }))}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Horários */}
           <div className="grid gap-4 md:grid-cols-2">

@@ -15,6 +15,7 @@ const schema = z.object({
         variacaoId: z.string().nullable().optional(),
         quantidade: z.number().int(),
         observacao: z.string().max(140).nullable().optional(),
+        complementos: z.array(z.object({ opcaoId: z.string(), quantidade: z.number().int().min(1).max(20).optional() })).max(40).optional(),
       }),
     )
     .min(1)

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import type { ComercioCtx } from "@/lib/comercio-ctx"
 import { deCentavos, paraCentavos, paraNumero } from "@/lib/dinheiro"
 import { centavosDe, precoEfetivo } from "@/lib/pedidos"
+import { gruposDosProdutos, resolverComplementos, type EscolhaComplemento, type SnapshotComplemento } from "@/lib/gestao/complementos"
 import { normalizarWhatsapp, vincularCliente } from "@/lib/gestao/clientes"
 import { calcularDivisao, type PlanoDivisao } from "@/lib/gestao/divisao"
 export { linkDaMesa } from "@/lib/gestao/mesas-link"
@@ -301,7 +302,14 @@ const JANELA_MIN = 5
 export interface CardapioDaMesa {
   categorias: {
     nome: string
-    itens: { id: string; titulo: string; descricao: string | null; preco: number | null; variacoes: { id: string; nome: string; preco: number }[] }[]
+    itens: {
+      id: string
+      titulo: string
+      descricao: string | null
+      preco: number | null
+      variacoes: { id: string; nome: string; preco: number }[]
+      complementos: { id: string; nome: string; minimo: number; maximo: number; opcoes: { id: string; nome: string; preco: number; quantidadeMax: number }[] }[]
+    }[]
   }[]
 }
 
@@ -322,7 +330,22 @@ export async function cardapioDaMesa(token: string): Promise<CardapioDaMesa | nu
       produtos: {
         where: { disponivel: true },
         orderBy: [{ ordem: "asc" }, { titulo: "asc" }],
-        select: { id: true, titulo: true, descricao: true, preco: true, precoPromo: true, promoFim: true, variacoes: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true } } },
+        select: {
+          id: true, titulo: true, descricao: true, preco: true, precoPromo: true, promoFim: true,
+          variacoes: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true } },
+          complementos: {
+            orderBy: { ordem: "asc" },
+            where: { grupo: { ativo: true } },
+            select: {
+              grupo: {
+                select: {
+                  id: true, nome: true, minimo: true, maximo: true,
+                  opcoes: { where: { disponivel: true }, orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true, quantidadeMax: true } },
+                },
+              },
+            },
+          },
+        },
       },
     },
   })
@@ -337,6 +360,7 @@ export async function cardapioDaMesa(token: string): Promise<CardapioDaMesa | nu
             descricao: p.descricao,
             preco: p.variacoes.length > 0 ? null : precoEfetivo(p),
             variacoes: p.variacoes,
+            complementos: p.complementos.map((c) => c.grupo).filter((g) => g.opcoes.length > 0),
           }))
           .filter((i) => i.variacoes.length > 0 || i.preco != null),
       }))
@@ -347,7 +371,7 @@ export async function cardapioDaMesa(token: string): Promise<CardapioDaMesa | nu
 export interface PedidoDaMesaInput {
   nome: string
   whatsapp?: string | null
-  itens: { produtoId: string; variacaoId?: string | null; quantidade: number; observacao?: string | null }[]
+  itens: { produtoId: string; variacaoId?: string | null; quantidade: number; observacao?: string | null; complementos?: EscolhaComplemento[] | null }[]
 }
 
 // Pedido feito pelo cliente no QR. Nada entra no total até o atendente aprovar
@@ -379,20 +403,25 @@ export async function pedirNaMesa(token: string, input: PedidoDaMesaInput) {
     include: { variacoes: true },
   })
   const mapa = new Map(produtos.map((p) => [p.id, p]))
+  const gruposPorProduto = await gruposDosProdutos(mesa.comercioId, ids)
   const linhas = input.itens.map((item) => {
     if (!Number.isInteger(item.quantidade) || item.quantidade < 1 || item.quantidade > MAX_QTD_ITEM) {
       throw new ErroVenda(`Quantidade inválida (máximo ${MAX_QTD_ITEM} por item).`)
     }
     const p = mapa.get(item.produtoId)
     if (!p) throw new ErroVenda("Um dos itens saiu do cardápio. Atualize a página.")
+    if (p.variacoes.length > 0 && !p.variacoes.some((x) => x.id === item.variacaoId)) {
+      throw new ErroVenda(`Escolha uma opção para "${p.titulo}".`)
+    }
+    const extras = resolverComplementos(p.titulo, gruposPorProduto.get(p.id) ?? [], item.complementos)
+    const base = { produtoId: p.id, quantidade: item.quantidade, observacao: item.observacao?.trim().slice(0, 140) || null, complementos: extras.snapshots }
     if (p.variacoes.length > 0) {
-      const v = p.variacoes.find((x) => x.id === item.variacaoId)
-      if (!v) throw new ErroVenda(`Escolha uma opção para "${p.titulo}".`)
-      return { produtoId: p.id, titulo: p.titulo, variacaoNome: v.nome, precoC: centavosDe(v.preco), quantidade: item.quantidade, observacao: item.observacao?.trim().slice(0, 140) || null }
+      const v = p.variacoes.find((x) => x.id === item.variacaoId)!
+      return { ...base, titulo: p.titulo, variacaoNome: v.nome, precoC: centavosDe(v.preco) + extras.extraC }
     }
     const preco = precoEfetivo(p)
     if (preco == null) throw new ErroVenda(`"${p.titulo}" está sem preço.`)
-    return { produtoId: p.id, titulo: p.titulo, variacaoNome: null, precoC: centavosDe(preco), quantidade: item.quantidade, observacao: item.observacao?.trim().slice(0, 140) || null }
+    return { ...base, titulo: p.titulo, variacaoNome: null, precoC: centavosDe(preco) + extras.extraC }
   })
 
   const servicoPct = cfg?.taxaServicoPct != null ? paraNumero(cfg.taxaServicoPct) : null
@@ -445,19 +474,22 @@ export async function pedirNaMesa(token: string, input: PedidoDaMesaInput) {
     }
 
     const agora = new Date()
-    await tx.pedidoItem.createMany({
-      data: linhas.map((l) => ({
-        pedidoId: comanda!.id,
-        produtoId: l.produtoId,
-        titulo: l.titulo,
-        variacaoNome: l.variacaoNome,
-        precoUnit: deCentavos(l.precoC),
-        quantidade: l.quantidade,
-        observacao: l.observacao,
-        solicitadoPor: nome,
-        solicitadoEm: agora,
-      })),
-    })
+    for (const l of linhas) {
+      await tx.pedidoItem.create({
+        data: {
+          pedidoId: comanda!.id,
+          produtoId: l.produtoId,
+          titulo: l.titulo,
+          variacaoNome: l.variacaoNome,
+          precoUnit: deCentavos(l.precoC),
+          quantidade: l.quantidade,
+          observacao: l.observacao,
+          solicitadoPor: nome,
+          solicitadoEm: agora,
+          complementos: { create: l.complementos.map((c: SnapshotComplemento) => ({ grupoNome: c.grupoNome, nome: c.nome, precoUnit: deCentavos(c.precoC), quantidade: c.quantidade })) },
+        },
+      })
+    }
     if (whatsapp && !comanda.clienteId) {
       const clienteId = await vincularCliente(tx, { comercioId: mesa.comercioId, nome, whatsapp })
       if (clienteId) await tx.pedido.update({ where: { id: comanda.id }, data: { clienteId } })

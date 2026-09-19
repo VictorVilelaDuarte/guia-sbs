@@ -7,16 +7,24 @@
 import { useCallback, useEffect, useState } from "react"
 import { arredondar } from "@/lib/pedidos"
 
+export interface ComplementoCarrinho {
+  opcaoId: string
+  nome: string
+  precoUnit: number
+  quantidade: number
+}
+
 export interface ItemCarrinho {
-  uid: string // determinístico: `${produtoId}|${variacaoId ?? ""}`
+  uid: string // determinístico: produto + variação + complementos escolhidos
   produtoId: string
   titulo: string
   imagem: string | null
   variacaoId: string | null
   variacaoNome: string | null
-  precoUnit: number
+  precoUnit: number // já com os complementos somados
   quantidade: number
   observacao: string | null
+  complementos: ComplementoCarrinho[]
 }
 
 // Payload de adição (sem uid/quantidade-acumulada — o hook resolve).
@@ -29,6 +37,7 @@ export interface AddCarrinho {
   precoUnit: number
   quantidade: number
   observacao: string | null
+  complementos?: ComplementoCarrinho[]
 }
 
 const PREFIXO = "carrinho:"
@@ -37,8 +46,14 @@ function chave(slug: string) {
   return PREFIXO + slug
 }
 
-function uidDe(produtoId: string, variacaoId: string | null) {
-  return `${produtoId}|${variacaoId ?? ""}`
+// Complementos diferentes = linha diferente (um lanche com bacon não junta com
+// outro sem). A assinatura é ordenada para não depender da ordem de escolha.
+function uidDe(produtoId: string, variacaoId: string | null, complementos: ComplementoCarrinho[] = []) {
+  const extras = complementos
+    .map((c) => `${c.opcaoId}x${c.quantidade}`)
+    .sort()
+    .join(",")
+  return `${produtoId}|${variacaoId ?? ""}|${extras}`
 }
 
 function ler(slug: string): ItemCarrinho[] {
@@ -77,7 +92,7 @@ export function useCarrinho(slug: string) {
   }, [slug, itens, mounted])
 
   const adicionar = useCallback((add: AddCarrinho) => {
-    const uid = uidDe(add.produtoId, add.variacaoId)
+    const uid = uidDe(add.produtoId, add.variacaoId, add.complementos)
     setItens((prev) => {
       const existente = prev.find((i) => i.uid === uid)
       if (existente) {
@@ -104,6 +119,7 @@ export function useCarrinho(slug: string) {
           precoUnit: add.precoUnit,
           quantidade: add.quantidade,
           observacao: add.observacao?.trim() || null,
+          complementos: add.complementos ?? [],
         },
       ]
     })

@@ -4,6 +4,23 @@ export interface Variacao {
   preco: number;
 }
 
+// Complementos do item ("Adicionais", "Ponto da carne") — ver
+// src/lib/gestao/complementos.ts. O preço entra no valor unitário do item.
+export interface OpcaoComplementoPublica {
+  id: string;
+  nome: string;
+  preco: number;
+  quantidadeMax: number;
+}
+
+export interface GrupoComplementoPublico {
+  id: string;
+  nome: string;
+  minimo: number;
+  maximo: number;
+  opcoes: OpcaoComplementoPublica[];
+}
+
 export interface Produto {
   id: string;
   titulo: string;
@@ -14,6 +31,7 @@ export interface Produto {
   destaque: boolean;
   imagens: string[];
   variacoes: Variacao[];
+  complementos?: GrupoComplementoPublico[];
 }
 
 export interface Categoria {

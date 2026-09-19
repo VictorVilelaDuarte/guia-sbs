@@ -9,6 +9,8 @@ import type { Prisma } from "@prisma/client"
 import { enviarPush, payloadNovoPedido } from "@/lib/push"
 import { parseHorarios, getDiaAtual, estaAbertoAgora } from "@/lib/horarios"
 import { vincularCliente } from "@/lib/gestao/clientes"
+import { gruposDosProdutos, resolverComplementos, type SnapshotComplemento } from "@/lib/gestao/complementos"
+import { ErroVenda } from "@/lib/gestao/vendas"
 
 // Rota PÚBLICA — sem auth. O servidor é a autoridade: ignora qualquer preço
 // vindo do cliente, recarrega itens do banco e recalcula subtotal/total.
@@ -18,6 +20,8 @@ const itemSchema = z.object({
   variacaoId: z.string().optional().nullable(),
   quantidade: z.number().int().positive().max(99),
   observacao: z.string().max(280).optional().nullable(),
+  // Complementos escolhidos no cardápio; o preço vem do cadastro (nunca do cliente).
+  complementos: z.array(z.object({ opcaoId: z.string(), quantidade: z.number().int().min(1).max(20).optional() })).max(40).optional(),
 })
 
 const createSchema = z.object({
@@ -120,7 +124,11 @@ export async function POST(req: NextRequest) {
     precoUnit: number
     quantidade: number
     observacao: string | null
+    complementos: SnapshotComplemento[]
   }[] = []
+
+  // Grupos de complementos dos itens do carrinho (mesma validação do PDV).
+  const gruposPorProduto = await gruposDosProdutos(comercio.id, ids)
 
   for (const item of d.itens) {
     const p = mapProd.get(item.produtoId)
@@ -140,6 +148,16 @@ export async function POST(req: NextRequest) {
       precoUnit = efetivo
     }
 
+    let complementos: SnapshotComplemento[] = []
+    try {
+      const r = resolverComplementos(p.titulo, gruposPorProduto.get(p.id) ?? [], item.complementos)
+      complementos = r.snapshots
+      precoUnit = precoUnit + r.extraC / 100
+    } catch (e) {
+      if (e instanceof ErroVenda) return erro(e.message)
+      throw e
+    }
+
     snapshots.push({
       produtoId: p.id,
       titulo: p.titulo,
@@ -147,6 +165,7 @@ export async function POST(req: NextRequest) {
       precoUnit,
       quantidade: item.quantidade,
       observacao: item.observacao?.trim() || null,
+      complementos,
     })
   }
 
@@ -204,7 +223,11 @@ export async function POST(req: NextRequest) {
         taxaEntrega: deCentavos(taxaC),
         total: deCentavos(totalC),
         itens: {
-          create: snapshots.map((s) => ({ ...s, precoUnit: deCentavos(centavosDe(s.precoUnit)) })),
+          create: snapshots.map(({ complementos, ...s }) => ({
+            ...s,
+            precoUnit: deCentavos(centavosDe(s.precoUnit)),
+            complementos: { create: complementos.map((c) => ({ grupoNome: c.grupoNome, nome: c.nome, precoUnit: deCentavos(c.precoC), quantidade: c.quantidade })) },
+          })),
         },
         // Pagamento previsto (fonte única dos relatórios por forma de pagamento).
         pagamentos: {

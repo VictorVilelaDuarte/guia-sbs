@@ -13,8 +13,9 @@ interface Linha {
   variacaoId: string | null
   titulo: string
   detalhe: string | null
-  preco: number
+  preco: number // já com os complementos
   quantidade: number
+  complementos: { opcaoId: string; nome: string; quantidade: number }[]
 }
 
 type Item = CardapioDaMesa["categorias"][number]["itens"][number]
@@ -36,6 +37,7 @@ export function PedidoSheet({
 }) {
   const [linhas, setLinhas] = useState<Linha[]>([])
   const [escolhendo, setEscolhendo] = useState<Item | null>(null)
+  const [complSel, setComplSel] = useState<Record<string, number>>({})
   const [etapa, setEtapa] = useState<"cardapio" | "revisar">("cardapio")
   const [nome, setNome] = useState(nomeSalvo)
   const [whatsapp, setWhatsapp] = useState("")
@@ -45,14 +47,32 @@ export function PedidoSheet({
   const total = linhas.reduce((a, l) => a + l.preco * l.quantidade, 0)
   const qtd = linhas.reduce((a, l) => a + l.quantidade, 0)
 
-  function adicionar(item: Item, variacao?: { id: string; nome: string; preco: number }) {
-    const chave = `${item.id}:${variacao?.id ?? ""}`
+  function adicionar(
+    item: Item,
+    variacao?: { id: string; nome: string; preco: number },
+    complementos: { opcaoId: string; nome: string; preco: number; quantidade: number }[] = [],
+  ) {
+    const extras = complementos.reduce((a, c) => a + c.preco * c.quantidade, 0)
+    const chave = `${item.id}:${variacao?.id ?? ""}:${complementos.map((c) => `${c.opcaoId}x${c.quantidade}`).sort().join(",")}`
     setLinhas((ls) => {
       const igual = ls.find((l) => l.chave === chave)
       if (igual) return ls.map((l) => (l.chave === chave ? { ...l, quantidade: Math.min(10, l.quantidade + 1) } : l))
-      return [...ls, { chave, produtoId: item.id, variacaoId: variacao?.id ?? null, titulo: item.titulo, detalhe: variacao?.nome ?? null, preco: variacao?.preco ?? item.preco ?? 0, quantidade: 1 }]
+      return [
+        ...ls,
+        {
+          chave,
+          produtoId: item.id,
+          variacaoId: variacao?.id ?? null,
+          titulo: item.titulo,
+          detalhe: [variacao?.nome, ...complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome))].filter(Boolean).join(" · ") || null,
+          preco: (variacao?.preco ?? item.preco ?? 0) + extras,
+          quantidade: 1,
+          complementos: complementos.map((c) => ({ opcaoId: c.opcaoId, nome: c.nome, quantidade: c.quantidade })),
+        },
+      ]
     })
     setEscolhendo(null)
+    setComplSel({})
   }
 
   const mudar = (chave: string, delta: number) =>
@@ -69,7 +89,12 @@ export function PedidoSheet({
         body: JSON.stringify({
           nome: nome.trim(),
           whatsapp: whatsapp.trim() || null,
-          itens: linhas.map((l) => ({ produtoId: l.produtoId, variacaoId: l.variacaoId, quantidade: l.quantidade })),
+          itens: linhas.map((l) => ({
+            produtoId: l.produtoId,
+            variacaoId: l.variacaoId,
+            quantidade: l.quantidade,
+            complementos: l.complementos.map((c) => ({ opcaoId: c.opcaoId, quantidade: c.quantidade })),
+          })),
         }),
       })
       const data = await r.json().catch(() => ({}))
@@ -107,7 +132,7 @@ export function PedidoSheet({
                       <li key={i.id}>
                         <button
                           type="button"
-                          onClick={() => (i.variacoes.length > 0 ? setEscolhendo(i) : adicionar(i))}
+                          onClick={() => (i.variacoes.length > 0 || i.complementos.length > 0 ? setEscolhendo(i) : adicionar(i))}
                           className="flex w-full items-start justify-between gap-3 rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-stone-200"
                         >
                           <span className="min-w-0">
@@ -208,25 +233,124 @@ export function PedidoSheet({
       </footer>
 
       {escolhendo && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={() => setEscolhendo(null)}>
-          <div className="w-full rounded-t-2xl bg-white p-4" onClick={(e) => e.stopPropagation()}>
-            <p className="mb-3 font-semibold">{escolhendo.titulo}</p>
-            <div className="grid gap-2">
-              {escolhendo.variacoes.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => adicionar(escolhendo, v)}
-                  className={cn("flex items-center justify-between rounded-xl bg-stone-50 p-3 text-left ring-1 ring-stone-200")}
-                >
-                  <span className="font-medium">{v.nome}</span>
-                  <span className="tabular-nums">{brl(v.preco)}</span>
-                </button>
-              ))}
-            </div>
+        <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={() => { setEscolhendo(null); setComplSel({}) }}>
+          <div className="max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl bg-white p-4" onClick={(e) => e.stopPropagation()}>
+            <EscolhaMesa
+              item={escolhendo}
+              complSel={complSel}
+              setComplSel={setComplSel}
+              onAdicionar={(variacao, complementos) => adicionar(escolhendo, variacao, complementos)}
+            />
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Escolha de variação e complementos antes de somar o item ao pedido da mesa.
+function EscolhaMesa({
+  item,
+  complSel,
+  setComplSel,
+  onAdicionar,
+}: {
+  item: Item
+  complSel: Record<string, number>
+  setComplSel: (f: (atual: Record<string, number>) => Record<string, number>) => void
+  onAdicionar: (
+    variacao?: { id: string; nome: string; preco: number },
+    complementos?: { opcaoId: string; nome: string; preco: number; quantidade: number }[],
+  ) => void
+}) {
+  const [variacao, setVariacao] = useState(item.variacoes[0] ?? null)
+  const escolhidos = item.complementos.flatMap((g) =>
+    g.opcoes.filter((o) => (complSel[o.id] ?? 0) > 0).map((o) => ({ opcaoId: o.id, nome: o.nome, preco: o.preco, quantidade: complSel[o.id] })),
+  )
+  const extras = escolhidos.reduce((a, c) => a + c.preco * c.quantidade, 0)
+  const noGrupo = (g: Item["complementos"][number]) => g.opcoes.reduce((a, o) => a + (complSel[o.id] ?? 0), 0)
+  const faltando = item.complementos.find((g) => noGrupo(g) < g.minimo)
+
+  function mudar(g: Item["complementos"][number], o: Item["complementos"][number]["opcoes"][number], delta: number) {
+    setComplSel((atual) => {
+      const novo = Math.min(Math.max((atual[o.id] ?? 0) + delta, 0), o.quantidadeMax)
+      const outros = g.opcoes.reduce((a, x) => a + (x.id === o.id ? 0 : atual[x.id] ?? 0), 0)
+      if (outros + novo > g.maximo) return atual
+      return { ...atual, [o.id]: novo }
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="font-semibold">{item.titulo}</p>
+
+      {item.variacoes.length > 0 && (
+        <div className="grid gap-2">
+          {item.variacoes.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => setVariacao(v)}
+              className={cn(
+                "flex items-center justify-between rounded-xl p-3 text-left ring-1",
+                variacao?.id === v.id ? "bg-stone-900 text-white ring-stone-900" : "bg-stone-50 ring-stone-200",
+              )}
+            >
+              <span className="font-medium">{v.nome}</span>
+              <span className="tabular-nums">{brl(v.preco)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {item.complementos.map((g) => (
+        <div key={g.id} className="space-y-1.5">
+          <p className="flex items-baseline justify-between text-sm font-semibold">
+            {g.nome}
+            <span className="text-xs font-normal text-stone-500">
+              {g.minimo > 0 ? `escolha ${g.minimo === g.maximo ? g.minimo : `${g.minimo} a ${g.maximo}`}` : `até ${g.maximo}`}
+            </span>
+          </p>
+          <ul className="divide-y divide-stone-100 rounded-xl ring-1 ring-stone-200">
+            {g.opcoes.map((o) => {
+              const qtd = complSel[o.id] ?? 0
+              return (
+                <li key={o.id} className="flex items-center gap-2 px-3 py-2.5 text-sm">
+                  <span className="min-w-0 flex-1">
+                    {o.nome}
+                    <span className="ml-1.5 text-xs text-stone-500">{o.preco > 0 ? `+ ${brl(o.preco)}` : "grátis"}</span>
+                  </span>
+                  {qtd > 0 || o.quantidadeMax > 1 ? (
+                    <span className="flex items-center gap-2">
+                      <button type="button" aria-label={`Menos ${o.nome}`} onClick={() => mudar(g, o, -1)} disabled={qtd === 0} className="flex h-9 w-9 items-center justify-center rounded-lg ring-1 ring-stone-300 disabled:opacity-40">
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="w-4 text-center font-semibold tabular-nums">{qtd}</span>
+                      <button type="button" aria-label={`Mais ${o.nome}`} onClick={() => mudar(g, o, 1)} className="flex h-9 w-9 items-center justify-center rounded-lg ring-1 ring-stone-300">
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => mudar(g, o, 1)} className="h-9 rounded-lg px-3 text-sm font-medium ring-1 ring-stone-300">
+                      Escolher
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        disabled={!!faltando}
+        onClick={() => onAdicionar(variacao ?? undefined, escolhidos)}
+        className="flex h-12 w-full items-center justify-between rounded-xl bg-stone-900 px-4 font-semibold text-white disabled:opacity-40"
+      >
+        <span>{faltando ? `Escolha em "${faltando.nome}"` : "Adicionar"}</span>
+        <span className="tabular-nums">{brl((variacao?.preco ?? item.preco ?? 0) + extras)}</span>
+      </button>
     </div>
   )
 }
