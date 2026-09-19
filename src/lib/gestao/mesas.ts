@@ -6,6 +6,7 @@ import { centavosDe, precoEfetivo } from "@/lib/pedidos"
 import { gruposDosProdutos, resolverComplementos, type EscolhaComplemento, type SnapshotComplemento } from "@/lib/gestao/complementos"
 import { normalizarWhatsapp, vincularCliente } from "@/lib/gestao/clientes"
 import { calcularDivisao, type PlanoDivisao } from "@/lib/gestao/divisao"
+import { dentroDaGrade, type PosicaoMesa } from "@/lib/gestao/mesas-grade"
 export { linkDaMesa } from "@/lib/gestao/mesas-link"
 import { novoToken } from "@/lib/gestao/mesas-token"
 export { novoToken }
@@ -34,7 +35,7 @@ export async function listarMesas(comercioId: string) {
     where: { comercioId },
     orderBy: [{ ordem: "asc" }, { nome: "asc" }],
     select: {
-      id: true, nome: true, area: true, lugares: true, token: true, ativa: true, ordem: true,
+      id: true, nome: true, area: true, lugares: true, token: true, ativa: true, ordem: true, posX: true, posY: true,
       pedidos: { where: { status: "ABERTA" }, select: { id: true, numero: true, total: true }, take: 1 },
     },
   })
@@ -43,6 +44,8 @@ export async function listarMesas(comercioId: string) {
     nome: m.nome,
     area: m.area,
     lugares: m.lugares,
+    posX: m.posX,
+    posY: m.posY,
     token: m.token,
     ativa: m.ativa,
     ordem: m.ordem,
@@ -522,6 +525,8 @@ export interface MesaNoMapa {
   nome: string
   area: string | null
   lugares: number | null
+  posX: number | null
+  posY: number | null
   comanda: { id: string; numero: number; total: number; pago: number; abertaEm: string; naProducao: number; aguardandoAprovacao: number } | null
   chamado: "GARCOM" | "CONTA" | null
   aLiberar: boolean
@@ -535,7 +540,7 @@ export async function mapaDoSalao(comercioId: string): Promise<MesaNoMapa[]> {
     where: { comercioId, ativa: true },
     orderBy: [{ ordem: "asc" }, { nome: "asc" }],
     select: {
-      id: true, nome: true, area: true, lugares: true, liberarAte: true,
+      id: true, nome: true, area: true, lugares: true, liberarAte: true, posX: true, posY: true,
       pedidos: {
         where: { status: "ABERTA" },
         orderBy: { createdAt: "desc" },
@@ -557,6 +562,8 @@ export async function mapaDoSalao(comercioId: string): Promise<MesaNoMapa[]> {
       nome: m.nome,
       area: m.area,
       lugares: m.lugares,
+      posX: m.posX,
+      posY: m.posY,
       comanda: c
         ? {
             id: c.id,
@@ -575,10 +582,37 @@ export async function mapaDoSalao(comercioId: string): Promise<MesaNoMapa[]> {
   })
 }
 
-// Ordem das mesas no mapa (arrastar no cadastro).
-export async function ordenarMesas(ctx: ComercioCtx, ids: string[]) {
-  const minhas = await prisma.mesa.findMany({ where: { comercioId: ctx.comercioId }, select: { id: true } })
-  const validos = ids.filter((id) => minhas.some((m) => m.id === id))
-  await prisma.$transaction(validos.map((id, ordem) => prisma.mesa.update({ where: { id }, data: { ordem } })))
+// Salva a planta do salão (arrastar no editor da Gestão). Posições chegam em
+// células; duas mesas da MESMA área não podem ocupar a mesma célula.
+export async function posicionarMesas(ctx: ComercioCtx, posicoes: PosicaoMesa[]) {
+  const minhas = await prisma.mesa.findMany({
+    where: { comercioId: ctx.comercioId },
+    select: { id: true, area: true },
+  })
+  const porId = new Map(minhas.map((m) => [m.id, m]))
+  const ocupadas = new Set<string>()
+  const validas: PosicaoMesa[] = []
+
+  for (const p of posicoes) {
+    const mesa = porId.get(p.id)
+    if (!mesa) throw new ErroVenda("Mesa não encontrada.", 404)
+    if (!dentroDaGrade(p.x, p.y)) throw new ErroVenda("Posição fora da planta.")
+    const chave = `${mesa.area ?? ""}|${p.x},${p.y}`
+    if (ocupadas.has(chave)) throw new ErroVenda("Duas mesas na mesma posição da planta.")
+    ocupadas.add(chave)
+    validas.push(p)
+  }
+
+  await prisma.$transaction(
+    validas.map((p) => prisma.mesa.update({ where: { id: p.id }, data: { posX: p.x, posY: p.y } })),
+  )
+  return listarMesas(ctx.comercioId)
+}
+
+// Tira a mesa da planta (volta para a bandeja "sem posição").
+export async function tirarDaPlanta(ctx: ComercioCtx, id: string) {
+  const mesa = await prisma.mesa.findFirst({ where: { id, comercioId: ctx.comercioId }, select: { id: true } })
+  if (!mesa) throw new ErroVenda("Mesa não encontrada.", 404)
+  await prisma.mesa.update({ where: { id }, data: { posX: null, posY: null } })
   return listarMesas(ctx.comercioId)
 }

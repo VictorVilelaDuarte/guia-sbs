@@ -730,14 +730,19 @@ model PedidoItemComplemento {
 // Mesa do salão com QR Code próprio (docs/gestao-ideias.md 5.2). O QR é fixo e
 // leva para /mesa/[token]: o cliente vê a conta da mesa, chama o garçom e pede.
 model Mesa {
-  id         String    @id @default(cuid())
+  id         String  @id @default(cuid())
   comercioId String
   nome       String // "4", "Varanda 2" — o que vai impresso no QR
   area       String? // "Salão", "Varanda", "Deck"
   lugares    Int? // quantas pessoas sentam (mostrado no mapa)
-  token      String    @unique // segredo do QR (não é o id: pode ser trocado sem perder a mesa)
-  ativa      Boolean   @default(true)
-  ordem      Int       @default(0)
+  token      String  @unique // segredo do QR (não é o id: pode ser trocado sem perder a mesa)
+  ativa      Boolean @default(true)
+  ordem      Int     @default(0)
+  // Planta do salão: posição em CÉLULAS da grade (não pixels), por área.
+  // Nula = mesa ainda não posicionada (fica na bandeja do editor).
+  posX       Int?
+  posY       Int?
+
   // Mapa do salão: conta fechada deixa a mesa "a liberar" até alguém liberar
   // (ou 15 min depois, o que vier primeiro).
   liberarAte DateTime?

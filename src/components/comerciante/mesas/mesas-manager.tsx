@@ -2,10 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Copy, GripVertical, Plus, QrCode, RefreshCw, Trash2, Users } from "lucide-react"
-import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable"
-import { SortableItemWrapper } from "@/components/comerciante/cardapio/sortable-wrappers"
+import { Copy, Plus, QrCode, RefreshCw, Trash2, Users } from "lucide-react"
+import { MapaEditor } from "./mapa-editor"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -46,20 +44,6 @@ export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[
   const [cfg, setCfg] = useState(config)
   const [nova, setNova] = useState({ nome: "", area: "", lugares: "" })
   const [salvando, setSalvando] = useState(false)
-  const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
-
-  // Arrastar define a ordem das mesas no mapa do salão do PDV.
-  async function reordenar(e: DragEndEvent) {
-    const de = String(e.active.id)
-    const para = e.over ? String(e.over.id) : null
-    if (!para || de === para) return
-    const ids = mesas.map((m) => m.id)
-    const nova = arrayMove(mesas, ids.indexOf(de), ids.indexOf(para))
-    setMesas(nova) // otimista: a tela já mostra a ordem nova
-    const r = await api<MesaPainel[]>("/api/comerciante/gestao/mesas/ordem", { ids: nova.map((m) => m.id) })
-    if (r) setMesas(r)
-  }
-
   async function adicionar(e: React.FormEvent) {
     e.preventDefault()
     if (!nova.nome.trim() || salvando) return
@@ -115,7 +99,7 @@ export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle className="text-base">Mesas</CardTitle>
-            <p className="text-sm text-muted-foreground">Cada mesa tem um QR Code próprio. Arraste para definir a ordem do mapa do salão no PDV.</p>
+            <p className="text-sm text-muted-foreground">Cada mesa tem um QR Code próprio. Monte a planta do salão abaixo — ela aparece igual no PDV.</p>
           </div>
           <Link
             href="/comerciante/gestao/mesas/qr"
@@ -155,21 +139,9 @@ export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[
           {mesas.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma mesa cadastrada. Comece pelas mesas do salão.</p>
           ) : (
-            <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={reordenar}>
-              <SortableContext items={mesas.map((m) => m.id)} strategy={verticalListSortingStrategy}>
-                <ul className="divide-y divide-border">
-                  {mesas.map((m) => (
-                    <SortableItemWrapper key={m.id} id={m.id}>
-                      {({ dragHandleProps }) => (
-                <li className={cn("flex flex-wrap items-center gap-2 py-2.5", !m.ativa && "opacity-60")}>
-                  <button
-                    type="button"
-                    {...dragHandleProps}
-                    aria-label={`Mover ${m.nome}`}
-                    className="cursor-grab rounded-md p-1 text-muted-foreground hover:bg-accent active:cursor-grabbing"
-                  >
-                    <GripVertical className="h-4 w-4" />
-                  </button>
+            <ul className="divide-y divide-border">
+              {mesas.map((m) => (
+                <li key={m.id} className={cn("flex flex-wrap items-center gap-2 py-2.5", !m.ativa && "opacity-60")}>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 font-medium">
                       {rotuloMesa(m.nome)}
@@ -213,13 +185,21 @@ export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[
                     </button>
                   </div>
                 </li>
-                      )}
-                    </SortableItemWrapper>
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
+              ))}
+            </ul>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Planta do salão</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Arraste cada mesa para o lugar dela. É essa planta que o PDV mostra na aba Comandas.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <MapaEditor mesas={mesas} onMesas={setMesas} />
         </CardContent>
       </Card>
 

@@ -1180,8 +1180,9 @@ mesas já tinha entrado com o QR (§14.1).
 
 **Decisões de 2026-09-19** (recomendações aceitas):
 1. **O mapa substitui a grade da aba Comandas do PDV** — é onde o salão já está, em vez de tela nova.
-2. **Grade ordenável arrastando** no cadastro, **sem** coordenadas livres: layout livre é bonito na
-   demonstração, trabalhoso de configurar, ruim no celular e ninguém mantém.
+2. ~~**Grade ordenável arrastando** no cadastro, **sem** coordenadas livres.~~ **Revertida em
+   2026-09-19** a pedido do dono: ordenar não é mapa — o garçom procura a mesa pelo lugar dela no
+   salão, não pela posição numa lista. Virou planta com posição de verdade (§16.1).
 3. **Status "a liberar"** por 15 minutos depois que a conta fecha, com botão "Liberar".
 4. **Campo `lugares`** opcional por mesa (aparece no cartão; terreno pronto para reservas).
 5. **Tocar numa mesa livre abre a conta direto**, com a taxa de serviço padrão da loja.
@@ -1197,3 +1198,36 @@ tomava 403. A rota passou a aceitar `vendas:registrar` quando a única mudança 
 abrir conta tocando na mesa livre (e 409 devolvendo a conta quando já está ocupada), chamado e pedido
 do QR aparecendo na carta, "a liberar" com prazo e liberação manual, prazo vencido sumindo sozinho,
 contas sem mesa e mesa inativa fora do mapa. Conferência visual no desktop e no celular.
+
+### 16.1 Planta do salão (posição de verdade) ✅ implementado
+
+Pedido do dono em 2026-09-19: *"quero que de fato tenha um mapa da parte de gestão onde eu possa de
+fato arrastar a mesa, não apenas ordená-las… ao fazer isso no PDV, considere a versão mobile de uma
+forma prática."* A ordenação por dnd-kit saiu do cadastro (junto com `POST .../mesas/ordem` como
+única forma de arrumar o salão; `Mesa.ordem` continua no schema só como critério de desempate).
+
+**Decisões:**
+1. **Posição em células de uma grade `14 × 10`, não em pixels** (`src/lib/gestao/mesas-grade.ts`,
+   módulo sem runtime, usado no servidor e no cliente). Pixel guardado quebra quando a tela muda de
+   tamanho; célula é a mesma planta no notebook do caixa e no celular do garçom.
+2. **Posição por área.** Duas mesas podem ocupar a célula (3,2) se forem de áreas diferentes
+   (Salão e Varanda são plantas independentes); dentro da mesma área, colisão é recusada.
+3. **Soltar em cima de outra mesa encosta ao lado** em vez de recusar — `celulaLivre()` procura em
+   espiral quadrada a partir do alvo. Arrastar com o dedo não tem precisão de mouse.
+4. **`posX`/`posY` nulos = mesa fora da planta**, na bandeja "Sem posição" do editor. Mesa nova não
+   nasce num canto aleatório do salão, e o PDV lista essas mesas em cartões abaixo da planta.
+5. **Salvamento otimista e automático** ao soltar — sem botão "Salvar planta".
+
+**Implementação:** `posicionarMesas()` / `tirarDaPlanta()` em `src/lib/gestao/mesas.ts`;
+`POST /api/comerciante/gestao/mesas/posicoes` (`pedidos:configurar`, aceita `{ posicoes }` ou
+`{ tirar }`); editor em `src/components/comerciante/mesas/mapa-editor.tsx` (pointer events —
+mouse e dedo — com `touch-action: none`, célula de 64–110 px acompanhando a largura via
+`ResizeObserver`, sombra do destino, abas por área).
+
+**PDV (`pdv/mapa-salao.tsx`):** a aba Comandas desenha a planta com as mesas em `position: absolute`
+sobre a grade. Só o **retângulo realmente usado** é renderizado (salão de 4 mesas não vira quadra
+vazia). **Mobile prático:** a célula acompanha a largura com mínimo legível de 76 px e rolagem
+horizontal só quando não couber; abaixo de 108 px o cartão fica **compacto** (nome + valor + ícone
+de estado); o botão **Planta / Lista** troca para os cartões grandes de antes e a escolha fica no
+`localStorage` do aparelho (`pdv:mapa-modo`). Loja que ainda não montou a planta continua vendo a
+lista — o botão nem aparece.
