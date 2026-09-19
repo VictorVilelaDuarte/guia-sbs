@@ -2,6 +2,21 @@ import type { DescontoInput } from "@/lib/gestao/vendas"
 
 // Tipos e utilitários do PDV no client. Valores sempre em CENTAVOS inteiros.
 
+export interface OpcaoPdv {
+  id: string
+  nome: string
+  preco: number
+  quantidadeMax: number
+}
+
+export interface GrupoComplementoPdv {
+  id: string
+  nome: string
+  minimo: number
+  maximo: number
+  opcoes: OpcaoPdv[]
+}
+
 export interface ItemCatalogoPdv {
   id: string
   titulo: string
@@ -10,6 +25,7 @@ export interface ItemCatalogoPdv {
   disponivel: boolean
   preco: number | null // preço vigente (promoção considerada); null quando há variações
   variacoes: { id: string; nome: string; preco: number }[]
+  complementos: GrupoComplementoPdv[]
 }
 
 export interface ZonaPdv {
@@ -19,16 +35,25 @@ export interface ZonaPdv {
 }
 
 // Linha da venda rápida ou item ainda não lançado na comanda.
+export interface ComplementoPdv {
+  opcaoId: string
+  grupoNome: string
+  nome: string
+  precoC: number
+  quantidade: number
+}
+
 export interface LinhaPdv {
   chave: string
   produtoId: string | null
   variacaoId: string | null
   titulo: string
   detalhe: string | null
-  precoC: number
+  precoC: number // já com os complementos somados
   quantidade: number
   observacao: string | null
   descontoC: number
+  complementos: ComplementoPdv[]
 }
 
 export type { DescontoInput }

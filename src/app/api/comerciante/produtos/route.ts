@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
+import { vincularGrupos } from "@/lib/gestao/complementos"
 
 const variacaoSchema = z.object({
   nome: z.string().min(1).max(80),
@@ -21,6 +22,7 @@ const createSchema = z.object({
   categoriaCardapioId: z.string().optional().nullable(),
   categoriaCatalogoId: z.string().optional().nullable(),
   variacoes: z.array(variacaoSchema).optional(),
+  complementoIds: z.array(z.string()).max(10).optional(), // grupos de complementos do produto
 })
 
 export async function GET() {
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { variacoes, ...produtoData } = parsed.data
+  const { variacoes, complementoIds, ...produtoData } = parsed.data
   const count = await prisma.produto.count({ where: { comercioId: ctx.comercioId } })
 
   const produto = await prisma.produto.create({
@@ -99,5 +101,7 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  return NextResponse.json(produto, { status: 201 })
+  if (complementoIds) await vincularGrupos(ctx.comercioId, produto.id, complementoIds)
+
+  return NextResponse.json({ ...produto, complementoIds: complementoIds ?? [] }, { status: 201 })
 }

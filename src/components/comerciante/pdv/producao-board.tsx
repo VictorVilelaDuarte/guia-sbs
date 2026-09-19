@@ -77,6 +77,11 @@ export function ProducaoBoard({ iniciais }: { iniciais: RodadaProducao[] }) {
                 <li key={i.id} className="text-sm">
                   <span className="font-bold tabular-nums">{i.quantidade}×</span> {i.titulo}
                   {i.variacaoNome && <span className="text-muted-foreground"> ({i.variacaoNome})</span>}
+                  {i.complementos.length > 0 && (
+                    <span className="block pl-5 text-xs text-sky-700">
+                      + {i.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)).join(", ")}
+                    </span>
+                  )}
                   {i.observacao && <span className="block pl-5 text-xs font-medium text-amber-700">↳ {i.observacao}</span>}
                 </li>
               ))}

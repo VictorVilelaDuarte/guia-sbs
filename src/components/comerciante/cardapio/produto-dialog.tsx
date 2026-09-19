@@ -35,6 +35,7 @@ interface ProdutoDialogProps {
   tipo?: TipoProduto;
   categorias: CardapioCategoria[];
   categoriasCatalogo?: CatalogoCategoria[];
+  gruposComplemento?: { id: string; nome: string; minimo: number; maximo: number; opcoes: { nome: string }[] }[];
   defaultCategoriaId?: string;
   defaultCategoriaCatalogoId?: string;
   onClose: () => void;
@@ -47,6 +48,7 @@ export function ProdutoDialog({
   tipo: tipoProp = "PRODUTO",
   categorias,
   categoriasCatalogo = [],
+  gruposComplemento = [],
   defaultCategoriaId,
   defaultCategoriaCatalogoId,
   onClose,
@@ -68,6 +70,7 @@ export function ProdutoDialog({
     precoPromo: "",
     promoFim: "",
     variacoes: [],
+    complementoIds: [],
     incluirNoCardapio: false,
     categoriaCardapioId: "",
     categoriaCatalogoId: "",
@@ -111,6 +114,7 @@ export function ProdutoDialog({
           nome: v.nome,
           preco: v.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
         })),
+        complementoIds: produto.complementos?.map((c) => c.grupoId) ?? [],
         incluirNoCardapio: !!produto.categoriaCardapioId,
         categoriaCardapioId:
           produto.categoriaCardapioId ?? categorias[0]?.id ?? "",
@@ -129,6 +133,7 @@ export function ProdutoDialog({
         precoPromo: "",
         promoFim: "",
         variacoes: [],
+        complementoIds: [],
         incluirNoCardapio: !!defaultCategoriaId,
         categoriaCardapioId: catId,
         categoriaCatalogoId: defaultCategoriaCatalogoId ?? "",
@@ -310,6 +315,7 @@ export function ProdutoDialog({
         nome: v.nome.trim(),
         preco: parsePreco(v.preco) ?? 0,
       })),
+      complementoIds: form.complementoIds,
     };
 
     const res = await fetch(
@@ -584,6 +590,46 @@ export function ProdutoDialog({
               )}
             </button>
           </div>
+
+          {/* Complementos — grupos da loja reaproveitados por vários produtos */}
+          {gruposComplemento.length > 0 && !isServico && (
+            <div className="space-y-2">
+              <div>
+                <span className="text-sm font-medium">Complementos</span>
+                <p className="text-xs text-muted-foreground">
+                  Grupos que o cliente escolhe junto com este item (borda, adicionais, ponto da carne).
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {gruposComplemento.map((g) => {
+                  const ativo = form.complementoIds.includes(g.id);
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          complementoIds: ativo
+                            ? f.complementoIds.filter((x) => x !== g.id)
+                            : [...f.complementoIds, g.id],
+                        }))
+                      }
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-sm cursor-pointer transition-colors",
+                        ativo
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input hover:border-foreground/30",
+                      )}
+                      title={`${g.opcoes.length} opção(ões) · escolha ${g.minimo === g.maximo ? g.minimo : `${g.minimo} a ${g.maximo}`}`}
+                    >
+                      {g.nome}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Destaque */}
           <button

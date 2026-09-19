@@ -18,12 +18,14 @@ export function ProdutosManager({
   produtosIniciais,
   categoriasCardapio,
   categoriasCatalogoIniciais = [],
+  gruposComplemento = [],
   tipo = "PRODUTO",
   limite,
   somenteDisponibilidade = false,
 }: {
   produtosIniciais: Produto[]
   categoriasCardapio: CardapioCategoria[]
+  gruposComplemento?: { id: string; nome: string; minimo: number; maximo: number; opcoes: { nome: string }[] }[]
   categoriasCatalogoIniciais?: CatalogoCategoria[]
   tipo?: TipoProduto
   limite?: number
@@ -490,6 +492,7 @@ export function ProdutosManager({
       )}
 
       <ProdutoDialog
+        gruposComplemento={gruposComplemento}
         open={dialogOpen}
         produto={editando}
         tipo={tipo}

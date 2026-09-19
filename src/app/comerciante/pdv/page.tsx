@@ -27,6 +27,18 @@ export default async function PdvPage() {
         categoriaCardapio: { select: { nome: true, ordem: true } },
         categoriaCatalogo: { select: { nome: true, ordem: true } },
         variacoes: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true } },
+        complementos: {
+          orderBy: { ordem: "asc" },
+          where: { grupo: { ativo: true } },
+          select: {
+            grupo: {
+              select: {
+                id: true, nome: true, minimo: true, maximo: true,
+                opcoes: { where: { disponivel: true }, orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true, quantidadeMax: true } },
+              },
+            },
+          },
+        },
       },
     }),
     prisma.zonaEntrega.findMany({
@@ -59,6 +71,7 @@ export default async function PdvPage() {
         disponivel: p.disponivel,
         preco: p.variacoes.length > 0 ? null : precoEfetivo(p),
         variacoes: p.variacoes,
+        complementos: p.complementos.map((c) => c.grupo).filter((g) => g.opcoes.length > 0),
       }
     })
     .filter((i) => i.variacoes.length > 0 || i.preco != null)

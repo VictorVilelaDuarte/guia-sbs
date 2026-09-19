@@ -250,6 +250,16 @@ Fase 3 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.2 venda manual,
 - **Rotas do PDV** usam `guardPdv(...)` e `responder()` de `src/lib/gestao/pdv-api.ts` (flag `gestao_relatorios` + permissão; `ErroVenda` vira JSON com status).
 - **Deploy:** `npm run db:push` (aditivo: tabela `pedido_pagamentos`, colunas, enums `ABERTA`/`COMANDA`) → `npx tsx prisma/migrate-flag-gestao-relatorios.ts` → publicar → `npx tsx prisma/migrate-pagamentos-pedidos.ts` (idempotente; depois de publicar para pegar pedidos criados pelo código antigo).
 
+### Complementos do cardápio (`GrupoComplemento`)
+
+Item 2.1 do [`docs/gestao-ideias.md`](docs/gestao-ideias.md), plano no §15 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md). "Borda recheada +R$ 8", "adicional de bacon", "ponto da carne", "sem cebola".
+
+- **Grupo é da loja, não do produto:** `GrupoComplemento` (nome, `minimo`/`maximo` de escolhas) + `OpcaoComplemento` (nome, preço — pode ser 0, `quantidadeMax` para repetir a mesma opção) + `ProdutoComplemento` (vínculo N:N com ordem). Cadastro na página do Cardápio; o vínculo é escolhido no formulário do produto (`complementoIds` em `/api/comerciante/produtos`).
+- **O preço do complemento entra no `PedidoItem.precoUnit`** e o detalhe vira snapshot em `PedidoItemComplemento` (grupo, nome, preço e quantidade do momento). Assim subtotal, desconto por item, serviço, divisão da conta e relatórios seguem com **uma conta só** — não há linha separada de complemento. Editar o preço do bacon não mexe em venda antiga.
+- **Validação única no servidor:** `resolverComplementos()` (`src/lib/gestao/complementos.ts`, sem Prisma) confere mínimo/máximo do grupo, `quantidadeMax` da opção, opção indisponível e opção de outro produto. `resolverItens()` (vendas.ts) chama para todos os canais — venda rápida, comanda e (PR B) cardápio online e QR da mesa. O cliente nunca manda preço.
+- **Onde aparece:** escolha no PDV (diálogo do item, com variação junto), conta do PDV, cozinha (`Produção`), cupom, fila de pedidos e conta pública da mesa.
+- **Deploy:** `npm run db:push` (aditivo: `grupos_complemento`, `opcoes_complemento`, `produto_complementos`, `pedido_item_complementos`) → publicar.
+
 ### QR na mesa (`Mesa`, `ChamadoMesa`)
 
 Item 5.2 do [`docs/gestao-ideias.md`](docs/gestao-ideias.md), plano no §14 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md). Cada mesa tem um QR fixo que leva para **`/mesa/[token]`** (página pública, `noindex`, fora do route group `(public)`): o cliente vê a conta da mesa em tempo real, chama o atendente e pede a conta.

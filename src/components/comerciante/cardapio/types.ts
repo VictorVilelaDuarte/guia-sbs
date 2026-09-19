@@ -26,6 +26,8 @@ export interface Produto {
   categoriaCatalogoId: string | null
   categoriaCatalogo: { id: string; nome: string } | null
   variacoes: CardapioVariacao[]
+  // Grupos de complementos do produto ("Borda", "Adicionais").
+  complementos?: { grupoId: string }[]
   createdAt: Date | string
   updatedAt: Date | string
 }
@@ -56,6 +58,7 @@ export interface ProdutoFormState {
   precoPromo: string
   promoFim: string
   variacoes: { nome: string; preco: string }[]
+  complementoIds: string[]
   incluirNoCardapio: boolean
   categoriaCardapioId: string
   categoriaCatalogoId: string

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao, pode } from "@/lib/comercio-ctx"
 import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
+import { vincularGrupos } from "@/lib/gestao/complementos"
 import { deleteFile } from "@/lib/supabase-storage"
 
 const variacaoSchema = z.object({
@@ -23,6 +24,7 @@ const patchSchema = z.object({
   categoriaCardapioId: z.string().optional().nullable(),
   categoriaCatalogoId: z.string().optional().nullable(),
   variacoes: z.array(variacaoSchema).optional(),
+  complementoIds: z.array(z.string()).max(10).optional(), // grupos de complementos do produto
 })
 
 // Cardápio e catálogo compartilham o model Produto: a permissão de edição
@@ -95,7 +97,7 @@ export async function PATCH(
     }
   }
 
-  const { variacoes, ...produtoData } = parsed.data
+  const { variacoes, complementoIds, ...produtoData } = parsed.data
 
   let updated
   if (variacoes !== undefined) {
@@ -128,7 +130,9 @@ export async function PATCH(
     })
   }
 
-  return NextResponse.json(updated)
+  if (complementoIds) await vincularGrupos(produto.comercioId, id, complementoIds)
+
+  return NextResponse.json({ ...updated, complementoIds })
 }
 
 export async function DELETE(

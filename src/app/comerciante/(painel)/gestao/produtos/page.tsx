@@ -34,7 +34,7 @@ export default async function GestaoProdutosPage({
 
   const tipo = tipoParam === "servico" ? "SERVICO" : "PRODUTO"
   const cfg = TIPOS[tipo]
-  const { produtos, catalogoCategorias, cardapioCategorias } = await getCatalogoData(
+  const { produtos, catalogoCategorias, cardapioCategorias, gruposComplemento } = await getCatalogoData(
     base.comercio.id,
   )
   const limite = temFeature(base.comercio.plan.features, "fotos_ilimitadas")
@@ -73,6 +73,7 @@ export default async function GestaoProdutosPage({
           {/* key por tipo: trocar a aba é navegação na mesma página — sem a key, o
               manager manteria o estado (lista, busca) do tipo anterior. */}
           <ProdutosManager
+          gruposComplemento={gruposComplemento}
             key={tipo}
             produtosIniciais={produtos}
             categoriasCardapio={cardapioCategorias}

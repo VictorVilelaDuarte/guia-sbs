@@ -200,6 +200,7 @@ model Comercio {
   membros             ComercioMembro[]
   clientes            Cliente[]
   mesas               Mesa[]
+  gruposComplemento   GrupoComplemento[]
   chamadosMesa        ChamadoMesa[]
   acessosDadosCliente AcessoDadosCliente[]
 
@@ -332,9 +333,10 @@ model Produto {
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
 
-  comercio          Comercio           @relation(fields: [comercioId], references: [id], onDelete: Cascade)
-  categoriaCardapio CardapioCategoria? @relation(fields: [categoriaCardapioId], references: [id], onDelete: SetNull)
-  categoriaCatalogo CatalogoCategoria? @relation(fields: [categoriaCatalogoId], references: [id], onDelete: SetNull)
+  comercio          Comercio             @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  complementos      ProdutoComplemento[]
+  categoriaCardapio CardapioCategoria?   @relation(fields: [categoriaCardapioId], references: [id], onDelete: SetNull)
+  categoriaCatalogo CatalogoCategoria?   @relation(fields: [categoriaCatalogoId], references: [id], onDelete: SetNull)
   variacoes         CardapioVariacao[]
 
   @@map("produtos")
@@ -625,7 +627,8 @@ model PedidoItem {
   prontoEm  DateTime?
   createdAt DateTime  @default(now())
 
-  pedido Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  pedido       Pedido                  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  complementos PedidoItemComplemento[]
 
   @@index([pedidoId])
   @@map("pedido_itens")
@@ -654,6 +657,74 @@ model PedidoPagamento {
   @@index([pedidoId])
   @@index([comercioId, createdAt])
   @@map("pedido_pagamentos")
+}
+
+// Complementos do cardápio (docs/gestao-ideias.md 2.1): "Borda", "Adicionais",
+// "Ponto da carne". O grupo é da LOJA e vale para vários produtos — pizzaria com
+// 12 sabores não recria "Borda" doze vezes.
+model GrupoComplemento {
+  id         String   @id @default(cuid())
+  comercioId String
+  nome       String
+  // Quantas opções o cliente escolhe (soma das quantidades): min 0 = opcional.
+  minimo     Int      @default(0)
+  maximo     Int      @default(1)
+  ordem      Int      @default(0)
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  comercio Comercio             @relation(fields: [comercioId], references: [id], onDelete: Cascade)
+  opcoes   OpcaoComplemento[]
+  produtos ProdutoComplemento[]
+
+  @@unique([comercioId, nome])
+  @@index([comercioId, ordem])
+  @@map("grupos_complemento")
+}
+
+model OpcaoComplemento {
+  id            String  @id @default(cuid())
+  grupoId       String
+  nome          String
+  preco         Float   @default(0) // pode ser 0 ("sem cebola", "ao ponto")
+  quantidadeMax Int     @default(1) // mesma opção repetida (2× bacon)
+  disponivel    Boolean @default(true)
+  ordem         Int     @default(0)
+
+  grupo GrupoComplemento @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+
+  @@index([grupoId, ordem])
+  @@map("opcoes_complemento")
+}
+
+// Quais grupos cada produto usa, na ordem em que aparecem.
+model ProdutoComplemento {
+  produtoId String
+  grupoId   String
+  ordem     Int    @default(0)
+
+  produto Produto          @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  grupo   GrupoComplemento @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+
+  @@id([produtoId, grupoId])
+  @@map("produto_complementos")
+}
+
+// Snapshot do que foi escolhido na venda — nome e preço do momento, como o
+// título e o preço do item. O preço já está somado em PedidoItem.precoUnit.
+model PedidoItemComplemento {
+  id           String  @id @default(cuid())
+  pedidoItemId String
+  grupoNome    String
+  nome         String
+  precoUnit    Decimal @db.Decimal(10, 2)
+  quantidade   Int     @default(1)
+
+  item PedidoItem @relation(fields: [pedidoItemId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoItemId])
+  @@map("pedido_item_complementos")
 }
 
 // Mesa do salão com QR Code próprio (docs/gestao-ideias.md 5.2). O QR é fixo e

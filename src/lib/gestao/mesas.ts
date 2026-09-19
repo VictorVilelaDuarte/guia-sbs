@@ -116,7 +116,7 @@ export interface ContaDaMesa {
   comanda: null | {
     numero: number
     abertaEm: string
-    itens: { id: string; titulo: string; variacaoNome: string | null; quantidade: number; valor: number; observacao: string | null; estado: "aguardando" | "lancado" | "producao" | "pronto" }[]
+    itens: { id: string; titulo: string; variacaoNome: string | null; quantidade: number; valor: number; observacao: string | null; complementos: string[]; estado: "aguardando" | "lancado" | "producao" | "pronto" }[]
     subtotal: number
     desconto: number
     taxaServico: number
@@ -154,7 +154,14 @@ export async function contaDaMesa(token: string): Promise<ContaDaMesa | null> {
     orderBy: { createdAt: "desc" },
     select: {
       id: true, numero: true, createdAt: true, subtotal: true, desconto: true, taxaServico: true, servicoPercentual: true, total: true, divisao: true,
-      itens: { orderBy: { createdAt: "asc" }, select: { id: true, titulo: true, variacaoNome: true, quantidade: true, precoUnit: true, desconto: true, observacao: true, enviadoEm: true, prontoEm: true, solicitadoEm: true, aprovadoEm: true } },
+      itens: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true, titulo: true, variacaoNome: true, quantidade: true, precoUnit: true, desconto: true, observacao: true,
+          enviadoEm: true, prontoEm: true, solicitadoEm: true, aprovadoEm: true,
+          complementos: { select: { nome: true, quantidade: true } },
+        },
+      },
       pagamentos: { where: { estornadoEm: null }, select: { valor: true } },
     },
   })
@@ -204,6 +211,7 @@ export async function contaDaMesa(token: string): Promise<ContaDaMesa | null> {
             quantidade: i.quantidade,
             valor: (paraCentavos(i.precoUnit) * i.quantidade - paraCentavos(i.desconto)) / 100,
             observacao: i.observacao,
+            complementos: i.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)),
             estado: i.solicitadoEm && !i.aprovadoEm ? "aguardando" : i.prontoEm ? "pronto" : i.enviadoEm ? "producao" : "lancado",
           })),
           subtotal: paraNumero(comanda.subtotal),

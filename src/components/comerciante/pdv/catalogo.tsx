@@ -1,10 +1,10 @@
 "use client"
 
 import { forwardRef, useMemo, useState } from "react"
-import { PackagePlus, Search, X } from "lucide-react"
+import { Minus, PackagePlus, Plus, Search, X } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { brl, centavos, parseReais, type ItemCatalogoPdv } from "./tipos"
+import { brl, centavos, parseReais, type ComplementoPdv, type ItemCatalogoPdv } from "./tipos"
 
 type Variacao = ItemCatalogoPdv["variacoes"][number]
 
@@ -12,7 +12,7 @@ type Variacao = ItemCatalogoPdv["variacoes"][number]
 // Enter na busca adiciona o primeiro resultado; produto com variações abre a escolha.
 export const CatalogoPdv = forwardRef<HTMLInputElement, {
   itens: ItemCatalogoPdv[]
-  onAdicionar: (item: ItemCatalogoPdv, variacao?: Variacao) => void
+  onAdicionar: (item: ItemCatalogoPdv, variacao?: Variacao, complementos?: ComplementoPdv[]) => void
   onAvulso: (titulo: string, precoC: number) => void
 }>(function CatalogoPdv({ itens, onAdicionar, onAvulso }, buscaRef) {
   const [busca, setBusca] = useState("")
@@ -38,7 +38,8 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
 
   function tocar(item: ItemCatalogoPdv) {
     if (!item.disponivel) return
-    if (item.variacoes.length > 0) setEscolhendo(item)
+    // Variação e/ou complementos: abre a escolha antes de lançar.
+    if (item.variacoes.length > 0 || item.complementos.length > 0) setEscolhendo(item)
     else onAdicionar(item)
   }
 
@@ -135,27 +136,19 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
       </div>
 
       <Dialog open={!!escolhendo} onOpenChange={(o) => !o && setEscolhendo(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{escolhendo?.titulo}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-2">
-            {escolhendo?.variacoes.map((v, idx) => (
-              <button
-                key={v.id}
-                type="button"
-                autoFocus={idx === 0}
-                onClick={() => {
-                  onAdicionar(escolhendo, v)
-                  setEscolhendo(null)
-                }}
-                className="rounded-xl bg-stone-50 p-3 text-left ring-1 ring-stone-200 hover:ring-stone-500 focus:ring-2 focus:ring-stone-900"
-              >
-                <span className="block text-sm font-semibold">{v.nome}</span>
-                <span className="text-sm tabular-nums text-stone-600">{brl(centavos(v.preco))}</span>
-              </button>
-            ))}
-          </div>
+          {escolhendo && (
+            <EscolhaItem
+              item={escolhendo}
+              onConfirmar={(variacao, complementos) => {
+                onAdicionar(escolhendo, variacao, complementos)
+                setEscolhendo(null)
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
@@ -199,3 +192,102 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
     </div>
   )
 })
+
+
+// Escolha de variação e complementos antes de lançar o item (PDV).
+function EscolhaItem({ item, onConfirmar }: { item: ItemCatalogoPdv; onConfirmar: (variacao?: Variacao, complementos?: ComplementoPdv[]) => void }) {
+  const [variacao, setVariacao] = useState<Variacao | null>(item.variacoes[0] ?? null)
+  const [escolhas, setEscolhas] = useState<Record<string, number>>({})
+
+  const baseC = centavos(variacao?.preco ?? item.preco ?? 0)
+  const selecionados: ComplementoPdv[] = item.complementos.flatMap((g) =>
+    g.opcoes
+      .filter((o) => (escolhas[o.id] ?? 0) > 0)
+      .map((o) => ({ opcaoId: o.id, grupoNome: g.nome, nome: o.nome, precoC: centavos(o.preco), quantidade: escolhas[o.id] })),
+  )
+  const extraC = selecionados.reduce((a, c) => a + c.precoC * c.quantidade, 0)
+  const porGrupo = (g: ItemCatalogoPdv["complementos"][number]) => g.opcoes.reduce((a, o) => a + (escolhas[o.id] ?? 0), 0)
+  const faltando = item.complementos.filter((g) => porGrupo(g) < g.minimo)
+
+  function mudar(opcaoId: string, delta: number, grupo: ItemCatalogoPdv["complementos"][number], max: number) {
+    setEscolhas((e) => {
+      const atual = e[opcaoId] ?? 0
+      const novo = Math.min(Math.max(atual + delta, 0), max)
+      const outros = grupo.opcoes.reduce((a, o) => a + (o.id === opcaoId ? 0 : e[o.id] ?? 0), 0)
+      if (outros + novo > grupo.maximo) return e
+      return { ...e, [opcaoId]: novo }
+    })
+  }
+
+  return (
+    <div className="space-y-4">
+      {item.variacoes.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {item.variacoes.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => setVariacao(v)}
+              className={cn(
+                "rounded-xl p-3 text-left ring-1",
+                variacao?.id === v.id ? "bg-stone-900 text-white ring-stone-900" : "bg-stone-50 ring-stone-200 hover:ring-stone-500",
+              )}
+            >
+              <span className="block text-sm font-semibold">{v.nome}</span>
+              <span className="text-sm tabular-nums opacity-80">{brl(centavos(v.preco))}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {item.complementos.map((g) => (
+        <div key={g.id} className="space-y-1.5">
+          <p className="flex items-baseline justify-between text-sm font-semibold">
+            {g.nome}
+            <span className="text-xs font-normal text-stone-500">
+              {g.minimo > 0 ? `escolha ${g.minimo === g.maximo ? g.minimo : `${g.minimo} a ${g.maximo}`}` : `até ${g.maximo}`}
+            </span>
+          </p>
+          <ul className="divide-y divide-stone-100 rounded-xl ring-1 ring-stone-200">
+            {g.opcoes.map((o) => {
+              const qtd = escolhas[o.id] ?? 0
+              return (
+                <li key={o.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                  <span className="min-w-0 flex-1">
+                    {o.nome}
+                    <span className="ml-1.5 text-xs tabular-nums text-stone-500">{o.preco > 0 ? `+ ${brl(centavos(o.preco))}` : "grátis"}</span>
+                  </span>
+                  {o.quantidadeMax > 1 || qtd > 0 ? (
+                    <span className="flex items-center gap-1">
+                      <button type="button" aria-label={`Menos ${o.nome}`} onClick={() => mudar(o.id, -1, g, o.quantidadeMax)} className="flex h-8 w-8 items-center justify-center rounded-lg ring-1 ring-stone-300">
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <span className="w-5 text-center font-semibold tabular-nums">{qtd}</span>
+                      <button type="button" aria-label={`Mais ${o.nome}`} onClick={() => mudar(o.id, 1, g, o.quantidadeMax)} className="flex h-8 w-8 items-center justify-center rounded-lg ring-1 ring-stone-300">
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ) : (
+                    <button type="button" onClick={() => mudar(o.id, 1, g, o.quantidadeMax)} className="h-8 rounded-lg px-3 text-sm font-medium ring-1 ring-stone-300 hover:ring-stone-500">
+                      Escolher
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+
+      <button
+        type="button"
+        disabled={faltando.length > 0}
+        onClick={() => onConfirmar(variacao ?? undefined, selecionados)}
+        className="flex h-12 w-full items-center justify-between rounded-xl bg-stone-900 px-4 font-semibold text-white disabled:opacity-40"
+      >
+        <span>{faltando.length > 0 ? `Escolha em "${faltando[0].nome}"` : "Adicionar"}</span>
+        <span className="tabular-nums">{brl(baseC + extraC)}</span>
+      </button>
+    </div>
+  )
+}

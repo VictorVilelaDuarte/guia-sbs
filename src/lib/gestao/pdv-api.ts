@@ -37,6 +37,8 @@ export const itemSchema = z.object({
   quantidade: z.number().int(),
   observacao: z.string().max(280).nullable().optional(),
   desconto: z.number().nonnegative().nullable().optional(),
+  // Complementos escolhidos (o preço vem do cadastro, nunca do cliente).
+  complementos: z.array(z.object({ opcaoId: z.string(), quantidade: z.number().int().min(1).max(20).optional() })).max(40).optional(),
 })
 
 export const pagamentoSchema = z.object({

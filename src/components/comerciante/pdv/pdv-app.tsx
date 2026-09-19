@@ -43,6 +43,7 @@ import {
   descontoParaConta,
   enviarJson,
   parseReais,
+  type ComplementoPdv,
   type DescontoInput,
   type ItemCatalogoPdv,
   type LinhaPdv,
@@ -82,7 +83,13 @@ function juntarLinha(ls: LinhaPdv[], nova: LinhaPdv): LinhaPdv[] {
 function itemParaApi(l: LinhaPdv) {
   const base = { quantidade: l.quantidade, observacao: l.observacao, desconto: l.descontoC > 0 ? l.descontoC / 100 : null }
   return l.produtoId
-    ? { ...base, produtoId: l.produtoId, variacaoId: l.variacaoId }
+    ? {
+        ...base,
+        produtoId: l.produtoId,
+        variacaoId: l.variacaoId,
+        // O servidor recalcula o preço do complemento pelo cadastro.
+        complementos: l.complementos.map((c) => ({ opcaoId: c.opcaoId, quantidade: c.quantidade })),
+      }
     : { ...base, titulo: l.titulo, precoUnit: l.precoC / 100 }
 }
 
@@ -246,17 +253,21 @@ export function PdvApp(props: Props) {
   }
 
   // ---- adicionar do catálogo
-  function adicionar(item: ItemCatalogoPdv, variacao?: ItemCatalogoPdv["variacoes"][number]) {
+  function adicionar(item: ItemCatalogoPdv, variacao?: ItemCatalogoPdv["variacoes"][number], complementos: ComplementoPdv[] = []) {
+    // Complemento entra no preço unitário; a chave separa combinações diferentes
+    // do mesmo produto (uma pizza com bacon não junta com outra sem).
+    const extraC = complementos.reduce((a, c) => a + c.precoC * c.quantidade, 0)
     const nova: LinhaPdv = {
-      chave: `${item.id}:${variacao?.id ?? ""}`,
+      chave: `${item.id}:${variacao?.id ?? ""}:${complementos.map((c) => `${c.opcaoId}x${c.quantidade}`).sort().join(",")}`,
       produtoId: item.id,
       variacaoId: variacao?.id ?? null,
       titulo: item.titulo,
       detalhe: variacao?.nome ?? null,
-      precoC: centavos(variacao?.preco ?? item.preco ?? 0),
+      precoC: centavos(variacao?.preco ?? item.preco ?? 0) + extraC,
       quantidade: 1,
       observacao: null,
       descontoC: 0,
+      complementos,
     }
     if (aba === "comandas") {
       if (!comanda) return toast.info("Abra ou escolha uma comanda primeiro.")
@@ -267,7 +278,7 @@ export function PdvApp(props: Props) {
   }
 
   function avulso(titulo: string, precoC: number) {
-    const nova: LinhaPdv = { chave: `avulso:${Date.now()}`, produtoId: null, variacaoId: null, titulo, detalhe: "avulso", precoC, quantidade: 1, observacao: null, descontoC: 0 }
+    const nova: LinhaPdv = { chave: `avulso:${Date.now()}`, produtoId: null, variacaoId: null, titulo, detalhe: "avulso", precoC, quantidade: 1, observacao: null, descontoC: 0, complementos: [] }
     if (aba === "comandas") {
       if (!comanda) return toast.info("Abra ou escolha uma comanda primeiro.")
       setPendentes((ls) => [...ls, nova])
@@ -300,8 +311,9 @@ export function PdvApp(props: Props) {
       observacao: i.observacao,
       descontoC: centavos(i.desconto),
       estado: i.solicitadoEm && !i.aprovadoEm ? "aguardando" : i.prontoEm ? "pronto" : i.enviadoEm ? "producao" : "lancado",
+      extras: i.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)),
     }))
-    return [...salvas, ...pendentes.map((l) => ({ ...l, estado: "novo" as const }))]
+    return [...salvas, ...pendentes.map((l) => ({ ...l, estado: "novo" as const, extras: l.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)) }))]
   }, [comanda, pendentes])
 
   // ---- venda: finalizar
@@ -454,7 +466,7 @@ export function PdvApp(props: Props) {
           <span className="text-xs text-stone-500">Venda rápida</span>
         </div>
       }
-      linhas={linhas}
+      linhas={linhas.map((l) => ({ ...l, extras: l.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)) }))}
       vazio="Toque nos produtos para montar a venda."
       onLinha={setEditando}
       onQtd={mudarQtd(setLinhas)}

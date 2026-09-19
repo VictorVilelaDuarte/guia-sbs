@@ -315,6 +315,11 @@ function PedidoCard({
             </span>{" "}
             {i.titulo}
             {i.variacaoNome && ` (${i.variacaoNome})`}
+            {i.complementos.length > 0 && (
+              <span className="block pl-5 text-xs">
+                + {i.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)).join(", ")}
+              </span>
+            )}
             {i.observacao && (
               <span className="block pl-5 text-xs italic">↳ {i.observacao}</span>
             )}

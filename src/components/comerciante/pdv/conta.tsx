@@ -14,6 +14,7 @@ export interface LinhaConta {
   observacao: string | null
   descontoC: number
   estado?: "novo" | "aguardando" | "lancado" | "producao" | "pronto"
+  extras?: string[] // complementos escolhidos
 }
 
 const ESTADO: Record<NonNullable<LinhaConta["estado"]>, { label: string; cls: string } | null> = {
@@ -90,6 +91,7 @@ export function Conta({
                       {l.detalhe && <span className="font-normal text-stone-500">· {l.detalhe}</span>}
                       {estado && <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-semibold", estado.cls)}>{estado.label}</span>}
                     </p>
+                    {l.extras && l.extras.length > 0 && <p className="truncate text-xs text-stone-500">+ {l.extras.join(", ")}</p>}
                     {l.observacao && <p className="truncate text-xs italic text-stone-500">↳ {l.observacao}</p>}
                     <p className="text-xs tabular-nums text-stone-500">
                       {brl(l.precoC)} × {l.quantidade}

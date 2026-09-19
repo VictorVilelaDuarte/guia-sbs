@@ -221,20 +221,24 @@ export async function lancarItens(ctx: ComercioCtx, id: string, itens: ItemVenda
       rodada = (max._max.rodada ?? 0) + 1
     }
     const agora = new Date()
-    await tx.pedidoItem.createMany({
-      data: snapshots.map((s) => ({
-        pedidoId: id,
-        produtoId: s.produtoId,
-        titulo: s.titulo,
-        variacaoNome: s.variacaoNome,
-        precoUnit: deCentavos(s.precoC),
-        quantidade: s.quantidade,
-        observacao: s.observacao,
-        desconto: deCentavos(s.descontoC),
-        rodada,
-        enviadoEm: enviar ? agora : null,
-      })),
-    })
+    // Um create por item (em vez de createMany) porque cada um pode ter complementos.
+    for (const s of snapshots) {
+      await tx.pedidoItem.create({
+        data: {
+          pedidoId: id,
+          produtoId: s.produtoId,
+          titulo: s.titulo,
+          variacaoNome: s.variacaoNome,
+          precoUnit: deCentavos(s.precoC),
+          quantidade: s.quantidade,
+          observacao: s.observacao,
+          desconto: deCentavos(s.descontoC),
+          rodada,
+          enviadoEm: enviar ? agora : null,
+          complementos: { create: s.complementos.map((c) => ({ grupoNome: c.grupoNome, nome: c.nome, precoUnit: deCentavos(c.precoC), quantidade: c.quantidade })) },
+        },
+      })
+    }
     await recalcular(tx, id)
     const qtd = snapshots.reduce((a, s) => a + s.quantidade, 0)
     await registrar(tx, ctx, autorNome, id, p.status, `Lançou ${qtd} item(ns)${rodada ? ` e enviou para a produção (rodada ${rodada})` : ""}`)
@@ -509,7 +513,11 @@ export async function detalheComanda(comercioId: string, id: string) {
       subtotal: true, desconto: true, descontoPercentual: true, taxaServico: true, servicoPercentual: true, total: true, divisao: true,
       itens: {
         orderBy: { createdAt: "asc" },
-        select: { id: true, produtoId: true, titulo: true, variacaoNome: true, precoUnit: true, quantidade: true, observacao: true, desconto: true, rodada: true, enviadoEm: true, prontoEm: true, solicitadoPor: true, solicitadoEm: true, aprovadoEm: true },
+        select: {
+          id: true, produtoId: true, titulo: true, variacaoNome: true, precoUnit: true, quantidade: true, observacao: true, desconto: true,
+          rodada: true, enviadoEm: true, prontoEm: true, solicitadoPor: true, solicitadoEm: true, aprovadoEm: true,
+          complementos: { select: { id: true, grupoNome: true, nome: true, precoUnit: true, quantidade: true } },
+        },
       },
       pagamentos: {
         orderBy: { createdAt: "asc" },
@@ -544,6 +552,7 @@ export async function detalheComanda(comercioId: string, id: string) {
       prontoEm: i.prontoEm?.toISOString() ?? null,
       solicitadoEm: i.solicitadoEm?.toISOString() ?? null,
       aprovadoEm: i.aprovadoEm?.toISOString() ?? null,
+      complementos: i.complementos.map((c) => ({ ...c, precoUnit: paraNumero(c.precoUnit) })),
     })),
     pagamentos: p.pagamentos.map((x) => ({
       ...x,
@@ -601,12 +610,13 @@ export async function listarProducao(comercioId: string) {
     take: 300,
     select: {
       id: true, titulo: true, variacaoNome: true, quantidade: true, observacao: true, rodada: true, enviadoEm: true,
+      complementos: { select: { nome: true, quantidade: true } },
       pedido: { select: { id: true, numero: true, mesa: true, clienteNome: true } },
     },
   })
   const grupos = new Map<string, {
     pedidoId: string; numero: number; mesa: string | null; clienteNome: string; rodada: number; enviadoEm: string
-    itens: { id: string; titulo: string; variacaoNome: string | null; quantidade: number; observacao: string | null }[]
+    itens: { id: string; titulo: string; variacaoNome: string | null; quantidade: number; observacao: string | null; complementos: { nome: string; quantidade: number }[] }[]
   }>()
   for (const i of itens) {
     const chave = `${i.pedido.id}:${i.rodada}`
@@ -615,7 +625,7 @@ export async function listarProducao(comercioId: string) {
       g = { pedidoId: i.pedido.id, numero: i.pedido.numero, mesa: i.pedido.mesa, clienteNome: i.pedido.clienteNome, rodada: i.rodada ?? 0, enviadoEm: i.enviadoEm!.toISOString(), itens: [] }
       grupos.set(chave, g)
     }
-    g.itens.push({ id: i.id, titulo: i.titulo, variacaoNome: i.variacaoNome, quantidade: i.quantidade, observacao: i.observacao })
+    g.itens.push({ id: i.id, titulo: i.titulo, variacaoNome: i.variacaoNome, quantidade: i.quantidade, observacao: i.observacao, complementos: i.complementos })
   }
   return [...grupos.values()]
 }

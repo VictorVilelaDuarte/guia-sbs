@@ -15,6 +15,7 @@ const itemSelect = {
   precoUnit: true,
   quantidade: true,
   observacao: true,
+  complementos: { select: { id: true, nome: true, quantidade: true } },
 } satisfies Prisma.PedidoItemSelect
 
 // Include usado pelo painel (carga inicial e polling) — mesma forma nos dois.
@@ -25,8 +26,12 @@ export const pedidoAdminInclude = {
 
 type PedidoComItens = Prisma.PedidoGetPayload<{ include: typeof pedidoAdminInclude }>
 
-export function serializarItens(itens: Pick<PedidoItem, "id" | "titulo" | "variacaoNome" | "precoUnit" | "quantidade" | "observacao">[]) {
-  return itens.map((i) => ({ ...i, precoUnit: paraNumero(i.precoUnit) }))
+type ItemComComplementos = Pick<PedidoItem, "id" | "titulo" | "variacaoNome" | "precoUnit" | "quantidade" | "observacao"> & {
+  complementos?: { id: string; nome: string; quantidade: number }[]
+}
+
+export function serializarItens(itens: ItemComComplementos[]) {
+  return itens.map((i) => ({ ...i, precoUnit: paraNumero(i.precoUnit), complementos: i.complementos ?? [] }))
 }
 
 export function serializarPedidoAdmin(p: PedidoComItens): PedidoAdmin {

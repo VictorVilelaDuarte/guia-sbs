@@ -25,7 +25,7 @@ export default async function CupomPage({ params, searchParams }: {
   const p = await prisma.pedido.findFirst({
     where: { id, comercioId: base.comercio.id },
     include: {
-      itens: { orderBy: { createdAt: "asc" } },
+      itens: { orderBy: { createdAt: "asc" }, include: { complementos: true } },
       pagamentos: { where: { estornadoEm: null }, orderBy: { createdAt: "asc" } },
       comercio: { select: { nome: true, endereco: true, numero: true, bairro: true, cidade: true, estado: true, telefone: true, whatsapp: true } },
     },
@@ -81,6 +81,14 @@ export default async function CupomPage({ params, searchParams }: {
                   <td className="pr-1">
                     {i.quantidade}x {i.titulo}
                     {i.variacaoNome ? ` (${i.variacaoNome})` : ""}
+                    {i.complementos.length > 0 && (
+                      <>
+                        <br />
+                        <span className="text-[10px]">
+                          + {i.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}x ${c.nome}` : c.nome)).join(", ")}
+                        </span>
+                      </>
+                    )}
                     <br />
                     <span className="text-[10px]">
                       {brl(paraCentavos(i.precoUnit))} un{desc > 0 ? ` · desc. -${brl(desc)}` : ""}

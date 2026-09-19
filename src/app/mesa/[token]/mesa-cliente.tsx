@@ -118,6 +118,7 @@ export function MesaCliente({ inicial, cardapio, token }: { inicial: ContaDaMesa
                       <span className="font-medium tabular-nums">{i.quantidade}×</span> {i.titulo}
                       {i.variacaoNome && <span className="text-stone-500"> · {i.variacaoNome}</span>}
                       {e && <span className={cn("ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold", e.cls)}>{e.label}</span>}
+                      {i.complementos.length > 0 && <span className="block text-xs text-stone-500">+ {i.complementos.join(", ")}</span>}
                       {i.observacao && <span className="block text-xs italic text-stone-500">↳ {i.observacao}</span>}
                     </span>
                     <span className="shrink-0 tabular-nums">{brl(i.valor)}</span>

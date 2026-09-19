@@ -17,6 +17,7 @@ export interface PedidoItemAdmin {
   precoUnit: number
   quantidade: number
   observacao: string | null
+  complementos: { id: string; nome: string; quantidade: number }[]
 }
 
 export interface PedidoAdmin {

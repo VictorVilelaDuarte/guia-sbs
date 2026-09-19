@@ -1,7 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CardapioManager } from "@/components/comerciante/cardapio-manager"
+import { ComplementosManager } from "@/components/comerciante/cardapio/complementos-manager"
 import { RecursoBloqueado } from "@/components/comerciante/painel/recurso-bloqueado"
 import { getCardapioData, getPainelBase } from "@/lib/painel/queries"
+import { listarGrupos } from "@/lib/gestao/complementos"
 import { notFound } from "next/navigation"
 import { temFeature } from "@/lib/plan-features"
 import { temPermissao } from "@/lib/gestao/permissoes"
@@ -21,9 +23,13 @@ export default async function GestaoCardapioPage() {
     )
   }
 
-  const categorias = await getCardapioData(base.comercio.id)
+  const [{ categorias, gruposComplemento }, grupos] = await Promise.all([
+    getCardapioData(base.comercio.id),
+    listarGrupos(base.comercio.id),
+  ])
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Cardápio</CardTitle>
@@ -34,8 +40,21 @@ export default async function GestaoCardapioPage() {
         </p>
       </CardHeader>
       <CardContent>
-        <CardapioManager categoriasIniciais={categorias} somenteDisponibilidade={!podeEditar} />
+        <CardapioManager categoriasIniciais={categorias} gruposComplemento={gruposComplemento} somenteDisponibilidade={!podeEditar} />
       </CardContent>
     </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Complementos</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Borda, adicionais, ponto da carne. Crie o grupo uma vez e ligue nos itens que usam — o preço entra na venda e a escolha aparece para a cozinha.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <ComplementosManager iniciais={grupos} somenteLeitura={!podeEditar} />
+      </CardContent>
+    </Card>
+    </div>
   )
 }

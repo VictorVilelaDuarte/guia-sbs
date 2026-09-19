@@ -44,6 +44,7 @@ export const getPainelBase = cache(async () => {
 
 const produtoInclude = {
   variacoes: { orderBy: { ordem: "asc" } },
+  complementos: { orderBy: { ordem: "asc" }, select: { grupoId: true } },
   categoriaCardapio: { select: { id: true, nome: true } },
   categoriaCatalogo: { select: { id: true, nome: true } },
 } satisfies Prisma.ProdutoInclude
@@ -77,19 +78,32 @@ export async function getVitrineData(comercioId: string) {
 // --- Gestão: cardápio ----------------------------------------------------------
 
 export async function getCardapioData(comercioId: string) {
-  return prisma.cardapioCategoria.findMany({
-    where: { comercioId },
-    orderBy: { ordem: "asc" },
-    include: {
-      produtos: { orderBy: { ordem: "asc" }, include: produtoInclude },
-    },
+  const [categorias, gruposComplemento] = await Promise.all([
+    prisma.cardapioCategoria.findMany({
+      where: { comercioId },
+      orderBy: { ordem: "asc" },
+      include: {
+        produtos: { orderBy: { ordem: "asc" }, include: produtoInclude },
+      },
+    }),
+    gruposParaFormulario(comercioId),
+  ])
+  return { categorias, gruposComplemento }
+}
+
+// Grupos de complementos ativos, no formato que o formulário de produto usa.
+export async function gruposParaFormulario(comercioId: string) {
+  return prisma.grupoComplemento.findMany({
+    where: { comercioId, ativo: true },
+    orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+    select: { id: true, nome: true, minimo: true, maximo: true, opcoes: { select: { nome: true } } },
   })
 }
 
 // --- Gestão: produtos e serviços ---------------------------------------------
 
 export async function getCatalogoData(comercioId: string) {
-  const [produtos, catalogoCategorias, cardapioCategorias] = await Promise.all([
+  const [produtos, catalogoCategorias, cardapioCategorias, gruposComplemento] = await Promise.all([
     prisma.produto.findMany({
       where: { comercioId },
       orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
@@ -106,11 +120,13 @@ export async function getCatalogoData(comercioId: string) {
       orderBy: { ordem: "asc" },
       select: { id: true, nome: true, ordem: true },
     }),
+    gruposParaFormulario(comercioId),
   ])
   return {
     produtos,
     catalogoCategorias,
     cardapioCategorias: cardapioCategorias.map((c) => ({ ...c, produtos: [] })),
+    gruposComplemento,
   }
 }
 

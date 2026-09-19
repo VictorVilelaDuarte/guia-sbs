@@ -6,6 +6,7 @@ import { FORMA_MULTIPLAS, FORMA_PAGAMENTO_KEYS } from "@/lib/hospedagem"
 import { centavosDe, precoEfetivo } from "@/lib/pedidos"
 import { mudarStatusPedido } from "@/lib/pedidos-historico"
 import { normalizarWhatsapp, vincularCliente } from "@/lib/gestao/clientes"
+import { gruposDosProdutos, resolverComplementos, type EscolhaComplemento, type SnapshotComplemento } from "@/lib/gestao/complementos"
 import { calcularTotais, MAX_PERCENTUAL_SERVICO, type DescontoConta } from "@/lib/gestao/totais"
 import { temFeature } from "@/lib/plan-features"
 
@@ -30,6 +31,7 @@ export interface ItemVendaInput {
   quantidade: number
   observacao?: string | null
   desconto?: number | null // reais, na linha
+  complementos?: EscolhaComplemento[] | null
 }
 
 export interface PagamentoInput {
@@ -71,10 +73,11 @@ export interface SnapshotItem {
   produtoId: string | null
   titulo: string
   variacaoNome: string | null
-  precoC: number
+  precoC: number // já com os complementos somados (ver src/lib/gestao/complementos.ts)
   quantidade: number
   observacao: string | null
   descontoC: number
+  complementos: SnapshotComplemento[]
 }
 
 export async function resolverItens(ctx: ComercioCtx, itens: ItemVendaInput[]): Promise<SnapshotItem[]> {
@@ -83,13 +86,14 @@ export async function resolverItens(ctx: ComercioCtx, itens: ItemVendaInput[]): 
     ? await prisma.produto.findMany({ where: { id: { in: ids }, comercioId: ctx.comercioId }, include: { variacoes: true } })
     : []
   const mapa = new Map(produtos.map((p) => [p.id, p]))
+  const gruposPorProduto = await gruposDosProdutos(ctx.comercioId, ids)
 
   return itens.map((item) => {
     if (!Number.isInteger(item.quantidade) || item.quantidade < 1 || item.quantidade > 999) {
       throw new ErroVenda("Quantidade inválida.")
     }
     const observacao = item.observacao?.trim() || null
-    let base: Omit<SnapshotItem, "descontoC">
+    let base: Omit<SnapshotItem, "descontoC" | "complementos">
     if (item.produtoId) {
       const p = mapa.get(item.produtoId)
       if (!p) throw new ErroVenda("Um dos itens não existe mais no catálogo.")
@@ -110,11 +114,16 @@ export async function resolverItens(ctx: ComercioCtx, itens: ItemVendaInput[]): 
       }
       base = { produtoId: null, titulo, variacaoNome: null, precoC: centavosDe(item.precoUnit), quantidade: item.quantidade, observacao }
     }
+    // Complementos entram no preço unitário; o detalhe vira snapshot no item.
+    const grupos = item.produtoId ? gruposPorProduto.get(item.produtoId) ?? [] : []
+    const { snapshots, extraC } = resolverComplementos(base.titulo, grupos, item.complementos)
+    base = { ...base, precoC: base.precoC + extraC }
+
     const descontoC = item.desconto ? centavosDe(item.desconto) : 0
     if (descontoC < 0 || descontoC > base.precoC * base.quantidade) {
       throw new ErroVenda(`Desconto inválido em "${base.titulo}".`)
     }
-    return { ...base, descontoC }
+    return { ...base, descontoC, complementos: snapshots }
   })
 }
 
@@ -301,6 +310,7 @@ export async function registrarVenda(ctx: ComercioCtx, v: VendaInput) {
             quantidade: s.quantidade,
             observacao: s.observacao,
             desconto: deCentavos(s.descontoC),
+            complementos: { create: s.complementos.map((c) => ({ grupoNome: c.grupoNome, nome: c.nome, precoUnit: deCentavos(c.precoC), quantidade: c.quantidade })) },
           })),
         },
         pagamentos: {

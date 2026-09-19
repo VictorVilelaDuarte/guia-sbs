@@ -278,6 +278,33 @@ async function main() {
     }
   }
 
+  // Complementos: grupos da loja ligados a alguns pratos
+  const adicionais = await prisma.grupoComplemento.create({
+    data: {
+      comercioId: comercio.id, nome: "Adicionais", minimo: 0, maximo: 3, ordem: 0,
+      opcoes: { create: [
+        { nome: "Queijo extra", preco: 6, quantidadeMax: 2, ordem: 0 },
+        { nome: "Bacon", preco: 8, quantidadeMax: 2, ordem: 1 },
+        { nome: "Ovo", preco: 4, ordem: 2 },
+        { nome: "Sem cebola", preco: 0, ordem: 3 },
+      ] },
+    },
+  })
+  const pontoCarne = await prisma.grupoComplemento.create({
+    data: {
+      comercioId: comercio.id, nome: "Ponto da carne", minimo: 1, maximo: 1, ordem: 1,
+      opcoes: { create: [{ nome: "Ao ponto", preco: 0, ordem: 0 }, { nome: "Bem passado", preco: 0, ordem: 1 }, { nome: "Mal passada", preco: 0, ordem: 2 }] },
+    },
+  })
+  for (const [titulo, grupos] of [
+    ["Costelinha com polenta cremosa", [adicionais.id, pontoCarne.id]],
+    ["Sanduíche de pernil", [adicionais.id]],
+    ["Misto quente", [adicionais.id]],
+  ] as const) {
+    const alvo = await prisma.produto.findFirst({ where: { comercioId: comercio.id, titulo }, select: { id: true } })
+    if (alvo) await prisma.produtoComplemento.createMany({ data: grupos.map((grupoId, ordem) => ({ produtoId: alvo.id, grupoId, ordem })) })
+  }
+
   // Catálogo (produtos e serviços fora do cardápio)
   const catalogo = await prisma.catalogoCategoria.create({ data: { comercioId: comercio.id, nome: "Da nossa cozinha", tipo: "PRODUTO", ordem: 0 } })
   await prisma.produto.createMany({

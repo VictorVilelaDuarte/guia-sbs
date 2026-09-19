@@ -1126,3 +1126,38 @@ Escolhido em 2026-09-18 como próximo passo, antes de adicionais, importação d
 - **Testado:** 28 cenários (abertura pelo cliente, validações, aprovação/recusa, segundo cliente na mesma
   conta, configuração da loja, bloqueio do fechamento com pedido pendente e dois celulares simultâneos)
   + conferência visual no celular e no PDV.
+
+---
+
+## 15. Complementos do cardápio (item 2.1 do banco de ideias)
+
+Escolhido em 2026-09-19, depois do QR na mesa.
+
+**Decisões de 2026-09-19** (recomendações aceitas):
+1. **Grupos reutilizáveis** entre produtos (biblioteca da loja), com vínculo por item.
+2. **Quantidade por opção** (2× bacon), limitada por opção e pelo máximo do grupo.
+3. **Mínimo e máximo por grupo** ("escolha 1", "até 3"), validados no servidor.
+4. **Opção com preço zero** para "sem cebola"/"ao ponto" — mesmo mecanismo, sem preço.
+5. **O complemento soma no preço unitário do item**; o detalhe fica no snapshot. Uma conta só no
+   sistema inteiro (desconto por item, serviço e divisão da conta continuam sem exceção).
+6. **PDV e cozinha primeiro**; cardápio online, QR e relatórios no PR B.
+7. **Estoque fora** — quando a Fase 4 chegar, decide-se se o adicional baixa estoque.
+
+### 15.1 PR A — Modelo, cadastro, PDV e cozinha ✅ implementado
+
+- `GrupoComplemento` / `OpcaoComplemento` / `ProdutoComplemento` (vínculo) e `PedidoItemComplemento`
+  (snapshot da venda).
+- Cadastro no bloco "Complementos" da página de Cardápio (`cardapio:editar`); vínculo por chips no
+  formulário do produto.
+- PDV: ao tocar num item com complementos abre a escolha (junto com a variação), com passo de
+  quantidade e bloqueio enquanto falta escolha obrigatória.
+- Complementos aparecem na conta do PDV, na cozinha, no cupom, na fila de pedidos e na conta da mesa.
+- **Testado:** 26 cenários — cadastro e permissões, vínculo, cálculo (2 hambúrgueres com 2× bacon =
+  R$ 84,00), regras (obrigatório, limite da opção, limite do grupo, opção de outro produto, opção
+  indisponível), comanda e cozinha, e a garantia de que editar o grupo **não** muda venda já registrada.
+
+### 15.2 PR B — Cardápio online, checkout, QR e relatórios (a fazer)
+
+- Complementos no cardápio público e no checkout do pedido online.
+- Complementos no pedido feito pelo QR da mesa.
+- Bloco "adicionais mais vendidos" nos relatórios.

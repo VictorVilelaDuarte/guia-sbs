@@ -44,9 +44,11 @@ import { SortableCategoriaWrapper, SortableItemWrapper } from "./sortable-wrappe
 
 export function CardapioManager({
   categoriasIniciais,
+  gruposComplemento = [],
   somenteDisponibilidade = false,
 }: {
   categoriasIniciais: CardapioCategoria[]
+  gruposComplemento?: { id: string; nome: string; minimo: number; maximo: number; opcoes: { nome: string }[] }[]
   // Papel com itens:disponibilidade mas sem cardapio:editar (ex.: atendente):
   // só vê a lista e liga/desliga Visível/Oculto. A API aplica a mesma regra.
   somenteDisponibilidade?: boolean
@@ -488,6 +490,7 @@ export function CardapioManager({
       />
 
       <ProdutoDialog
+        gruposComplemento={gruposComplemento}
         open={itemDialog}
         produto={editandoItem}
         categorias={categorias}
