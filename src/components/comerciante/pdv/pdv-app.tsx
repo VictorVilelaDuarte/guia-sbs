@@ -525,7 +525,7 @@ export function PdvApp(props: Props) {
           <div className="space-y-2 border-b border-violet-200 bg-violet-50 p-3">
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-violet-900">
-                <Hand className="h-4 w-4" /> Pedido do cliente
+                <Hand className="h-4 w-4" /> Pedido do cliente — confirmar manda para a cozinha
                 {solicitadosNaComanda[0].solicitadoPor ? ` · ${solicitadosNaComanda[0].solicitadoPor}` : ""}
               </p>
               <button
@@ -533,11 +533,11 @@ export function PdvApp(props: Props) {
                 disabled={ocupado}
                 onClick={async () => {
                   setOcupado(true)
-                  try { await acaoComanda({ acao: "aprovarPedido" }, "Pedido confirmado e lançado na conta.") } finally { setOcupado(false) }
+                  try { await acaoComanda({ acao: "aprovarPedido" }, "Pedido confirmado e enviado para a produção.") } finally { setOcupado(false) }
                 }}
                 className="h-9 rounded-lg bg-violet-700 px-3 text-sm font-semibold text-white disabled:opacity-40"
               >
-                Confirmar tudo
+                Confirmar e enviar
               </button>
             </div>
             <ul className="space-y-1 text-sm">
@@ -552,7 +552,7 @@ export function PdvApp(props: Props) {
                   <button
                     type="button"
                     aria-label={`Confirmar ${i.titulo}`}
-                    onClick={() => acaoComanda({ acao: "aprovarPedido", itemId: i.id })}
+                    onClick={() => acaoComanda({ acao: "aprovarPedido", itemId: i.id }, "Item confirmado e enviado para a produção.")}
                     className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-emerald-700 ring-1 ring-stone-300"
                   >
                     <Check className="h-4 w-4" />

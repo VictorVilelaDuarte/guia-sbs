@@ -1114,7 +1114,9 @@ Escolhido em 2026-09-18 como próximo passo, antes de adicionais, importação d
 
 - O cliente escolhe no cardápio da mesa, informa o nome (WhatsApp opcional) e envia. Os itens entram na
   comanda como **solicitação**: não contam no total, não vão para a produção e **não deixam fechar a conta**
-  até o atendente confirmar. Recusar apaga o item e registra no histórico com o motivo.
+  até o atendente confirmar. **Confirmar no PDV já envia para a produção** (decisão de 2026-09-19: quem
+  confirma quer o item na cozinha, sem um segundo clique). Recusar apaga o item e registra no histórico
+  com o motivo.
 - Conta aberta pelo próprio cliente quando a mesa está livre (se a loja permitir), em nome dele.
 - Preço e disponibilidade sempre do banco (só cardápio digital disponível); limites de 20 linhas por
   pedido, 10 por item e teto por janela de 5 minutos; lock por mesa impede dois celulares abrirem

@@ -635,19 +635,23 @@ export async function marcarRodadaPronta(ctx: ComercioCtx, pedidoId: string, rod
 
 // ---- pedidos feitos pelo cliente no QR da mesa ----------------------------------------
 
-// Aprova o que o cliente pediu: o item passa a contar no total e segue o fluxo
-// normal (lançado → enviar para a produção).
+// Aprova o que o cliente pediu: o item entra no total e vai DIRETO para a
+// produção (confirmar no PDV já é o "manda fazer" — o atendente não precisa
+// clicar em enviar depois). Confirmar item a item gera uma rodada por vez;
+// "confirmar tudo" manda todos numa rodada só.
 export async function aprovarSolicitacao(ctx: ComercioCtx, id: string, itemId: string | null) {
   const autorNome = await autorNomeDe(ctx)
   await prisma.$transaction(async (tx) => {
     const p = await travar(tx, ctx, id)
+    const max = await tx.pedidoItem.aggregate({ where: { pedidoId: id }, _max: { rodada: true } })
+    const rodada = (max._max.rodada ?? 0) + 1
     const r = await tx.pedidoItem.updateMany({
       where: { pedidoId: id, solicitadoEm: { not: null }, aprovadoEm: null, ...(itemId ? { id: itemId } : {}) },
-      data: { aprovadoEm: new Date() },
+      data: { aprovadoEm: new Date(), rodada, enviadoEm: new Date() },
     })
     if (r.count === 0) throw new ErroVenda("Nada para aprovar — o pedido já foi tratado.", 409)
     await recalcular(tx, id)
-    await registrar(tx, ctx, autorNome, id, p.status, `Aprovou ${r.count} item(ns) pedido(s) pelo cliente na mesa`)
+    await registrar(tx, ctx, autorNome, id, p.status, `Confirmou ${r.count} item(ns) do cliente e enviou para a produção (rodada ${rodada})`)
   })
   return detalheComanda(ctx.comercioId, id)
 }

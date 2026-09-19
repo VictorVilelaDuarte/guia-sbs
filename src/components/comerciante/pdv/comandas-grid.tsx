@@ -55,7 +55,7 @@ export function ComandasGrid({
                   {s.mesa ? rotuloMesa(s.mesa) : s.clienteNome} pediu {s.itens} item(ns) pelo QR
                 </span>
                 <span className="block text-xs text-stone-600">
-                  {minutosDesde(s.desde, agora)} min{s.pedidoPor ? ` · ${s.pedidoPor}` : ""} · confirme para entrar na conta
+                  {minutosDesde(s.desde, agora)} min{s.pedidoPor ? ` · ${s.pedidoPor}` : ""} · confirme para entrar na conta e ir para a cozinha
                 </span>
               </span>
               <button type="button" onClick={() => onAbrir(s.pedidoId)} className="flex h-10 items-center gap-1.5 rounded-xl bg-stone-900 px-3 text-sm font-semibold text-white">
