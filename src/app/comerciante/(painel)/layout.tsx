@@ -56,7 +56,10 @@ export default async function ComercianteLayout({
       where: { id: session.user.id },
       select: { trocarSenha: true },
     })
-    if (user?.trocarSenha) redirect("/comerciante/trocar-senha")
+    // Conta apagada (ou banco recriado) com JWT ainda válido: manda para o login
+    // em vez de mostrar "nenhum comércio vinculado", que confunde.
+    if (!user) redirect("/admin/login")
+    if (user.trocarSenha) redirect("/comerciante/trocar-senha")
   }
 
   const base = await getPainelBase()

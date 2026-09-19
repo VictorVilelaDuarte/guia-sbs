@@ -8,7 +8,9 @@
  *
  * Nada aqui é dado real: nomes de loja, pessoas e telefones são inventados.
  *
- *   npx tsx prisma/seed-demo.ts           # cria (recria se já existir)
+ *   npx tsx prisma/seed-demo.ts           # cria (recria se já existir — os usuários
+ *                                         # são recriados, então quem estava logado
+ *                                         # na demo precisa entrar de novo)
  *   npx tsx prisma/seed-demo.ts --limpar  # apaga a loja e os usuários da demo
  *
  * Acesso: demo-dono@guiasbs.local / demo123 (mesma senha para os demais papéis).

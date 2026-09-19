@@ -21,7 +21,8 @@ export default async function PdvLayout({ children }: { children: React.ReactNod
   if (!isAdminRole && role !== "COMERCIANTE") redirect("/")
   if (role === "COMERCIANTE") {
     const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { trocarSenha: true } })
-    if (user?.trocarSenha) redirect("/comerciante/trocar-senha")
+    if (!user) redirect("/admin/login") // conta apagada com sessão ainda válida
+    if (user.trocarSenha) redirect("/comerciante/trocar-senha")
   }
 
   const base = await getPainelBase()
