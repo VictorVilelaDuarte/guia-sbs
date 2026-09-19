@@ -2,7 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { Copy, Plus, QrCode, RefreshCw, Trash2 } from "lucide-react"
+import { Copy, GripVertical, Plus, QrCode, RefreshCw, Trash2, Users } from "lucide-react"
+import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { SortableItemWrapper } from "@/components/comerciante/cardapio/sortable-wrappers"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
@@ -41,17 +44,34 @@ async function api<T>(url: string, body?: unknown, method = "POST"): Promise<T |
 export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[]; base: string; config: ConfigQr }) {
   const [mesas, setMesas] = useState(iniciais)
   const [cfg, setCfg] = useState(config)
-  const [nova, setNova] = useState({ nome: "", area: "" })
+  const [nova, setNova] = useState({ nome: "", area: "", lugares: "" })
   const [salvando, setSalvando] = useState(false)
+  const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
+
+  // Arrastar define a ordem das mesas no mapa do salão do PDV.
+  async function reordenar(e: DragEndEvent) {
+    const de = String(e.active.id)
+    const para = e.over ? String(e.over.id) : null
+    if (!para || de === para) return
+    const ids = mesas.map((m) => m.id)
+    const nova = arrayMove(mesas, ids.indexOf(de), ids.indexOf(para))
+    setMesas(nova) // otimista: a tela já mostra a ordem nova
+    const r = await api<MesaPainel[]>("/api/comerciante/gestao/mesas/ordem", { ids: nova.map((m) => m.id) })
+    if (r) setMesas(r)
+  }
 
   async function adicionar(e: React.FormEvent) {
     e.preventDefault()
     if (!nova.nome.trim() || salvando) return
     setSalvando(true)
-    const r = await api<MesaPainel[]>("/api/comerciante/gestao/mesas", { nome: nova.nome, area: nova.area || null })
+    const r = await api<MesaPainel[]>("/api/comerciante/gestao/mesas", {
+      nome: nova.nome,
+      area: nova.area || null,
+      lugares: nova.lugares ? Number(nova.lugares) : null,
+    })
     if (r) {
       setMesas(r)
-      setNova({ nome: "", area: nova.area })
+      setNova({ nome: "", area: nova.area, lugares: nova.lugares })
       toast.success("Mesa cadastrada.")
     }
     setSalvando(false)
@@ -95,7 +115,7 @@ export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <div>
             <CardTitle className="text-base">Mesas</CardTitle>
-            <p className="text-sm text-muted-foreground">Cada mesa tem um QR Code próprio. O cliente escaneia e acompanha a conta no celular.</p>
+            <p className="text-sm text-muted-foreground">Cada mesa tem um QR Code próprio. Arraste para definir a ordem do mapa do salão no PDV.</p>
           </div>
           <Link
             href="/comerciante/gestao/mesas/qr"
@@ -120,6 +140,13 @@ export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[
               maxLength={40}
               className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-[16px]"
             />
+            <input
+              value={nova.lugares}
+              onChange={(e) => setNova({ ...nova, lugares: e.target.value.replace(/\D/g, "").slice(0, 2) })}
+              placeholder="Lugares"
+              inputMode="numeric"
+              className="h-10 w-24 rounded-md border border-input bg-background px-3 text-[16px]"
+            />
             <button type="submit" disabled={!nova.nome.trim() || salvando} className="inline-flex h-10 items-center gap-1.5 rounded-md border border-border px-3 text-sm font-medium hover:bg-accent disabled:opacity-40">
               <Plus className="h-4 w-4" /> Adicionar
             </button>
@@ -128,13 +155,30 @@ export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[
           {mesas.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma mesa cadastrada. Comece pelas mesas do salão.</p>
           ) : (
-            <ul className="divide-y divide-border">
-              {mesas.map((m) => (
-                <li key={m.id} className={cn("flex flex-wrap items-center gap-2 py-2.5", !m.ativa && "opacity-60")}>
+            <DndContext sensors={sensores} collisionDetection={closestCenter} onDragEnd={reordenar}>
+              <SortableContext items={mesas.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+                <ul className="divide-y divide-border">
+                  {mesas.map((m) => (
+                    <SortableItemWrapper key={m.id} id={m.id}>
+                      {({ dragHandleProps }) => (
+                <li className={cn("flex flex-wrap items-center gap-2 py-2.5", !m.ativa && "opacity-60")}>
+                  <button
+                    type="button"
+                    {...dragHandleProps}
+                    aria-label={`Mover ${m.nome}`}
+                    className="cursor-grab rounded-md p-1 text-muted-foreground hover:bg-accent active:cursor-grabbing"
+                  >
+                    <GripVertical className="h-4 w-4" />
+                  </button>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-2 font-medium">
                       {rotuloMesa(m.nome)}
                       {m.area && <span className="text-xs font-normal text-muted-foreground">{m.area}</span>}
+                      {m.lugares && (
+                        <span className="inline-flex items-center gap-0.5 text-xs font-normal text-muted-foreground">
+                          <Users className="h-3 w-3" /> {m.lugares}
+                        </span>
+                      )}
                       {m.comandaAberta && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
                           conta aberta · #{m.comandaAberta.numero}
@@ -169,8 +213,12 @@ export function MesasManager({ iniciais, base, config }: { iniciais: MesaPainel[
                     </button>
                   </div>
                 </li>
-              ))}
-            </ul>
+                      )}
+                    </SortableItemWrapper>
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           )}
         </CardContent>
       </Card>

@@ -105,7 +105,8 @@ PR A (modelo, cadastro, PDV e cozinha) e PR B (cardápio online, checkout, QR e 
   terminam? Estação por categoria ou por produto?
 
 ### 2.3 Mapa de mesas
-**Esforço:** M · **Depende de:** comandas (prontas)
+**Esforço:** M · **Depende de:** comandas (prontas) · **✅ implementado (2026-09-19)** — ver §16 do
+[`modulo-gestao.md`](modulo-gestao.md).
 
 - **Proposta:** cadastro de mesas (número, área — salão, varanda) e visão em grade com status (livre,
   ocupada, conta pedida, aguardando limpeza) e tempo de ocupação. Abrir comanda tocando na mesa.

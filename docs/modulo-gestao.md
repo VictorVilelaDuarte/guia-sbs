@@ -1170,3 +1170,30 @@ Escolhido em 2026-09-19, depois do QR na mesa.
 - **Testado:** 18 cenários — cardápio online, checkout (pizza 50 + catupiry 8 + 2× bacon 12, ×2 = R$ 140,00),
   recusa de grupo obrigatório vazio e de complemento em produto que não usa o grupo, fila e tela de
   pedidos, pedido pelo QR com aprovação, cozinha e relatório (4× bacon = R$ 24,00).
+
+---
+
+## 16. Mapa de mesas (item 2.3 do banco de ideias) ✅ implementado
+
+Escolhido em 2026-09-19, depois do QR na mesa e dos complementos. Ficou menor porque o cadastro de
+mesas já tinha entrado com o QR (§14.1).
+
+**Decisões de 2026-09-19** (recomendações aceitas):
+1. **O mapa substitui a grade da aba Comandas do PDV** — é onde o salão já está, em vez de tela nova.
+2. **Grade ordenável arrastando** no cadastro, **sem** coordenadas livres: layout livre é bonito na
+   demonstração, trabalhoso de configurar, ruim no celular e ninguém mantém.
+3. **Status "a liberar"** por 15 minutos depois que a conta fecha, com botão "Liberar".
+4. **Campo `lugares`** opcional por mesa (aparece no cartão; terreno pronto para reservas).
+5. **Tocar numa mesa livre abre a conta direto**, com a taxa de serviço padrão da loja.
+
+**Implementação:** `mapaDoSalao()` em `src/lib/gestao/mesas.ts` (mesa → conta aberta, chamado do QR,
+"a liberar"); `GET /api/comerciante/gestao/comandas` passou a devolver `{ comandas, mesas }`, então o
+PDV mantém **um polling só**; `fecharTx` marca `Mesa.liberarAte`; ordenação em `POST .../mesas/ordem`.
+
+**Achado do teste:** liberar a mesa estava exigindo `pedidos:configurar` — o garçom, que é quem limpa,
+tomava 403. A rota passou a aceitar `vendas:registrar` quando a única mudança é `{ liberar: true }`.
+
+**Testado:** 21 cenários — cadastro com lugares e áreas, ordenação (e 403 para atendente), mapa no PDV,
+abrir conta tocando na mesa livre (e 409 devolvendo a conta quando já está ocupada), chamado e pedido
+do QR aparecendo na carta, "a liberar" com prazo e liberação manual, prazo vencido sumindo sozinho,
+contas sem mesa e mesa inativa fora do mapa. Conferência visual no desktop e no celular.

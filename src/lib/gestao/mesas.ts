@@ -34,7 +34,7 @@ export async function listarMesas(comercioId: string) {
     where: { comercioId },
     orderBy: [{ ordem: "asc" }, { nome: "asc" }],
     select: {
-      id: true, nome: true, area: true, token: true, ativa: true, ordem: true,
+      id: true, nome: true, area: true, lugares: true, token: true, ativa: true, ordem: true,
       pedidos: { where: { status: "ABERTA" }, select: { id: true, numero: true, total: true }, take: 1 },
     },
   })
@@ -42,6 +42,7 @@ export async function listarMesas(comercioId: string) {
     id: m.id,
     nome: m.nome,
     area: m.area,
+    lugares: m.lugares,
     token: m.token,
     ativa: m.ativa,
     ordem: m.ordem,
@@ -51,7 +52,7 @@ export async function listarMesas(comercioId: string) {
 
 export type MesaPainel = Awaited<ReturnType<typeof listarMesas>>[number]
 
-export async function criarMesa(ctx: ComercioCtx, input: { nome: string; area?: string | null }) {
+export async function criarMesa(ctx: ComercioCtx, input: { nome: string; area?: string | null; lugares?: number | null }) {
   const nome = nomeNormalizado(input.nome)
   if (!nome) throw new ErroVenda("Informe o nome da mesa.")
   const existe = await prisma.mesa.findFirst({ where: { comercioId: ctx.comercioId, nome: { equals: nome, mode: "insensitive" } } })
@@ -62,6 +63,7 @@ export async function criarMesa(ctx: ComercioCtx, input: { nome: string; area?: 
       comercioId: ctx.comercioId,
       nome,
       area: input.area?.trim().slice(0, 40) || null,
+      lugares: input.lugares && input.lugares > 0 ? Math.min(input.lugares, 99) : null,
       token: novoToken(),
       ordem: (ultima._max.ordem ?? -1) + 1,
     },
@@ -72,7 +74,7 @@ export async function criarMesa(ctx: ComercioCtx, input: { nome: string; area?: 
 export async function atualizarMesa(
   ctx: ComercioCtx,
   id: string,
-  input: { nome?: string; area?: string | null; ativa?: boolean; trocarToken?: boolean },
+  input: { nome?: string; area?: string | null; lugares?: number | null; ativa?: boolean; trocarToken?: boolean; liberar?: boolean },
 ) {
   const mesa = await prisma.mesa.findFirst({ where: { id, comercioId: ctx.comercioId } })
   if (!mesa) throw new ErroVenda("Mesa não encontrada.", 404)
@@ -89,8 +91,11 @@ export async function atualizarMesa(
     data: {
       ...(nome !== undefined ? { nome } : {}),
       ...(input.area !== undefined ? { area: input.area?.trim().slice(0, 40) || null } : {}),
+      ...(input.lugares !== undefined ? { lugares: input.lugares && input.lugares > 0 ? Math.min(input.lugares, 99) : null } : {}),
       ...(input.ativa !== undefined ? { ativa: input.ativa } : {}),
       ...(input.trocarToken ? { token: novoToken() } : {}),
+      // Mesa limpa: sai do estado "a liberar" no mapa.
+      ...(input.liberar ? { liberarAte: null } : {}),
     },
   })
   return listarMesas(ctx.comercioId)
@@ -506,4 +511,74 @@ export async function pedirNaMesa(token: string, input: PedidoDaMesaInput) {
   })
 
   return contaDaMesa(token)
+}
+
+// ---- mapa do salão --------------------------------------------------------------------
+
+export { MIN_A_LIBERAR } from "@/lib/gestao/mesas-const"
+
+export interface MesaNoMapa {
+  id: string
+  nome: string
+  area: string | null
+  lugares: number | null
+  comanda: { id: string; numero: number; total: number; pago: number; abertaEm: string; naProducao: number; aguardandoAprovacao: number } | null
+  chamado: "GARCOM" | "CONTA" | null
+  aLiberar: boolean
+}
+
+// Mapa do salão para o PDV: uma linha por mesa ativa, com a conta aberta, o
+// chamado pendente do QR e o "a liberar" de quem acabou de fechar.
+export async function mapaDoSalao(comercioId: string): Promise<MesaNoMapa[]> {
+  const agora = new Date()
+  const mesas = await prisma.mesa.findMany({
+    where: { comercioId, ativa: true },
+    orderBy: [{ ordem: "asc" }, { nome: "asc" }],
+    select: {
+      id: true, nome: true, area: true, lugares: true, liberarAte: true,
+      pedidos: {
+        where: { status: "ABERTA" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          id: true, numero: true, total: true, createdAt: true,
+          itens: { select: { enviadoEm: true, prontoEm: true, solicitadoEm: true, aprovadoEm: true } },
+          pagamentos: { where: { estornadoEm: null }, select: { valor: true } },
+        },
+      },
+      chamados: { where: { atendidoEm: null }, orderBy: { createdAt: "desc" }, take: 1, select: { tipo: true } },
+    },
+  })
+
+  return mesas.map((m) => {
+    const c = m.pedidos[0]
+    return {
+      id: m.id,
+      nome: m.nome,
+      area: m.area,
+      lugares: m.lugares,
+      comanda: c
+        ? {
+            id: c.id,
+            numero: c.numero,
+            total: paraNumero(c.total),
+            pago: c.pagamentos.reduce((a, p) => a + paraCentavos(p.valor), 0) / 100,
+            abertaEm: c.createdAt.toISOString(),
+            naProducao: c.itens.filter((i) => i.enviadoEm && !i.prontoEm).length,
+            aguardandoAprovacao: c.itens.filter((i) => i.solicitadoEm && !i.aprovadoEm).length,
+          }
+        : null,
+      chamado: m.chamados[0]?.tipo ?? null,
+      // "A liberar" só vale enquanto não passou do prazo e a mesa está vazia.
+      aLiberar: !c && !!m.liberarAte && m.liberarAte > agora,
+    }
+  })
+}
+
+// Ordem das mesas no mapa (arrastar no cadastro).
+export async function ordenarMesas(ctx: ComercioCtx, ids: string[]) {
+  const minhas = await prisma.mesa.findMany({ where: { comercioId: ctx.comercioId }, select: { id: true } })
+  const validos = ids.filter((id) => minhas.some((m) => m.id === id))
+  await prisma.$transaction(validos.map((id, ordem) => prisma.mesa.update({ where: { id }, data: { ordem } })))
+  return listarMesas(ctx.comercioId)
 }

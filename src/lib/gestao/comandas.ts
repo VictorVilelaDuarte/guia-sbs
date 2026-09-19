@@ -5,6 +5,7 @@ import { deCentavos, paraCentavos, paraNumero } from "@/lib/dinheiro"
 import { formaPagamentoLabel } from "@/lib/hospedagem"
 import { centavosDe } from "@/lib/pedidos"
 import { vincularCliente, normalizarWhatsapp } from "@/lib/gestao/clientes"
+import { MIN_A_LIBERAR } from "@/lib/gestao/mesas-const"
 import { calcularTotais, type DescontoConta } from "@/lib/gestao/totais"
 import {
   autorNomeDe,
@@ -393,10 +394,15 @@ async function fecharTx(tx: Tx, ctx: ComercioCtx, autorNome: string | null, id: 
   if (pendentes > 0) throw new ErroVenda("Confirme ou recuse o pedido feito pelo cliente antes de fechar.", 409)
   if (t.saldoC > 0) throw new ErroVenda(`Falta receber ${brl(t.saldoC)}.`, 409)
   const pagamentos = await tx.pedidoPagamento.findMany({ where: { pedidoId: id, estornadoEm: null }, select: { forma: true } })
-  await tx.pedido.update({
+  const fechado = await tx.pedido.update({
     where: { id },
     data: { status: "CONCLUIDO", formaPagamento: formaResumo(pagamentos), fechadaEm: new Date() },
+    select: { mesaId: true },
   })
+  // Mesa entra em "a liberar" no mapa do salão (some sozinho depois do prazo).
+  if (fechado.mesaId) {
+    await tx.mesa.update({ where: { id: fechado.mesaId }, data: { liberarAte: new Date(Date.now() + MIN_A_LIBERAR * 60000) } })
+  }
   await registrar(tx, ctx, autorNome, id, "CONCLUIDO", null)
 }
 
@@ -572,7 +578,7 @@ export async function listarComandasAbertas(comercioId: string) {
     where: { comercioId, origem: "COMANDA", status: "ABERTA" },
     orderBy: { createdAt: "asc" },
     select: {
-      id: true, numero: true, mesa: true, clienteNome: true, total: true, createdAt: true,
+      id: true, numero: true, mesa: true, mesaId: true, clienteNome: true, total: true, createdAt: true,
       itens: { select: { quantidade: true, enviadoEm: true, prontoEm: true, solicitadoEm: true, aprovadoEm: true } },
       pagamentos: { where: { estornadoEm: null }, select: { valor: true } },
     },
@@ -583,6 +589,7 @@ export async function listarComandasAbertas(comercioId: string) {
       id: c.id,
       numero: c.numero,
       mesa: c.mesa,
+      mesaId: c.mesaId,
       clienteNome: c.clienteNome,
       total: paraNumero(c.total),
       pago: pagoC / 100,

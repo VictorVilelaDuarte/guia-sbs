@@ -10,7 +10,11 @@ export async function GET() {
   return responder(() => listarMesas(g.ctx.comercioId))
 }
 
-const schema = z.object({ nome: z.string().max(20), area: z.string().max(40).nullable().optional() })
+const schema = z.object({
+  nome: z.string().max(20),
+  area: z.string().max(40).nullable().optional(),
+  lugares: z.number().int().min(1).max(99).nullable().optional(),
+})
 
 export async function POST(req: NextRequest) {
   const g = await guardPdv("pedidos:configurar")

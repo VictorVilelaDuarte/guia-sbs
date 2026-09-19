@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { abrirComanda, listarComandasAbertas } from "@/lib/gestao/comandas"
+import { mapaDoSalao } from "@/lib/gestao/mesas"
 import { guardPdv, responder } from "@/lib/gestao/pdv-api"
 
-// Comandas abertas (polling do PDV) e abertura de comanda por mesa ou nome.
+// Comandas abertas + mapa do salão (polling do PDV) e abertura de comanda.
 export async function GET() {
   const g = await guardPdv("vendas:registrar")
   if ("resposta" in g) return g.resposta
-  return responder(() => listarComandasAbertas(g.ctx.comercioId))
+  return responder(async () => {
+    const [comandas, mesas] = await Promise.all([listarComandasAbertas(g.ctx.comercioId), mapaDoSalao(g.ctx.comercioId)])
+    return { comandas, mesas }
+  })
 }
 
 const abrirSchema = z.object({

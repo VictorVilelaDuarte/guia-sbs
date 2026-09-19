@@ -229,6 +229,7 @@ async function main() {
       comercioId: comercio.id,
       nome,
       area: nome.startsWith("Varanda") ? "Varanda" : "Salão",
+      lugares: nome.startsWith("Varanda") ? 6 : [2, 4, 4, 6][ordem % 4],
       token: novoToken(),
       ordem,
     })),

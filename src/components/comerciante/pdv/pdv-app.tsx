@@ -25,14 +25,15 @@ import {
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { ComandaDetalhe, ComandaResumo, SolicitacaoPainel } from "@/lib/gestao/comandas"
-import type { ChamadoPainel } from "@/lib/gestao/mesas"
+import type { ChamadoPainel, MesaNoMapa } from "@/lib/gestao/mesas"
 import { rotuloMesa } from "@/lib/gestao/mesas-link"
 import { beep } from "@/components/comerciante/pedidos/beep"
 import type { PlanoDivisao } from "@/lib/gestao/divisao"
 import { calcularTotais, valorLinhaC, MAX_PERCENTUAL_SERVICO } from "@/lib/gestao/totais"
 import { cn } from "@/lib/utils"
 import { CatalogoPdv } from "./catalogo"
-import { AbrirComandaDialog, ComandasGrid } from "./comandas-grid"
+import { AbrirComandaDialog } from "./comandas-grid"
+import { MapaSalao } from "./mapa-salao"
 import { Conta, type LinhaConta } from "./conta"
 import { ClienteVendaDialog, DADOS_VENDA_VAZIOS, DescontoDialog, type DadosVenda } from "./dados-dialogs"
 import { LinhaDialog, type EdicaoLinha } from "./linha-dialog"
@@ -63,6 +64,7 @@ interface Props {
   servicoPct: number | null
   comandasIniciais: ComandaResumo[]
   mesas: { nome: string; area: string | null }[]
+  mapaInicial: MesaNoMapa[]
   chamadosIniciais: ChamadoPainel[]
   solicitacoesIniciais: SolicitacaoPainel[]
   temPedidoOnline: boolean
@@ -149,6 +151,7 @@ export function PdvApp(props: Props) {
 
   // ---- comandas
   const [comandas, setComandas] = useState<ComandaResumo[]>(props.comandasIniciais)
+  const [mapa, setMapa] = useState<MesaNoMapa[]>(props.mapaInicial)
   const [comanda, setComanda] = useState<ComandaDetalhe | null>(null)
   const [pendentes, setPendentes] = useState<LinhaPdv[]>([])
   const [ocupado, setOcupado] = useState(false)
@@ -158,7 +161,10 @@ export function PdvApp(props: Props) {
 
   const atualizarLista = useCallback(async () => {
     const r = await fetch("/api/comerciante/gestao/comandas", { cache: "no-store" }).catch(() => null)
-    if (r?.ok) setComandas(await r.json())
+    if (!r?.ok) return
+    const dados: { comandas: ComandaResumo[]; mesas: MesaNoMapa[] } = await r.json()
+    setComandas(dados.comandas)
+    setMapa(dados.mesas)
   }, [])
 
   const carregarComanda = useCallback(async (id: string) => {
@@ -209,6 +215,34 @@ export function PdvApp(props: Props) {
     }, POLL_MS)
     return () => clearInterval(t)
   }, [aba, comanda, atualizarLista, carregarComanda])
+
+  // Toque numa mesa livre do mapa: abre a conta direto, com a taxa de serviço
+  // padrão da loja (para dar nome ou cliente, o caminho é "Abrir comanda").
+  async function abrirNaMesa(nome: string) {
+    if (ocupado) return
+    setOcupado(true)
+    try {
+      const r = await enviarJson<ComandaDetalhe>("/api/comerciante/gestao/comandas", { mesa: nome, cobrarServico: servicoPct != null })
+      if (!r.ok) {
+        toast.error(r.erro)
+        if (typeof r.data.comandaId === "string") await abrirComandaExistente(r.data.comandaId)
+        return
+      }
+      setComanda(r.data)
+      setPendentes([])
+      setTelaMobile("produtos")
+      atualizarLista()
+      buscaRef.current?.focus()
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  async function liberarMesa(id: string) {
+    const r = await enviarJson(`/api/comerciante/gestao/mesas/${id}`, { liberar: true }, "PATCH")
+    if (!r.ok) return toast.error(r.erro)
+    atualizarLista()
+  }
 
   async function abrirComandaExistente(id: string) {
     const c = await carregarComanda(id)
@@ -667,12 +701,16 @@ export function PdvApp(props: Props) {
       {/* Corpo */}
       {mostrandoGrid ? (
         <main className="min-h-0 flex-1">
-          <ComandasGrid
+          <MapaSalao
+            mesas={mapa}
             comandas={comandas}
-            solicitacoes={solicitacoes}
             chamados={chamados}
+            solicitacoes={solicitacoes}
+            ocupado={ocupado}
+            onAbrirComanda={abrirComandaExistente}
+            onAbrirMesaLivre={abrirNaMesa}
+            onLiberarMesa={liberarMesa}
             onAtenderChamado={atenderChamado}
-            onAbrir={abrirComandaExistente}
             onNova={() => setDlg("abrir")}
           />
         </main>
