@@ -24,6 +24,15 @@ Administradores aprovam e gerenciam os comércios. Os perfis públicos ficam em 
 - Pode criar arquivos e fazer mudanças livremente, sem pedir confirmação.
 - Sempre explicar o **motivo** das decisões técnicas e estruturais ao implementá-las.
 
+## Deploy e produção
+
+**Não há ambiente de desenvolvimento separado:** o `DATABASE_URL` do `.env` local é o banco
+de **produção** (Supabase, pooler 6543 — dev e prod compartilham), e a Vercel publica
+**automaticamente a cada push na `main`** (`https://guia-sbs.vercel.app`). Ou seja,
+`db:push`, scripts `prisma/migrate-*.ts` e seeds alteram produção, e todo push vai ao ar na
+hora. Estado das migrações, variáveis de ambiente, pendências conhecidas e a ordem para
+subir um ambiente novo estão em [`docs/deploy.md`](docs/deploy.md).
+
 ## Comandos
 
 ```bash
