@@ -15,7 +15,7 @@ export default async function TrocarSenhaPage() {
     where: { id: session.user.id },
     select: { trocarSenha: true, name: true },
   })
-  if (!user) redirect("/admin/login")
+  if (!user) redirect("/api/sessao/encerrar")
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-6 py-10">

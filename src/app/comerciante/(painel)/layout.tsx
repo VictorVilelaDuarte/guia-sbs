@@ -58,7 +58,7 @@ export default async function ComercianteLayout({
     })
     // Conta apagada (ou banco recriado) com JWT ainda válido: manda para o login
     // em vez de mostrar "nenhum comércio vinculado", que confunde.
-    if (!user) redirect("/admin/login")
+    if (!user) redirect("/api/sessao/encerrar")
     if (user.trocarSenha) redirect("/comerciante/trocar-senha")
   }
 
