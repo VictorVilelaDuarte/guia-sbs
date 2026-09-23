@@ -1,82 +1,153 @@
 "use client"
 
-import { useState } from "react"
-import { ArrowLeft, Loader2, Minus, Plus, X } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import Image from "next/image"
+import { ArrowLeft, Loader2, Minus, Plus, Search, ShoppingBag, Trash2, X } from "lucide-react"
 import type { CardapioDaMesa, ContaDaMesa } from "@/lib/gestao/mesas"
+import type { AddCarrinho } from "@/lib/carrinho"
+import { ProdutoBottomSheet, type ProdutoSheet } from "@/components/public/cardapio/produto-bottom-sheet"
+import { DestaqueCard } from "@/components/public/cardapio/destaque-card"
+import { ItemRow } from "@/components/public/cardapio/item-row"
 import { cn } from "@/lib/utils"
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+const DIAMOND = "✦"
+const DESTAQUES_ID = "__destaques__"
+// Limites da rota /api/mesa/[token]/pedido — a tela respeita para não chegar num 400.
+const MAX_LINHAS = 20
+const MAX_QTD = 10
+const MAX_OBS = 140
 
 interface Linha {
   chave: string
-  produtoId: string
-  variacaoId: string | null
-  titulo: string
-  detalhe: string | null
-  preco: number // já com os complementos
-  quantidade: number
-  complementos: { opcaoId: string; nome: string; quantidade: number }[]
+  add: AddCarrinho // precoUnit já inclui os complementos
 }
 
-type Item = CardapioDaMesa["categorias"][number]["itens"][number]
-
-// Pedido feito pelo cliente na mesa: escolhe no cardápio, confere e envia.
-// O atendente confirma antes de entrar na conta — a tela deixa isso claro.
+// Pedido feito pelo cliente na mesa: mesma cara do cardápio público (fotos,
+// destaques, abas por categoria e bottom sheet do produto), mas os itens vão
+// para a conta da mesa. O atendente confirma antes de entrar na conta.
 export function PedidoSheet({
   cardapio,
   token,
+  loja,
+  mesa,
   nomeSalvo,
   onFechar,
   onEnviado,
 }: {
   cardapio: CardapioDaMesa
   token: string
+  loja: { nome: string; logo: string | null }
+  mesa: string
   nomeSalvo: string
   onFechar: () => void
   onEnviado: (conta: ContaDaMesa, nome: string) => void
 }) {
+  const categorias = cardapio.categorias
   const [linhas, setLinhas] = useState<Linha[]>([])
-  const [escolhendo, setEscolhendo] = useState<Item | null>(null)
-  const [complSel, setComplSel] = useState<Record<string, number>>({})
   const [etapa, setEtapa] = useState<"cardapio" | "revisar">("cardapio")
+  const [selecionado, setSelecionado] = useState<ProdutoSheet | null>(null)
   const [nome, setNome] = useState(nomeSalvo)
   const [whatsapp, setWhatsapp] = useState("")
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
 
-  const total = linhas.reduce((a, l) => a + l.preco * l.quantidade, 0)
-  const qtd = linhas.reduce((a, l) => a + l.quantidade, 0)
+  // `now` fixo na montagem: promoção que vence com a tela aberta o servidor corrige.
+  const [now] = useState(() => Date.now())
+  const destaques = categorias.flatMap((c) => c.produtos.filter((p) => p.destaque).map((p) => ({ ...p, categoriaNome: c.nome })))
+  const temDestaques = destaques.length > 0
 
-  function adicionar(
-    item: Item,
-    variacao?: { id: string; nome: string; preco: number },
-    complementos: { opcaoId: string; nome: string; preco: number; quantidade: number }[] = [],
-  ) {
-    const extras = complementos.reduce((a, c) => a + c.preco * c.quantidade, 0)
-    const chave = `${item.id}:${variacao?.id ?? ""}:${complementos.map((c) => `${c.opcaoId}x${c.quantidade}`).sort().join(",")}`
-    setLinhas((ls) => {
-      const igual = ls.find((l) => l.chave === chave)
-      if (igual) return ls.map((l) => (l.chave === chave ? { ...l, quantidade: Math.min(10, l.quantidade + 1) } : l))
-      return [
-        ...ls,
-        {
-          chave,
-          produtoId: item.id,
-          variacaoId: variacao?.id ?? null,
-          titulo: item.titulo,
-          detalhe: [variacao?.nome, ...complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome))].filter(Boolean).join(" · ") || null,
-          preco: (variacao?.preco ?? item.preco ?? 0) + extras,
-          quantidade: 1,
-          complementos: complementos.map((c) => ({ opcaoId: c.opcaoId, nome: c.nome, quantidade: c.quantidade })),
-        },
-      ]
-    })
-    setEscolhendo(null)
-    setComplSel({})
+  const [activeId, setActiveId] = useState(temDestaques ? DESTAQUES_ID : (categorias[0]?.id ?? ""))
+  const [busca, setBusca] = useState("")
+  const [buscaAberta, setBuscaAberta] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map())
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const rolandoManual = useRef(false)
+  const buscaRef = useRef<HTMLInputElement>(null)
+
+  const total = linhas.reduce((a, l) => a + l.add.precoUnit * l.add.quantidade, 0)
+  const qtd = linhas.reduce((a, l) => a + l.add.quantidade, 0)
+  const qtdPorProduto = (id: string) => linhas.filter((l) => l.add.produtoId === id).reduce((a, l) => a + l.add.quantidade, 0)
+
+  // Aba ativa acompanha a rolagem. A raiz é o container da tela (não a janela):
+  // este pedido abre por cima da página da conta.
+  useEffect(() => {
+    if (buscaAberta || etapa !== "cardapio") return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (rolandoManual.current) return
+        const visiveis = entries.filter((e) => e.isIntersecting)
+        if (visiveis.length === 0) return
+        const topo = visiveis.reduce((a, b) => (a.boundingClientRect.top < b.boundingClientRect.top ? a : b))
+        setActiveId(topo.target.id)
+      },
+      { root: scrollRef.current, rootMargin: "-48px 0px -50% 0px", threshold: 0 },
+    )
+    sectionRefs.current.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [buscaAberta, etapa, categorias, temDestaques])
+
+  useEffect(() => {
+    if (!tabsRef.current || buscaAberta) return
+    tabsRef.current
+      .querySelector<HTMLElement>(`[data-catid="${activeId}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" })
+  }, [activeId, buscaAberta])
+
+  useEffect(() => {
+    if (buscaAberta) setTimeout(() => buscaRef.current?.focus(), 50)
+  }, [buscaAberta])
+
+  useEffect(() => {
+    if (!aviso) return
+    const t = setTimeout(() => setAviso(null), 2500)
+    return () => clearTimeout(t)
+  }, [aviso])
+
+  function irPara(id: string) {
+    setActiveId(id)
+    const el = sectionRefs.current.get(id)
+    if (!el) return
+    rolandoManual.current = true
+    el.scrollIntoView({ behavior: "smooth", block: "start" })
+    setTimeout(() => (rolandoManual.current = false), 900)
+  }
+
+  // Mesma escolha (variação, complementos e observação) soma na mesma linha.
+  function adicionar(add: AddCarrinho) {
+    const compl = (add.complementos ?? []).map((c) => `${c.opcaoId}x${c.quantidade}`).sort().join(",")
+    const chave = `${add.produtoId}:${add.variacaoId ?? ""}:${compl}:${add.observacao ?? ""}`
+    const existente = linhas.find((l) => l.chave === chave)
+    if (!existente && linhas.length >= MAX_LINHAS) {
+      setAviso(`Envie este pedido antes de escolher mais — o limite é de ${MAX_LINHAS} itens diferentes por vez.`)
+      return
+    }
+    setLinhas((ls) =>
+      existente
+        ? ls.map((l) => (l.chave === chave ? { ...l, add: { ...l.add, quantidade: Math.min(MAX_QTD, l.add.quantidade + add.quantidade) } } : l))
+        : [...ls, { chave, add }],
+    )
+    setAviso(`${add.quantidade}× ${add.titulo} no pedido`)
   }
 
   const mudar = (chave: string, delta: number) =>
-    setLinhas((ls) => ls.flatMap((l) => (l.chave !== chave ? [l] : l.quantidade + delta <= 0 ? [] : [{ ...l, quantidade: Math.min(10, l.quantidade + delta) }])))
+    setLinhas((ls) =>
+      ls.flatMap((l) =>
+        l.chave !== chave ? [l] : l.add.quantidade + delta <= 0 ? [] : [{ ...l, add: { ...l.add, quantidade: Math.min(MAX_QTD, l.add.quantidade + delta) } }],
+      ),
+    )
+
+  function abrirRevisao() {
+    setEtapa("revisar")
+    scrollRef.current?.scrollTo({ top: 0 })
+  }
+
+  function voltarAoCardapio() {
+    setEtapa("cardapio")
+    if (linhas.length === 0) setErro(null)
+  }
 
   async function enviar() {
     if (enviando) return
@@ -89,11 +160,12 @@ export function PedidoSheet({
         body: JSON.stringify({
           nome: nome.trim(),
           whatsapp: whatsapp.trim() || null,
-          itens: linhas.map((l) => ({
-            produtoId: l.produtoId,
-            variacaoId: l.variacaoId,
-            quantidade: l.quantidade,
-            complementos: l.complementos.map((c) => ({ opcaoId: c.opcaoId, quantidade: c.quantidade })),
+          itens: linhas.map(({ add }) => ({
+            produtoId: add.produtoId,
+            variacaoId: add.variacaoId,
+            quantidade: add.quantidade,
+            observacao: add.observacao,
+            complementos: (add.complementos ?? []).map((c) => ({ opcaoId: c.opcaoId, quantidade: c.quantidade })),
           })),
         }),
       })
@@ -105,252 +177,360 @@ export function PedidoSheet({
     }
   }
 
+  const termo = busca.trim().toLowerCase()
+  const resultados = termo
+    ? categorias.flatMap((c) =>
+        c.produtos
+          .filter((p) => p.titulo.toLowerCase().includes(termo) || p.descricao?.toLowerCase().includes(termo))
+          .map((p) => ({ ...p, categoriaNome: c.nome })),
+      )
+    : []
+  const tabs = [...(temDestaques ? [{ id: DESTAQUES_ID, nome: `${DIAMOND} Destaques` }] : []), ...categorias.map((c) => ({ id: c.id, nome: c.nome }))]
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-stone-50">
-      <header className="flex items-center gap-2 border-b border-stone-200 bg-white px-3 py-3">
-        <button
-          type="button"
-          aria-label={etapa === "revisar" ? "Voltar ao cardápio" : "Fechar"}
-          onClick={() => (etapa === "revisar" ? setEtapa("cardapio") : onFechar())}
-          className="rounded-lg p-2 hover:bg-stone-100"
-        >
-          {etapa === "revisar" ? <ArrowLeft className="h-5 w-5" /> : <X className="h-5 w-5" />}
-        </button>
-        <h2 className="font-semibold">{etapa === "revisar" ? "Confira seu pedido" : "Fazer pedido"}</h2>
-      </header>
-
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+    <div className="fixed inset-0 z-50 flex justify-center bg-[#F5EFE4]">
+      <div ref={scrollRef} className="relative h-full w-full max-w-md overflow-y-auto bg-[#F5EFE4] text-stone-900">
         {etapa === "cardapio" ? (
-          <div className="space-y-5">
-            {cardapio.categorias.map((cat) => (
-              <section key={cat.nome}>
-                <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-stone-500">{cat.nome}</h3>
-                <ul className="space-y-2">
-                  {cat.itens.map((i) => {
-                    const naLista = linhas.filter((l) => l.produtoId === i.id).reduce((a, l) => a + l.quantidade, 0)
-                    return (
-                      <li key={i.id}>
-                        <button
-                          type="button"
-                          onClick={() => (i.variacoes.length > 0 || i.complementos.length > 0 ? setEscolhendo(i) : adicionar(i))}
-                          className="flex w-full items-start justify-between gap-3 rounded-2xl bg-white p-3 text-left shadow-sm ring-1 ring-stone-200"
-                        >
-                          <span className="min-w-0">
-                            <span className="block font-medium">
-                              {i.titulo}
-                              {naLista > 0 && <span className="ml-2 rounded-full bg-stone-900 px-1.5 py-0.5 text-[11px] font-bold text-white">{naLista}</span>}
-                            </span>
-                            {i.descricao && <span className="mt-0.5 line-clamp-2 block text-xs text-stone-500">{i.descricao}</span>}
-                          </span>
-                          <span className="shrink-0 text-sm font-semibold tabular-nums">
-                            {i.variacoes.length > 0 ? `a partir de ${brl(Math.min(...i.variacoes.map((v) => v.preco)))}` : brl(i.preco ?? 0)}
-                          </span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </section>
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <ul className="divide-y divide-stone-100 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-stone-200">
-              {linhas.map((l) => (
-                <li key={l.chave} className="flex items-center gap-2 p-2.5">
-                  <span className="min-w-0 flex-1 text-sm">
-                    <span className="block font-medium">
-                      {l.titulo}
-                      {l.detalhe && <span className="text-stone-500"> · {l.detalhe}</span>}
-                    </span>
-                    <span className="text-xs tabular-nums text-stone-500">{brl(l.preco)} cada</span>
-                  </span>
-                  <button type="button" aria-label={`Menos ${l.titulo}`} onClick={() => mudar(l.chave, -1)} className="flex h-9 w-9 items-center justify-center rounded-lg ring-1 ring-stone-300">
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <span className="w-5 text-center font-semibold tabular-nums">{l.quantidade}</span>
-                  <button type="button" aria-label={`Mais ${l.titulo}`} onClick={() => mudar(l.chave, 1)} className="flex h-9 w-9 items-center justify-center rounded-lg ring-1 ring-stone-300">
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-
-            <div className="space-y-2 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-stone-200">
-              <label className="block text-sm font-medium" htmlFor="nome-cliente">Seu nome</label>
-              <input
-                id="nome-cliente"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Como o atendente vai te chamar"
-                maxLength={60}
-                className="h-12 w-full rounded-xl border border-stone-300 px-3 text-[16px]"
-              />
-              <label className="block pt-2 text-sm font-medium" htmlFor="whats-cliente">
-                WhatsApp <span className="font-normal text-stone-500">(opcional)</span>
-              </label>
-              <input
-                id="whats-cliente"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="(12) 90000-0000"
-                inputMode="tel"
-                className="h-12 w-full rounded-xl border border-stone-300 px-3 text-[16px]"
-              />
-              <p className="text-xs text-stone-500">Usamos o WhatsApp só para a loja te identificar nas próximas visitas.</p>
+          <>
+            {/* Cabeçalho da loja */}
+            <div className="px-4 pb-5 pt-4">
+              <button
+                type="button"
+                onClick={onFechar}
+                className="mb-4 inline-flex items-center gap-1 text-xs text-stone-500 transition-colors hover:text-stone-800"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Voltar para a conta
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-white bg-stone-200 shadow-sm">
+                  {loja.logo ? (
+                    <Image src={loja.logo} alt={loja.nome} fill sizes="56px" className="object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xl font-bold text-stone-500">{loja.nome[0]}</div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="truncate text-lg font-bold leading-tight">{loja.nome}</h1>
+                  <p className="mt-0.5 text-xs font-medium text-amber-800">{mesa} · pedido pelo celular</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBuscaAberta(true)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-stone-200 bg-white text-stone-600 shadow-sm transition-colors hover:bg-stone-50"
+                  aria-label="Buscar no cardápio"
+                >
+                  <Search className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
-            <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
-              O atendente confirma o pedido antes de ir para a cozinha e entrar na conta.
-            </p>
-            {erro && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800">{erro}</p>}
-          </div>
+            {/* Sticky: abas ou busca */}
+            <div className="sticky top-0 z-10 border-b border-stone-200 bg-[#F5EFE4]">
+              {buscaAberta ? (
+                <div className="flex items-center gap-2 px-4 py-2">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+                    <input
+                      ref={buscaRef}
+                      type="text"
+                      placeholder="Buscar no cardápio..."
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                      className="h-9 w-full rounded-full border border-stone-200 bg-white pl-9 pr-4 text-[16px] placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+                    />
+                    {busca && (
+                      <button
+                        type="button"
+                        onClick={() => setBusca("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+                        aria-label="Limpar busca"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBuscaAberta(false)
+                      setBusca("")
+                    }}
+                    className="shrink-0 text-sm font-medium text-stone-600 transition-colors hover:text-stone-900"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <div ref={tabsRef} className="scrollbar-none flex overflow-x-auto px-2">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      data-catid={tab.id}
+                      onClick={() => irPara(tab.id)}
+                      className={cn(
+                        "shrink-0 whitespace-nowrap border-b-2 px-2.5 py-3 text-sm font-medium transition-colors",
+                        activeId === tab.id ? "border-stone-800 text-stone-900" : "border-transparent text-stone-400 hover:text-stone-700",
+                      )}
+                    >
+                      {tab.nome}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pb-28">
+              {termo ? (
+                <div>
+                  <p className="px-4 py-3 text-xs text-stone-400">
+                    {resultados.length === 0
+                      ? `Nenhum resultado para "${busca}"`
+                      : `${resultados.length} resultado${resultados.length !== 1 ? "s" : ""} para "${busca}"`}
+                  </p>
+                  <div className="divide-y divide-stone-200">
+                    {resultados.map((p) => (
+                      <div key={p.id}>
+                        <p className="px-4 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-widest text-stone-400">{p.categoriaNome}</p>
+                        <ItemRow produto={p} now={now} noPedido={qtdPorProduto(p.id)} onClick={() => setSelecionado(p)} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {temDestaques && (
+                    <section id={DESTAQUES_ID} ref={(el) => {
+                        if (el) sectionRefs.current.set(DESTAQUES_ID, el)
+                        else sectionRefs.current.delete(DESTAQUES_ID)
+                      }} className="scroll-mt-12 pb-6 pt-6">
+                      <div className="mb-4 px-4">
+                        <h2 className="flex items-center gap-2 font-serif text-2xl font-bold">
+                          <span className="text-xl text-amber-700">{DIAMOND}</span>
+                          Em destaque
+                        </h2>
+                        <p className="mt-0.5 text-sm text-stone-400">seleção da casa para hoje</p>
+                      </div>
+                      <div className="scrollbar-none flex gap-3 overflow-x-auto px-4 pb-1">
+                        {destaques.map((p) => (
+                          <DestaqueCard key={p.id} produto={p} now={now} onClick={() => setSelecionado(p)} />
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {categorias.map((cat) => (
+                    <section key={cat.id} id={cat.id} ref={(el) => {
+                        if (el) sectionRefs.current.set(cat.id, el)
+                        else sectionRefs.current.delete(cat.id)
+                      }} className="scroll-mt-12">
+                      <div className="px-4 pb-2 pt-6">
+                        <h2 className="font-serif text-4xl font-bold leading-none">{cat.nome}</h2>
+                        <p className="mt-1.5 text-sm text-stone-400">
+                          {cat.produtos.length} {cat.produtos.length === 1 ? "item" : "itens"}
+                        </p>
+                      </div>
+                      <div className="mt-2 divide-y divide-stone-200">
+                        {cat.produtos.map((p) => (
+                          <ItemRow
+                            key={p.id}
+                            produto={p}
+                            now={now}
+                            noPedido={qtdPorProduto(p.id)}
+                            onClick={() => setSelecionado({ ...p, categoriaNome: cat.nome })}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <Revisao
+            linhas={linhas}
+            nome={nome}
+            setNome={setNome}
+            whatsapp={whatsapp}
+            setWhatsapp={setWhatsapp}
+            erro={erro}
+            onVoltar={voltarAoCardapio}
+            onMudar={mudar}
+          />
         )}
       </div>
 
-      <footer className="border-t border-stone-200 bg-white p-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}>
-        {etapa === "cardapio" ? (
-          <button
-            type="button"
-            disabled={qtd === 0}
-            onClick={() => setEtapa("revisar")}
-            className="flex h-14 w-full items-center justify-between rounded-xl bg-stone-900 px-4 font-semibold text-white disabled:opacity-40"
-          >
-            <span>Revisar pedido{qtd > 0 ? ` · ${qtd} item(ns)` : ""}</span>
-            <span className="tabular-nums">{brl(total)}</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={enviando || qtd === 0 || nome.trim().length < 2}
-            onClick={enviar}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 font-semibold text-white disabled:opacity-40"
-          >
-            {enviando && <Loader2 className="h-5 w-5 animate-spin" />}
-            Enviar pedido · {brl(total)}
-          </button>
-        )}
-      </footer>
-
-      {escolhendo && (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={() => { setEscolhendo(null); setComplSel({}) }}>
-          <div className="max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl bg-white p-4" onClick={(e) => e.stopPropagation()}>
-            <EscolhaMesa
-              item={escolhendo}
-              complSel={complSel}
-              setComplSel={setComplSel}
-              onAdicionar={(variacao, complementos) => adicionar(escolhendo, variacao, complementos)}
-            />
-          </div>
+      {/* Aviso rápido de item adicionado */}
+      {aviso && etapa === "cardapio" && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-24 z-40 flex justify-center px-4">
+          <p className="fade-up rounded-full bg-stone-900/90 px-4 py-2 text-center text-sm font-medium text-white shadow-lg">{aviso}</p>
         </div>
       )}
+
+      {/* Barra fixa — mesma do carrinho do cardápio online */}
+      {(etapa === "revisar" || qtd > 0) && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+          {etapa === "cardapio" ? (
+            <button
+              type="button"
+              onClick={abrirRevisao}
+              className="pointer-events-auto mx-auto flex w-full max-w-md items-center justify-between gap-3 rounded-2xl bg-stone-900 px-5 py-3.5 text-white shadow-lg shadow-black/25 transition-colors active:bg-black"
+            >
+              <span className="flex items-center gap-2.5 font-semibold">
+                <span className="relative">
+                  <ShoppingBag className="h-5 w-5" />
+                  <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold tabular-nums">
+                    {qtd}
+                  </span>
+                </span>
+                Ver pedido
+              </span>
+              <span className="font-bold tabular-nums">{brl(total)}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={enviando || qtd === 0 || nome.trim().length < 2}
+              onClick={enviar}
+              className="pointer-events-auto mx-auto flex w-full max-w-md items-center justify-between gap-3 rounded-2xl bg-emerald-600 px-5 py-3.5 font-semibold text-white shadow-lg shadow-black/25 transition-colors active:bg-emerald-700 disabled:opacity-50"
+            >
+              <span className="flex items-center gap-2">
+                {enviando && <Loader2 className="h-5 w-5 animate-spin" />}
+                {nome.trim().length < 2 && qtd > 0 ? "Diga o seu nome" : "Enviar pedido"}
+              </span>
+              <span className="font-bold tabular-nums">{brl(total)}</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      <ProdutoBottomSheet
+        produto={selecionado}
+        now={now}
+        onClose={() => setSelecionado(null)}
+        onAddToCart={adicionar}
+        quantidadeMax={MAX_QTD}
+        observacaoMax={MAX_OBS}
+      />
     </div>
   )
 }
 
-// Escolha de variação e complementos antes de somar o item ao pedido da mesa.
-function EscolhaMesa({
-  item,
-  complSel,
-  setComplSel,
-  onAdicionar,
+// Conferência antes de enviar: fotos, escolhas, quantidades e quem está pedindo.
+function Revisao({
+  linhas,
+  nome,
+  setNome,
+  whatsapp,
+  setWhatsapp,
+  erro,
+  onVoltar,
+  onMudar,
 }: {
-  item: Item
-  complSel: Record<string, number>
-  setComplSel: (f: (atual: Record<string, number>) => Record<string, number>) => void
-  onAdicionar: (
-    variacao?: { id: string; nome: string; preco: number },
-    complementos?: { opcaoId: string; nome: string; preco: number; quantidade: number }[],
-  ) => void
+  linhas: Linha[]
+  nome: string
+  setNome: (v: string) => void
+  whatsapp: string
+  setWhatsapp: (v: string) => void
+  erro: string | null
+  onVoltar: () => void
+  onMudar: (chave: string, delta: number) => void
 }) {
-  const [variacao, setVariacao] = useState(item.variacoes[0] ?? null)
-  const escolhidos = item.complementos.flatMap((g) =>
-    g.opcoes.filter((o) => (complSel[o.id] ?? 0) > 0).map((o) => ({ opcaoId: o.id, nome: o.nome, preco: o.preco, quantidade: complSel[o.id] })),
-  )
-  const extras = escolhidos.reduce((a, c) => a + c.preco * c.quantidade, 0)
-  const noGrupo = (g: Item["complementos"][number]) => g.opcoes.reduce((a, o) => a + (complSel[o.id] ?? 0), 0)
-  const faltando = item.complementos.find((g) => noGrupo(g) < g.minimo)
-
-  function mudar(g: Item["complementos"][number], o: Item["complementos"][number]["opcoes"][number], delta: number) {
-    setComplSel((atual) => {
-      const novo = Math.min(Math.max((atual[o.id] ?? 0) + delta, 0), o.quantidadeMax)
-      const outros = g.opcoes.reduce((a, x) => a + (x.id === o.id ? 0 : atual[x.id] ?? 0), 0)
-      if (outros + novo > g.maximo) return atual
-      return { ...atual, [o.id]: novo }
-    })
-  }
-
   return (
-    <div className="space-y-4">
-      <p className="font-semibold">{item.titulo}</p>
+    <div className="px-4 pb-32 pt-4">
+      <button type="button" onClick={onVoltar} className="mb-4 inline-flex items-center gap-1 text-xs text-stone-500 transition-colors hover:text-stone-800">
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Continuar escolhendo
+      </button>
+      <h1 className="font-serif text-3xl font-bold leading-none">Seu pedido</h1>
+      <p className="mt-1.5 text-sm text-stone-500">Confira antes de enviar para o atendente.</p>
 
-      {item.variacoes.length > 0 && (
-        <div className="grid gap-2">
-          {item.variacoes.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => setVariacao(v)}
-              className={cn(
-                "flex items-center justify-between rounded-xl p-3 text-left ring-1",
-                variacao?.id === v.id ? "bg-stone-900 text-white ring-stone-900" : "bg-stone-50 ring-stone-200",
-              )}
-            >
-              <span className="font-medium">{v.nome}</span>
-              <span className="tabular-nums">{brl(v.preco)}</span>
-            </button>
-          ))}
+      {linhas.length === 0 ? (
+        <div className="mt-6 rounded-2xl bg-white p-6 text-center shadow-sm">
+          <ShoppingBag className="mx-auto h-8 w-8 text-stone-300" />
+          <p className="mt-2 font-semibold">Nenhum item escolhido</p>
+          <button type="button" onClick={onVoltar} className="mt-3 text-sm font-semibold text-amber-800">
+            Voltar ao cardápio
+          </button>
         </div>
-      )}
-
-      {item.complementos.map((g) => (
-        <div key={g.id} className="space-y-1.5">
-          <p className="flex items-baseline justify-between text-sm font-semibold">
-            {g.nome}
-            <span className="text-xs font-normal text-stone-500">
-              {g.minimo > 0 ? `escolha ${g.minimo === g.maximo ? g.minimo : `${g.minimo} a ${g.maximo}`}` : `até ${g.maximo}`}
-            </span>
-          </p>
-          <ul className="divide-y divide-stone-100 rounded-xl ring-1 ring-stone-200">
-            {g.opcoes.map((o) => {
-              const qtd = complSel[o.id] ?? 0
-              return (
-                <li key={o.id} className="flex items-center gap-2 px-3 py-2.5 text-sm">
-                  <span className="min-w-0 flex-1">
-                    {o.nome}
-                    <span className="ml-1.5 text-xs text-stone-500">{o.preco > 0 ? `+ ${brl(o.preco)}` : "grátis"}</span>
-                  </span>
-                  {qtd > 0 || o.quantidadeMax > 1 ? (
-                    <span className="flex items-center gap-2">
-                      <button type="button" aria-label={`Menos ${o.nome}`} onClick={() => mudar(g, o, -1)} disabled={qtd === 0} className="flex h-9 w-9 items-center justify-center rounded-lg ring-1 ring-stone-300 disabled:opacity-40">
-                        <Minus className="h-3.5 w-3.5" />
+      ) : (
+        <ul className="mt-5 divide-y divide-stone-100 overflow-hidden rounded-2xl bg-white shadow-sm">
+          {linhas.map(({ chave, add }) => {
+            const detalhe = [
+              add.variacaoNome,
+              ...(add.complementos ?? []).map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)),
+            ].filter(Boolean)
+            return (
+              <li key={chave} className="flex gap-3 p-3">
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-stone-100">
+                  {add.imagem && <Image src={add.imagem} alt={add.titulo} fill sizes="64px" className="object-cover" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold leading-snug">{add.titulo}</p>
+                  {detalhe.length > 0 && <p className="mt-0.5 text-xs text-stone-500">{detalhe.join(" · ")}</p>}
+                  {add.observacao && <p className="mt-0.5 text-xs italic text-stone-500">↳ {add.observacao}</p>}
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold tabular-nums">{brl(add.precoUnit * add.quantidade)}</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        aria-label={add.quantidade === 1 ? `Tirar ${add.titulo}` : `Menos ${add.titulo}`}
+                        onClick={() => onMudar(chave, -1)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 text-stone-700 active:bg-stone-100"
+                      >
+                        {add.quantidade === 1 ? <Trash2 className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
                       </button>
-                      <span className="w-4 text-center font-semibold tabular-nums">{qtd}</span>
-                      <button type="button" aria-label={`Mais ${o.nome}`} onClick={() => mudar(g, o, 1)} className="flex h-9 w-9 items-center justify-center rounded-lg ring-1 ring-stone-300">
+                      <span className="w-5 text-center font-semibold tabular-nums">{add.quantidade}</span>
+                      <button
+                        type="button"
+                        aria-label={`Mais ${add.titulo}`}
+                        onClick={() => onMudar(chave, 1)}
+                        disabled={add.quantidade >= MAX_QTD}
+                        className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-200 text-stone-700 active:bg-stone-100 disabled:opacity-40"
+                      >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
-                    </span>
-                  ) : (
-                    <button type="button" onClick={() => mudar(g, o, 1)} className="h-9 rounded-lg px-3 text-sm font-medium ring-1 ring-stone-300">
-                      Escolher
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
-      ))}
+                    </div>
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
 
-      <button
-        type="button"
-        disabled={!!faltando}
-        onClick={() => onAdicionar(variacao ?? undefined, escolhidos)}
-        className="flex h-12 w-full items-center justify-between rounded-xl bg-stone-900 px-4 font-semibold text-white disabled:opacity-40"
-      >
-        <span>{faltando ? `Escolha em "${faltando.nome}"` : "Adicionar"}</span>
-        <span className="tabular-nums">{brl((variacao?.preco ?? item.preco ?? 0) + extras)}</span>
-      </button>
+      <div className="mt-4 space-y-2 rounded-2xl bg-white p-4 shadow-sm">
+        <label className="block text-sm font-medium" htmlFor="nome-cliente">
+          Seu nome
+        </label>
+        <input
+          id="nome-cliente"
+          value={nome}
+          onChange={(e) => setNome(e.target.value)}
+          placeholder="Como o atendente vai te chamar"
+          maxLength={60}
+          className="h-12 w-full rounded-xl border border-stone-200 px-3 text-[16px] placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+        />
+        <label className="block pt-2 text-sm font-medium" htmlFor="whats-cliente">
+          WhatsApp <span className="font-normal text-stone-400">(opcional)</span>
+        </label>
+        <input
+          id="whats-cliente"
+          value={whatsapp}
+          onChange={(e) => setWhatsapp(e.target.value)}
+          placeholder="(12) 90000-0000"
+          inputMode="tel"
+          className="h-12 w-full rounded-xl border border-stone-200 px-3 text-[16px] placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
+        />
+        <p className="text-xs text-stone-500">Usamos o WhatsApp só para a loja te identificar nas próximas visitas.</p>
+      </div>
+
+      <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        O atendente confirma o pedido antes de ir para a cozinha e entrar na conta.
+      </p>
+      {erro && <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-800">{erro}</p>}
     </div>
   )
 }

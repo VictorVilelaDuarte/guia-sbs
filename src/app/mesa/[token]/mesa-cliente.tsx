@@ -190,6 +190,8 @@ export function MesaCliente({ inicial, cardapio, token }: { inicial: ContaDaMesa
         <PedidoSheet
           cardapio={cardapio}
           token={token}
+          loja={conta.loja}
+          mesa={rotuloMesa(conta.mesa.nome)}
           nomeSalvo={meuNome}
           onFechar={() => setPedindo(false)}
           onEnviado={(nova, nome) => {

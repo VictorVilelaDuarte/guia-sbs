@@ -40,6 +40,10 @@ interface Props {
   // quantidade, campo de observação e botão "Adicionar ao carrinho" no rodapé.
   // Ausente = comportamento somente-leitura (catálogo / cardápio sem pedido).
   onAddToCart?: (add: AddCarrinho) => void;
+  // Limites do modo pedido — o pedido pela mesa aceita menos que o online
+  // (ver /api/mesa/[token]/pedido).
+  quantidadeMax?: number;
+  observacaoMax?: number;
 }
 
 function formatBRL(v: number) {
@@ -56,7 +60,14 @@ function isPromoAtiva(
   return new Date(promoFim).getTime() > now;
 }
 
-export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props) {
+export function ProdutoBottomSheet({
+  produto,
+  now,
+  onClose,
+  onAddToCart,
+  quantidadeMax = 99,
+  observacaoMax = 280,
+}: Props) {
   // Mantém o último produto em memória para renderizar durante o fechamento
   const [mounted, setMounted] = useState(false);
   const [displayed, setDisplayed] = useState<ProdutoSheet | null>(null);
@@ -587,8 +598,9 @@ export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props
                   </span>
                   <button
                     type="button"
-                    onClick={() => setQuantidade((q) => Math.min(99, q + 1))}
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 text-stone-700 active:bg-stone-100"
+                    onClick={() => setQuantidade((q) => Math.min(quantidadeMax, q + 1))}
+                    disabled={quantidade >= quantidadeMax}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 text-stone-700 disabled:opacity-40 active:bg-stone-100"
                     aria-label="Aumentar"
                   >
                     <Plus className="h-4 w-4" />
@@ -604,7 +616,7 @@ export function ProdutoBottomSheet({ produto, now, onClose, onAddToCart }: Props
                   value={observacao}
                   onChange={(e) => setObservacao(e.target.value)}
                   rows={2}
-                  maxLength={280}
+                  maxLength={observacaoMax}
                   placeholder="Ex: sem cebola, ponto da carne…"
                   className="mt-1.5 w-full resize-none rounded-xl border border-stone-200 px-3 py-2 text-[16px] placeholder:text-stone-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-stone-400"
                 />

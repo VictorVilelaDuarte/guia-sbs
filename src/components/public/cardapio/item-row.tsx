@@ -7,9 +7,11 @@ interface Props {
   produto: Produto & { categoriaNome?: string };
   now: number;
   onClick: () => void;
+  // Unidades já escolhidas no pedido (pedido pela mesa) — mostra um selo.
+  noPedido?: number;
 }
 
-export function ItemRow({ produto, now, onClick }: Props) {
+export function ItemRow({ produto, now, onClick, noPedido = 0 }: Props) {
   const promoAtiva = isPromoAtiva(produto.precoPromo, produto.promoFim, now);
 
   return (
@@ -20,6 +22,11 @@ export function ItemRow({ produto, now, onClick }: Props) {
     >
       <div className="flex-1 min-w-0">
         <p className="text-md font-semibold text-stone-950 leading-snug">
+          {noPedido > 0 && (
+            <span className="mr-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-600 px-1.5 align-[2px] text-[11px] font-bold tabular-nums text-white">
+              {noPedido}
+            </span>
+          )}
           {produto.titulo}
         </p>
         {produto.descricao && (

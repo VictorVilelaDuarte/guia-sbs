@@ -307,14 +307,21 @@ const MAX_QTD_ITEM = 10
 const MAX_PEDIDOS_JANELA = 5 // por mesa, a cada 5 minutos
 const JANELA_MIN = 5
 
+// Mesmo formato do cardápio público (src/components/public/cardapio/types.ts)
+// para a página da mesa reaproveitar lista, destaques e bottom sheet de produto.
 export interface CardapioDaMesa {
   categorias: {
+    id: string
     nome: string
-    itens: {
+    produtos: {
       id: string
       titulo: string
       descricao: string | null
       preco: number | null
+      precoPromo: number | null
+      promoFim: string | null
+      destaque: boolean
+      imagens: string[]
       variacoes: { id: string; nome: string; preco: number }[]
       complementos: { id: string; nome: string; minimo: number; maximo: number; opcoes: { id: string; nome: string; preco: number; quantidadeMax: number }[] }[]
     }[]
@@ -334,12 +341,13 @@ export async function cardapioDaMesa(token: string): Promise<CardapioDaMesa | nu
     where: { comercioId: mesa.comercioId },
     orderBy: { ordem: "asc" },
     select: {
+      id: true,
       nome: true,
       produtos: {
         where: { disponivel: true },
         orderBy: [{ ordem: "asc" }, { titulo: "asc" }],
         select: {
-          id: true, titulo: true, descricao: true, preco: true, precoPromo: true, promoFim: true,
+          id: true, titulo: true, descricao: true, preco: true, precoPromo: true, promoFim: true, destaque: true, imagens: true,
           variacoes: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true } },
           complementos: {
             orderBy: { ordem: "asc" },
@@ -360,19 +368,25 @@ export async function cardapioDaMesa(token: string): Promise<CardapioDaMesa | nu
   return {
     categorias: categorias
       .map((c) => ({
+        id: c.id,
         nome: c.nome,
-        itens: c.produtos
+        produtos: c.produtos
+          // Sem variação e sem preço não dá para pedir (o servidor recusaria).
+          .filter((p) => p.variacoes.length > 0 || precoEfetivo(p) != null)
           .map((p) => ({
             id: p.id,
             titulo: p.titulo,
             descricao: p.descricao,
-            preco: p.variacoes.length > 0 ? null : precoEfetivo(p),
+            preco: p.preco,
+            precoPromo: p.precoPromo,
+            promoFim: p.promoFim?.toISOString() ?? null,
+            destaque: p.destaque,
+            imagens: p.imagens,
             variacoes: p.variacoes,
             complementos: p.complementos.map((c) => c.grupo).filter((g) => g.opcoes.length > 0),
-          }))
-          .filter((i) => i.variacoes.length > 0 || i.preco != null),
+          })),
       }))
-      .filter((c) => c.itens.length > 0),
+      .filter((c) => c.produtos.length > 0),
   }
 }
 
