@@ -46,7 +46,7 @@ async function totaisJanela(
   }
 }
 
-async function totaisPeriodo(comercioId: string, dias: number): Promise<TotaisPeriodo> {
+export async function totaisPeriodo(comercioId: string, dias: number): Promise<TotaisPeriodo> {
   const [atual, anterior] = await Promise.all([
     totaisJanela(comercioId, diasAtras(dias)),
     totaisJanela(comercioId, diasAtras(dias * 2), diasAtras(dias)),

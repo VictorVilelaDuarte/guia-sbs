@@ -13,15 +13,10 @@ import {
   type TotaisPeriodo,
   type Origem,
 } from "@/lib/analytics/types";
+import Link from "next/link";
+import { passosCompletude, type PerfilCompletude } from "@/lib/painel/completude";
 
-export interface PerfilCompletude {
-  fotos: number;
-  temDescricao: boolean;
-  produtos: number;
-  tags: number;
-  temHorarios: boolean;
-  temLogo: boolean;
-}
+export type { PerfilCompletude };
 
 interface Props {
   data: AnalyticsResumo;
@@ -187,14 +182,7 @@ function Funil({ funil }: { funil: AnalyticsResumo["funil"] }) {
 }
 
 function Completude({ perfil }: { perfil: PerfilCompletude }) {
-  const dicas = [
-    { ok: perfil.temLogo, texto: "Adicione uma logo" },
-    { ok: perfil.fotos >= 3, texto: `Tenha pelo menos 3 fotos (você tem ${perfil.fotos})` },
-    { ok: perfil.temDescricao, texto: "Escreva uma descrição do seu negócio" },
-    { ok: perfil.temHorarios, texto: "Cadastre seus horários de funcionamento" },
-    { ok: perfil.tags >= 3, texto: `Cadastre 3+ palavras-chave (você tem ${perfil.tags})` },
-    { ok: perfil.produtos >= 1, texto: "Cadastre produtos, serviços ou cardápio" },
-  ];
+  const dicas = passosCompletude(perfil);
   const feitas = dicas.filter((d) => d.ok).length;
   return (
     <div>
@@ -203,15 +191,17 @@ function Completude({ perfil }: { perfil: PerfilCompletude }) {
       </p>
       <div className="space-y-2">
         {dicas.map((d) => (
-          <div key={d.texto} className="flex items-center gap-2 text-sm">
+          <div key={d.id} className="flex items-center gap-2 text-sm">
             {d.ok ? (
               <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
             ) : (
               <Circle className="h-4 w-4 text-muted-foreground/40 shrink-0" />
             )}
-            <span className={cn(d.ok ? "text-muted-foreground line-through" : "text-foreground")}>
-              {d.texto}
-            </span>
+            {d.ok ? (
+              <span className="text-muted-foreground line-through">{d.texto}</span>
+            ) : (
+              <Link href={d.href} className="text-foreground hover:underline">{d.texto}</Link>
+            )}
           </div>
         ))}
       </div>

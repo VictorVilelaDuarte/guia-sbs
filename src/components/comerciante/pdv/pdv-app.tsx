@@ -421,7 +421,7 @@ export function PdvApp(props: Props) {
   function fecharPdv() {
     // Só fecha abas abertas por script; aberta por link, volta ao painel.
     window.close()
-    setTimeout(() => (window.location.href = "/comerciante/gestao"), 150)
+    setTimeout(() => (window.location.href = "/comerciante"), 150)
   }
 
   // ---- linha em edição

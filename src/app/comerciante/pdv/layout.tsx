@@ -45,7 +45,7 @@ export default async function PdvLayout({ children }: { children: React.ReactNod
                 ? "Seu papel neste comércio não registra vendas."
                 : "O PDV (vendas de balcão, telefone e comandas) está disponível no plano Premium — fale com a equipe do guia para liberar."}
             </p>
-            <Link href="/comerciante/gestao" className="inline-block text-sm font-medium underline">Voltar ao painel</Link>
+            <Link href="/comerciante" className="inline-block text-sm font-medium underline">Voltar ao painel</Link>
           </div>
         </div>
       ) : (

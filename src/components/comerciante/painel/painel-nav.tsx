@@ -72,7 +72,7 @@ interface GrupoMenu {
 const GRUPOS: GrupoMenu[] = [
   {
     titulo: null,
-    itens: [{ id: "inicio", label: "Início", icon: Home, destino: { tipo: "rota", href: "/comerciante/gestao" } }],
+    itens: [{ id: "inicio", label: "Início", icon: Home, destino: { tipo: "rota", href: "/comerciante" } }],
   },
   {
     titulo: "Operação",
@@ -271,7 +271,8 @@ function useItemAtivo(): string | null {
   for (const i of GRUPOS.flatMap((g) => g.itens)) {
     if (i.destino.tipo !== "rota") continue
     const href = i.destino.href
-    const casa = href === "/comerciante/gestao" ? pathname === href : pathname === href || pathname.startsWith(href + "/")
+    // Início (/comerciante) é prefixo de tudo: só acende na própria página.
+    const casa = href === "/comerciante" ? pathname === href : pathname === href || pathname.startsWith(href + "/")
     if (casa && (!melhor || href.length > (melhor.destino as { href: string }).href.length)) melhor = i
   }
   return melhor?.id ?? null

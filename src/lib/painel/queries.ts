@@ -2,10 +2,10 @@ import { cache } from "react"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, permissoesCtx, vinculosValidos } from "@/lib/comercio-ctx"
-import { getAnalyticsResumo } from "@/lib/analytics/queries"
+import { getAnalyticsResumo, totaisPeriodo } from "@/lib/analytics/queries"
+import type { PerfilCompletude } from "@/lib/painel/completude"
 import { pedidoAdminInclude, serializarPedidoAdmin } from "@/lib/pedidos-serializar"
 import { paraNumero } from "@/lib/dinheiro"
-import { contagemClientes } from "@/lib/gestao/clientes-dados"
 import type {
   PedidoAdmin,
   PedidoConfigData,
@@ -89,26 +89,33 @@ export function getHospedagemPerfil(comercioId: string) {
   return prisma.hospedagemPerfil.findUnique({ where: { comercioId } })
 }
 
-// Visitas da vitrine + o que alimenta o box "Melhore seus números" (completude).
-export async function getVisitasData(comercioId: string) {
-  const [analytics, comercio, fotos, tags, produtos] = await Promise.all([
-    getAnalyticsResumo(comercioId),
-    prisma.comercio.findUnique({ where: { id: comercioId }, select: { descricao: true, horarios: true, logo: true } }),
+// Fatos da checklist "Complete seu perfil" (src/lib/painel/completude.ts).
+async function perfilCompletude(comercioId: string): Promise<PerfilCompletude> {
+  const [comercio, fotos, tags, produtos] = await Promise.all([
+    prisma.comercio.findUnique({
+      where: { id: comercioId },
+      select: { descricao: true, horarios: true, logo: true, lat: true, lng: true, whatsapp: true },
+    }),
     prisma.foto.count({ where: { comercioId } }),
     prisma.tag.count({ where: { comercioId } }),
     prisma.produto.count({ where: { comercioId } }),
   ])
   return {
-    analytics,
-    perfil: {
-      fotos,
-      temDescricao: !!comercio?.descricao,
-      produtos,
-      tags,
-      temHorarios: !!comercio?.horarios,
-      temLogo: !!comercio?.logo,
-    },
+    fotos,
+    temDescricao: !!comercio?.descricao,
+    produtos,
+    tags,
+    temHorarios: !!comercio?.horarios,
+    temLogo: !!comercio?.logo,
+    temMapa: comercio?.lat != null && comercio?.lng != null,
+    temWhatsapp: !!comercio?.whatsapp,
   }
+}
+
+// Visitas da vitrine + o que alimenta o box "Melhore seus números" (completude).
+export async function getVisitasData(comercioId: string) {
+  const [analytics, perfil] = await Promise.all([getAnalyticsResumo(comercioId), perfilCompletude(comercioId)])
+  return { analytics, perfil }
 }
 
 // --- Gestão: cardápio ----------------------------------------------------------
@@ -234,58 +241,35 @@ export interface ResumoPedidosHoje {
 
 // opts.pedidos: fila de pedidos online (aguardando/andamento/aceite).
 // opts.vendas: números do dia (pedidos online + venda manual de balcão/telefone).
-export async function getResumoData(comercioId: string, opts: { pedidos: boolean; vendas?: boolean }) {
-  const [aguardando, andamento, hoje, config, itensCardapio, indisponiveis, catalogo, quartos, membrosAtivos, clientes, comandasAbertas] =
-    await Promise.all([
-      opts.pedidos
-        ? prisma.pedido.count({ where: { comercioId, status: "AGUARDANDO" } })
-        : 0,
-      opts.pedidos
-        ? prisma.pedido.count({
-            where: {
-              comercioId,
-              status: { in: ["ACEITO", "EM_PREPARO", "PRONTO", "SAIU_ENTREGA"] },
-            },
-          })
-        : 0,
-      opts.pedidos || opts.vendas ? pedidosHoje(comercioId) : null,
-      opts.pedidos
-        ? prisma.pedidoConfig.findUnique({
-            where: { comercioId },
-            select: { aceitaPedidos: true },
-          })
-        : null,
-      prisma.produto.count({ where: { comercioId, categoriaCardapioId: { not: null } } }),
-      prisma.produto.count({
-        where: { comercioId, categoriaCardapioId: { not: null }, disponivel: false },
-      }),
-      prisma.produto.groupBy({
-        by: ["tipo"],
-        where: { comercioId, categoriaCardapioId: null },
-        _count: { _all: true },
-      }),
-      prisma.tipoQuarto.count({ where: { comercioId, ativo: true } }),
-      prisma.comercioMembro.count({ where: { comercioId, ativo: true } }),
-      contagemClientes(comercioId),
-      opts.vendas ? prisma.pedido.count({ where: { comercioId, origem: "COMANDA", status: "ABERTA" } }) : 0,
-    ])
-
-  const porTipo = (tipo: "PRODUTO" | "SERVICO") =>
-    catalogo.find((g) => g.tipo === tipo)?._count._all ?? 0
-
+// Início do painel (/comerciante): cada bloco só é buscado se o cartão
+// correspondente aparece para esta loja e este papel.
+export async function getInicioData(
+  comercioId: string,
+  opts: { pedidos: boolean; vendas: boolean; cardapio: boolean; visitas: boolean; perfil: boolean },
+) {
+  const [aguardando, andamento, hoje, config, indisponiveis, comandasAbertas, visitas, perfil] = await Promise.all([
+    opts.pedidos ? prisma.pedido.count({ where: { comercioId, status: "AGUARDANDO" } }) : 0,
+    opts.pedidos
+      ? prisma.pedido.count({ where: { comercioId, status: { in: ["ACEITO", "EM_PREPARO", "PRONTO", "SAIU_ENTREGA"] } } })
+      : 0,
+    opts.pedidos || opts.vendas ? pedidosHoje(comercioId) : null,
+    opts.pedidos ? prisma.pedidoConfig.findUnique({ where: { comercioId }, select: { aceitaPedidos: true } }) : null,
+    opts.cardapio
+      ? prisma.produto.count({ where: { comercioId, categoriaCardapioId: { not: null }, disponivel: false } })
+      : 0,
+    opts.vendas ? prisma.pedido.count({ where: { comercioId, origem: "COMANDA", status: "ABERTA" } }) : 0,
+    opts.visitas ? totaisPeriodo(comercioId, 7) : null,
+    opts.perfil ? perfilCompletude(comercioId) : null,
+  ])
   return {
     aguardando,
     andamento,
     hoje,
     aceitaPedidos: config?.aceitaPedidos ?? false,
-    itensCardapio,
     indisponiveis,
-    produtos: porTipo("PRODUTO"),
-    servicos: porTipo("SERVICO"),
-    quartos,
-    membrosAtivos,
-    clientes,
     comandasAbertas,
+    visitas,
+    perfil,
   }
 }
 
