@@ -10,7 +10,8 @@
 | Hospedagem | Vercel, projeto `guia-sbs` (time `vvictor-projects`) |
 | Produção | `https://guia-sbs.vercel.app` (sem domínio próprio) |
 | Publicação | **Automática a cada push na `main`** |
-| Banco | Supabase — **o mesmo do `.env` local** (pooler 6543) |
+| Banco | Supabase — **o mesmo do `.env` local** (pooler 6543), região `sa-east-1` (São Paulo) |
+| Região das funções | `gru1` (São Paulo), fixada em `vercel.json` — **junto do banco**. Na padrão (`iad1`, EUA) cada consulta cruzava o continente e a vitrine levava ~3 s; em `gru1`, ~0,2 s |
 
 **Não existe ambiente de desenvolvimento separado.** O `.env` local aponta para o banco de
 produção, onde convivem a loja real (`Chão Bento`), a demo (`Cantinho da Serra`) e os
