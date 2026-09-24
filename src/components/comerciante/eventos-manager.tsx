@@ -280,7 +280,7 @@ function EventoDialog({ open, evento, onClose, onSaved }: EventoDialogProps) {
               placeholder="Detalhes do evento, programação, atrações..."
               value={f.descricao}
               onChange={set("descricao")}
-              className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
           </div>
 

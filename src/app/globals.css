@@ -30,6 +30,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
+  --color-placeholder: var(--placeholder);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
@@ -51,6 +52,9 @@
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+  /* Placeholder bem mais claro que o texto digitado — com o muted-foreground
+     escurecido (contraste sobre o bege), o placeholder parecia campo preenchido. */
+  --placeholder: oklch(0.65 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -89,6 +93,7 @@
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
+  --placeholder: oklch(0.55 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
@@ -123,6 +128,12 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  /* Campo sem classe de placeholder própria (inputs crus do painel, PDV, admin). */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--placeholder);
+    opacity: 1;
   }
   body {
     @apply bg-background text-foreground;

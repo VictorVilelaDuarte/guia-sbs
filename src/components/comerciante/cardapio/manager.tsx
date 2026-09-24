@@ -243,7 +243,7 @@ export function CardapioManager({
             placeholder="Buscar item ou categoria..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full h-9 rounded-md border border-input bg-background pl-8 pr-8 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full h-9 rounded-md border border-input bg-background pl-8 pr-8 text-sm placeholder:text-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           {busca && (
             <button

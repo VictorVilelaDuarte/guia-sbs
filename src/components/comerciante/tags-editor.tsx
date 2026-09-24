@@ -144,7 +144,7 @@ export function TagsEditor({ tagsIniciais, limite }: TagsEditorProps) {
                 ? "Digite uma palavra-chave e pressione Enter..."
                 : ""
             }
-            className="flex-1 min-w-32 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+            className="flex-1 min-w-32 text-sm bg-transparent outline-none placeholder:text-placeholder"
           />
         )}
 

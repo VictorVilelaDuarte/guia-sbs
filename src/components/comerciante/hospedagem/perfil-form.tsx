@@ -172,7 +172,7 @@ export function PerfilForm({ perfilInicial }: { perfilInicial: HospedagemPerfilD
             placeholder="Ex: Cancelamento gratuito até 7 dias antes do check-in."
             value={form.politicaCancelamento ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, politicaCancelamento: e.target.value }))}
-            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
 
@@ -185,7 +185,7 @@ export function PerfilForm({ perfilInicial }: { perfilInicial: HospedagemPerfilD
             placeholder="Outras regras da casa..."
             value={form.observacoes ?? ""}
             onChange={(e) => setForm((f) => ({ ...f, observacoes: e.target.value }))}
-            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
       </div>
