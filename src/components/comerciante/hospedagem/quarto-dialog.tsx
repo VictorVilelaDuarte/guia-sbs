@@ -13,6 +13,8 @@ import { COMODIDADES, GRUPO_LABEL, type GrupoComodidade } from "@/lib/hospedagem
 import { formatPreco, parsePreco } from "@/components/comerciante/cardapio/utils"
 import { ComodidadeIcon } from "./comodidade-icons"
 import type { TipoQuartoData } from "./types"
+import { useRecorteQuadrado } from "@/components/imagem/recorte-quadrado"
+import { ACCEPT_IMAGENS, ehImagem } from "@/lib/imagem/heic"
 
 const MAX_FOTOS = 8
 const GRUPOS: GrupoComodidade[] = ["geral", "quarto", "lazer", "vista", "acessibilidade"]
@@ -45,6 +47,7 @@ export function QuartoDialog({
   const isEdicao = !!quarto
   const [form, setForm] = useState<FormState>(EMPTY)
   const [uploading, setUploading] = useState(false)
+  const { recortar, cropper } = useRecorteQuadrado()
   const [saving, setSaving] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -80,25 +83,12 @@ export function QuartoDialog({
   async function processFiles(rawFiles: File[]) {
     const slots = MAX_FOTOS - form.fotos.length
     if (slots <= 0) return
-    const toProcess = rawFiles.slice(0, slots)
+    // Recorte quadrado antes do upload (também converte HEIC).
+    const toProcess = await recortar(rawFiles.slice(0, slots))
+    if (toProcess.length === 0) return
     setUploading(true)
     const uploaded: string[] = []
-    for (const rawFile of toProcess) {
-      let file = rawFile
-      const isHeic = file.type === "image/heic" || file.type === "image/heif" ||
-        file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif")
-      if (isHeic) {
-        try {
-          // import dinâmico: heic2any acessa window na carga do módulo e quebra o SSR
-          const { default: heic2any } = await import("heic2any")
-          const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })
-          const blob = Array.isArray(converted) ? converted[0] : converted
-          file = new File([blob], file.name.replace(/\.hei[cf]$/i, ".jpg"), { type: "image/jpeg" })
-        } catch {
-          toast.error(`Não foi possível converter "${file.name}".`)
-          continue
-        }
-      }
+    for (const file of toProcess) {
       const fd = new FormData()
       fd.append("file", file)
       fd.append("tipo", "quarto")
@@ -123,7 +113,7 @@ export function QuartoDialog({
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setIsDragging(false)
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || /\.hei[cf]$/i.test(f.name))
+    const files = Array.from(e.dataTransfer.files).filter(ehImagem)
     if (files.length > 0) processFiles(files)
   }
 
@@ -159,6 +149,7 @@ export function QuartoDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -200,7 +191,7 @@ export function QuartoDialog({
                 </div>
               )}
             </div>
-            <input ref={fileRef} type="file" multiple={slotsRestantes > 1} accept="image/jpeg,image/png,image/webp,image/heic,image/heif" className="hidden" onChange={handleImageChange} />
+            <input ref={fileRef} type="file" multiple={slotsRestantes > 1} accept={ACCEPT_IMAGENS} className="hidden" onChange={handleImageChange} />
           </div>
 
           {/* Nome */}
@@ -284,5 +275,7 @@ export function QuartoDialog({
         </form>
       </DialogContent>
     </Dialog>
+    {cropper}
+    </>
   )
 }

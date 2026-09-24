@@ -52,7 +52,7 @@ export function Events({ eventos }: Props) {
                 href={`/vitrine/${e.comercioSlug}?src=home_eventos`}
                 className="press shadow-card"
                 style={{
-                  width: 280,
+                  width: 240,
                   borderRadius: 24,
                   overflow: "hidden",
                   position: "relative",
@@ -60,12 +60,12 @@ export function Events({ eventos }: Props) {
                   display: "block",
                   textDecoration: "none",
                   flexShrink: 0,
-                  aspectRatio: "4/3",
+                  aspectRatio: "1/1",
                 }}
               >
                 {e.imagem ? (
                   <div style={{ position: "absolute", inset: 0 }}>
-                    <Image src={e.imagem} alt={`${e.titulo} — evento em São Bento do Sapucaí`} fill className="object-cover" sizes="280px" />
+                    <Image src={e.imagem} alt={`${e.titulo} — evento em São Bento do Sapucaí`} fill className="object-cover" sizes="240px" />
                   </div>
                 ) : (
                   <div style={{ position: "absolute", inset: 0 }}>

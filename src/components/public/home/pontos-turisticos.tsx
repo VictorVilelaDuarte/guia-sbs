@@ -102,11 +102,11 @@ export function PontosTuristicos({ pontos }: Props) {
                 href={`/pontos-turisticos/${p.slug}`}
                 className="press"
                 style={{
-                  width: 158,
+                  width: 170,
                   borderRadius: 20,
                   overflow: "hidden",
                   position: "relative",
-                  aspectRatio: "3/4",
+                  aspectRatio: "1/1",
                   display: "block",
                   textDecoration: "none",
                 }}
@@ -118,7 +118,7 @@ export function PontosTuristicos({ pontos }: Props) {
                       alt={`${p.nome} — ponto turístico em São Bento do Sapucaí`}
                       fill
                       className="object-cover"
-                      sizes="158px"
+                      sizes="170px"
                     />
                   </div>
                 ) : (

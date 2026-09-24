@@ -227,7 +227,7 @@ export default async function PontosTuristicosPage({
                 style={{ background: "#fff" }}
               >
                 {/* Foto */}
-                <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+                <div className="relative aspect-square overflow-hidden bg-muted">
                   {p.fotos[0] ? (
                     <Image
                       src={p.fotos[0]}

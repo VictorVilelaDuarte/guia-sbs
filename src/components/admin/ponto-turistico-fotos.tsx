@@ -5,6 +5,8 @@ import Image from "next/image"
 import { toast } from "sonner"
 import { Loader2, ImagePlus, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useRecorteQuadrado } from "@/components/imagem/recorte-quadrado"
+import { ACCEPT_IMAGENS, ehImagem } from "@/lib/imagem/heic"
 
 const MAX_FOTOS = 8
 
@@ -19,35 +21,18 @@ export function PontoTuristicoFotos({ pontoId, fotosIniciais }: Props) {
   const [isDragging, setIsDragging] = useState(false)
   const [deletando, setDeletando] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const { recortar, cropper } = useRecorteQuadrado()
 
   const slotsLivres = MAX_FOTOS - fotos.length
 
   async function processFiles(rawFiles: File[]) {
     if (slotsLivres <= 0) return
-    const toProcess = rawFiles.slice(0, slotsLivres)
+    // Recorte quadrado antes do upload (também converte HEIC).
+    const toProcess = await recortar(rawFiles.slice(0, slotsLivres))
+    if (toProcess.length === 0) return
     setUploading(true)
 
-    for (const rawFile of toProcess) {
-      let file = rawFile
-
-      const isHeic =
-        file.type === "image/heic" ||
-        file.type === "image/heif" ||
-        file.name.toLowerCase().endsWith(".heic") ||
-        file.name.toLowerCase().endsWith(".heif")
-
-      if (isHeic) {
-        try {
-          const { default: heic2any } = await import("heic2any")
-          const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })
-          const blob = Array.isArray(converted) ? converted[0] : converted
-          file = new File([blob], file.name.replace(/\.hei[cf]$/i, ".jpg"), { type: "image/jpeg" })
-        } catch {
-          toast.error(`Não foi possível converter "${file.name}".`)
-          continue
-        }
-      }
-
+    for (const file of toProcess) {
       const fd = new FormData()
       fd.append("file", file)
       const res = await fetch(`/api/admin/pontos-turisticos/${pontoId}/fotos`, {
@@ -87,9 +72,7 @@ export function PontoTuristicoFotos({ pontoId, fotosIniciais }: Props) {
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setIsDragging(false)
-    const files = Array.from(e.dataTransfer.files).filter(
-      (f) => f.type.startsWith("image/") || /\.hei[cf]$/i.test(f.name),
-    )
+    const files = Array.from(e.dataTransfer.files).filter(ehImagem)
     if (files.length > 0) processFiles(files)
   }
 
@@ -172,11 +155,12 @@ export function PontoTuristicoFotos({ pontoId, fotosIniciais }: Props) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+        accept={ACCEPT_IMAGENS}
         multiple={slotsLivres > 1}
         className="hidden"
         onChange={handleFileChange}
       />
+      {cropper}
     </div>
   )
 }

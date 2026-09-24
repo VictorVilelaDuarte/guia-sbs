@@ -33,7 +33,7 @@ export function CardComercio({ item: c, categoriaFiltro }: Props) {
       className="group rounded-2xl overflow-hidden block shadow-soft hover:-translate-y-0.5 transition-transform"
       style={{ background: "#fff" }}
     >
-      <div className="relative aspect-4/3 overflow-hidden bg-muted">
+      <div className="relative aspect-square overflow-hidden bg-muted">
         {coverUrl ? (
           <Image
             src={coverUrl}

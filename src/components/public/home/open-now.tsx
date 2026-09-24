@@ -128,7 +128,7 @@ export function OpenNow({ items }: { items: ComercioAberto[] }) {
               href={`/vitrine/${it.slug}?src=home_abertos`}
               className="press shadow-card"
               style={{
-                width: 248,
+                width: 200,
                 background: "#FBF7EE",
                 borderRadius: 22,
                 overflow: "hidden",
@@ -145,7 +145,7 @@ export function OpenNow({ items }: { items: ComercioAberto[] }) {
                     style={{
                       position: "relative",
                       width: "100%",
-                      aspectRatio: "5/3",
+                      aspectRatio: "1/1",
                       overflow: "hidden",
                       background: "#e8ddc8",
                     }}
@@ -155,14 +155,14 @@ export function OpenNow({ items }: { items: ComercioAberto[] }) {
                       alt={`${it.nome} em São Bento do Sapucaí`}
                       fill
                       className="object-cover"
-                      sizes="248px"
+                      sizes="200px"
                     />
                   </div>
                 ) : (
                   <PhotoPH
                     palette={palette(it.slug)}
                     label={it.slug}
-                    ratio="5/3"
+                    ratio="1/1"
                   />
                 )}
 

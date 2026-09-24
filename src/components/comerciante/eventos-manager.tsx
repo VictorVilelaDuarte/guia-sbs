@@ -14,6 +14,8 @@ import {
   CalendarDays, MapPin, Link as LinkIcon, Ticket,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useRecorteQuadrado } from "@/components/imagem/recorte-quadrado"
+import { ACCEPT_IMAGENS } from "@/lib/imagem/heic"
 
 export interface Evento {
   id:          string
@@ -98,6 +100,7 @@ function EventoDialog({ open, evento, onClose, onSaved }: EventoDialogProps) {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const { recortar, cropper } = useRecorteQuadrado()
 
   function handleOpenChange(isOpen: boolean) {
     if (isOpen) {
@@ -119,7 +122,11 @@ function EventoDialog({ open, evento, onClose, onSaved }: EventoDialogProps) {
   }
 
   async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+    const original = e.target.files?.[0]
+    e.target.value = ""
+    if (!original) return
+    // Recorte quadrado antes do upload (também converte HEIC).
+    const [file] = await recortar([original])
     if (!file) return
     const fd = new FormData()
     fd.append("file", file)
@@ -130,7 +137,6 @@ function EventoDialog({ open, evento, onClose, onSaved }: EventoDialogProps) {
     if (!res.ok) { toast.error("Erro ao enviar imagem."); return }
     const { url } = await res.json()
     setForm((f) => ({ ...f, imagem: url }))
-    e.target.value = ""
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -178,6 +184,7 @@ function EventoDialog({ open, evento, onClose, onSaved }: EventoDialogProps) {
     setForm((prev) => ({ ...prev, [key]: e.target.value }))
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -187,17 +194,16 @@ function EventoDialog({ open, evento, onClose, onSaved }: EventoDialogProps) {
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           {/* Imagem */}
           <div className="space-y-2">
-            <Label>Banner <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            <Label>Imagem <span className="text-muted-foreground font-normal">(opcional)</span></Label>
             <div
               className={cn(
-                "relative flex items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted/30 overflow-hidden cursor-pointer transition-colors hover:bg-muted/50",
-                f.imagem ? "h-36" : "h-24"
+                "relative flex aspect-square w-36 items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted/30 overflow-hidden cursor-pointer transition-colors hover:bg-muted/50",
               )}
               onClick={() => fileRef.current?.click()}
             >
               {f.imagem ? (
                 <>
-                  <Image src={f.imagem} alt="Banner" fill className="object-cover" />
+                  <Image src={f.imagem} alt="Imagem do evento" fill className="object-cover" />
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setForm((p) => ({ ...p, imagem: null })) }}
@@ -211,11 +217,11 @@ function EventoDialog({ open, evento, onClose, onSaved }: EventoDialogProps) {
               ) : (
                 <div className="flex flex-col items-center gap-1 text-muted-foreground">
                   <ImagePlus className="h-5 w-5" />
-                  <span className="text-xs">Adicionar banner</span>
+                  <span className="text-xs">Adicionar imagem</span>
                 </div>
               )}
             </div>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleImageChange} />
+            <input ref={fileRef} type="file" accept={ACCEPT_IMAGENS} className="hidden" onChange={handleImageChange} />
           </div>
 
           {/* Título */}
@@ -288,6 +294,8 @@ function EventoDialog({ open, evento, onClose, onSaved }: EventoDialogProps) {
         </form>
       </DialogContent>
     </Dialog>
+    {cropper}
+    </>
   )
 }
 
@@ -307,9 +315,9 @@ function EventoCard({
   const passado = isPast(evento.dataInicio)
 
   return (
-    <div className={cn("rounded-lg border border-input bg-background overflow-hidden", passado && "opacity-60")}>
+    <div className={cn("flex rounded-lg border border-input bg-background overflow-hidden", passado && "opacity-60")}>
       {evento.imagem && (
-        <div className="relative h-28 w-full">
+        <div className="relative aspect-square w-28 shrink-0 self-start">
           <Image src={evento.imagem} alt={evento.titulo} fill className="object-cover" />
           {passado && (
             <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
@@ -319,7 +327,7 @@ function EventoCard({
         </div>
       )}
 
-      <div className="p-3 space-y-2">
+      <div className="min-w-0 flex-1 p-3 space-y-2">
         <div className="flex items-start justify-between gap-2">
           <p className="text-sm font-semibold leading-tight">{evento.titulo}</p>
           <div className="flex gap-1 shrink-0">

@@ -44,14 +44,14 @@ export function SecaoEventos({ eventos, trackComercioId }: Props) {
             const card = (
               <div
                 key={evento.id}
-                className={`rounded-xl border border-border overflow-hidden ${encerrado ? "opacity-60" : ""}`}
+                className={`flex rounded-xl border border-border overflow-hidden ${encerrado ? "opacity-60" : ""}`}
               >
                 {evento.imagem && (
-                  <div className="relative h-36 w-full">
-                    <Image src={evento.imagem} alt={evento.titulo} fill className="object-cover" />
+                  <div className="relative aspect-square w-28 shrink-0 self-start">
+                    <Image src={evento.imagem} alt={evento.titulo} fill sizes="112px" className="object-cover" />
                   </div>
                 )}
-                <div className="p-3 space-y-1">
+                <div className="min-w-0 flex-1 p-3 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                       <Calendar className="h-3 w-3" />

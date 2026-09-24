@@ -306,6 +306,8 @@ Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, 
 **Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload fora do painel (ex.: `LogoUploader` em `/admin/comercios/[id]`), inclui `comercioId` no formData e a rota só confere que o comércio existe. Sem `comercioId`, resolve via `getComercioCtx()` — cobre tanto o comerciante no próprio painel quanto o admin no painel de gestão (cookie `admin_comercio_id`).
 
 **heic2any só com import dinâmico:** o módulo executa `window.__heic2any__worker = new Worker(...)` na carga — import estático num Client Component quebra o SSR do build de produção com `ReferenceError: window is not defined` (o `next dev` **não** acusa; só `next start`). Sempre `const { default: heic2any } = await import("heic2any")` dentro da função de conversão.
+**Toda imagem cadastrada é quadrada (1:1).** O recorte acontece no navegador, antes do upload, pelo hook `useRecorteQuadrado()` (`src/components/imagem/recorte-quadrado.tsx`, com `react-easy-crop`): `const prontos = await recortar(arquivos)` converte HEIC, abre o cropper para cada arquivo (fila "1 de N", com "Pular esta") e devolve os arquivos já quadrados — máx. 1600 px, JPEG com fundo branco. A logo usa `preservarTransparencia` (PNG/WebP sai PNG). Usado na logo, fotos da vitrine, produto/cardápio, eventos, quartos e fotos de pontos turísticos. **Ponto de upload novo deve passar por esse hook** (e usar `ACCEPT_IMAGENS`/`ehImagem` de `src/lib/imagem/heic.ts`). Nas telas, foto de conteúdo é exibida em quadrado (`aspect-square` + `object-cover`); só heros de largura total seguem largos. O servidor não confere a proporção.
+
 
 **Upload de fotos de produtos (cardápio):** o componente `produto-dialog.tsx` suporta múltiplos arquivos simultâneos, drag-and-drop e conversão de HEIC/HEIF para JPEG antes do envio (via `heic2any`). A detecção de HEIC usa tanto o MIME type quanto a extensão do arquivo (iOS Safari às vezes omite o MIME type). A quantidade máxima de slots disponíveis (`MAX_IMAGENS - imagens.length`) limita dinamicamente tanto o seletor de arquivos (`multiple` é `false` quando só resta 1 slot) quanto o drop handler.
 
@@ -395,7 +397,7 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 
 `src/components/public/galeria-fotos.tsx` — carrossel horizontal com lightbox fullscreen.
 
-- Carrossel: `overflow-x-auto -mx-4 px-4` (mesma convenção do CTA strip — sem `snap-*`, pois o snap quebra o alinhamento com o padding). **Não adicione snap classes aqui.**
+- Carrossel de miniaturas quadradas (`h-52 w-52`): `overflow-x-auto -mx-4 px-4` (mesma convenção do CTA strip — sem `snap-*`, pois o snap quebra o alinhamento com o padding). **Não adicione snap classes aqui.**
 - Lightbox: pinch-to-zoom via listener `touchmove` não-passivo (`{ passive: false }` + `e.preventDefault()`). Refs espelham state para evitar stale closures em event listeners DOM.
 - Todas as cores do lightbox são `rgba()` inline — classes Tailwind de opacidade (`text-white/70`, `bg-black/40`) não funcionam em alguns browsers móveis.
 - `key={indice}` no componente `<Lightbox>` reseta zoom/pan ao trocar foto sem useEffect.

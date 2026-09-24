@@ -68,7 +68,7 @@ function ItemCard({ item, now, onClick }: { item: Item; now: number; onClick: ()
       onClick={onClick}
       className="flex flex-col rounded-2xl overflow-hidden bg-white shadow-sm text-left active:scale-[0.97] transition-transform w-full"
     >
-      <div className="relative w-full bg-stone-100" style={{ aspectRatio: "4/3" }}>
+      <div className="relative aspect-square w-full bg-stone-100">
         {item.imagens[0] ? (
           <Image
             src={item.imagens[0]}

@@ -22,7 +22,7 @@ export function DestaqueCard({ produto, now, onClick }: Props) {
       onClick={onClick}
       className="shrink-0 w-44 rounded-2xl overflow-hidden bg-white shadow-sm text-left active:scale-[0.97] flex flex-col justify-between transition-transform"
     >
-      <div className="relative h-36 w-full bg-stone-100">
+      <div className="relative aspect-square w-full bg-stone-100">
         {produto.imagens[0] && (
           <Image
             src={produto.imagens[0]}

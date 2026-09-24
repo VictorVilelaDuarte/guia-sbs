@@ -5,6 +5,8 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Loader2, Plus, X, Lock } from "lucide-react"
+import { useRecorteQuadrado } from "@/components/imagem/recorte-quadrado"
+import { ACCEPT_IMAGENS } from "@/lib/imagem/heic"
 
 interface Foto {
   id: string
@@ -22,17 +24,19 @@ export function FotosUploader({ fotosIniciais, limite }: FotosUploaderProps) {
   const [uploading, setUploading] = useState(false)
   const [removendo, setRemovendo] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const { recortar, cropper } = useRecorteQuadrado()
 
   const atingiuLimite = limite !== undefined && fotos.length >= limite
 
   async function handleFiles(files: FileList) {
     const disponivel = limite !== undefined ? limite - fotos.length : Infinity
-    const arquivos = Array.from(files).slice(0, disponivel)
+    const selecionados = Array.from(files).slice(0, disponivel)
 
-    if (arquivos.length < files.length) {
+    if (selecionados.length < files.length) {
       toast.warning(`Limite de ${limite} fotos atingido. Faça upgrade para o plano Premium.`)
     }
 
+    const arquivos = await recortar(selecionados)
     if (arquivos.length === 0) return
 
     setUploading(true)
@@ -87,7 +91,7 @@ export function FotosUploader({ fotosIniciais, limite }: FotosUploaderProps) {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {fotos.map((foto) => (
-          <div key={foto.id} className="group relative aspect-video rounded-lg overflow-hidden border border-input bg-muted">
+          <div key={foto.id} className="group relative aspect-square rounded-lg overflow-hidden border border-input bg-muted">
             <Image src={foto.url} alt={foto.alt ?? "Foto do comércio"} fill className="object-cover" />
             <button
               type="button"
@@ -105,7 +109,7 @@ export function FotosUploader({ fotosIniciais, limite }: FotosUploaderProps) {
         ))}
 
         {atingiuLimite ? (
-          <div className="flex aspect-video flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-input bg-muted/50 text-muted-foreground/60">
+          <div className="flex aspect-square flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-input bg-muted/50 text-muted-foreground/60">
             <Lock className="h-4 w-4" />
             <span className="text-[11px] text-center leading-tight px-2">Premium para mais fotos</span>
           </div>
@@ -114,7 +118,7 @@ export function FotosUploader({ fotosIniciais, limite }: FotosUploaderProps) {
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="flex aspect-video items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted hover:border-ring transition-colors disabled:opacity-50"
+            className="flex aspect-square items-center justify-center rounded-lg border-2 border-dashed border-input bg-muted hover:border-ring transition-colors disabled:opacity-50"
           >
             {uploading ? (
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -127,7 +131,7 @@ export function FotosUploader({ fotosIniciais, limite }: FotosUploaderProps) {
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          JPEG, PNG ou WebP · máx. 5MB por foto · pode selecionar várias de uma vez
+          JPEG, PNG, WebP ou HEIC · recortadas em quadrado · pode selecionar várias de uma vez
         </p>
         {limite !== undefined && (
           <p className={`text-xs font-medium ${atingiuLimite ? "text-amber-600" : "text-muted-foreground"}`}>
@@ -139,7 +143,7 @@ export function FotosUploader({ fotosIniciais, limite }: FotosUploaderProps) {
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept={ACCEPT_IMAGENS}
         multiple
         className="hidden"
         onChange={(e) => {
@@ -147,6 +151,7 @@ export function FotosUploader({ fotosIniciais, limite }: FotosUploaderProps) {
           e.target.value = ""
         }}
       />
+      {cropper}
     </div>
   )
 }

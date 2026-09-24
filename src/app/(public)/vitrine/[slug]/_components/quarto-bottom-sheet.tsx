@@ -145,8 +145,8 @@ export function QuartoBottomSheet({ quarto, whatsappUrl, onClose }: Props) {
 
         {/* Carrossel */}
         <div
-          className="relative w-full shrink-0 overflow-hidden bg-stone-100"
-          style={{ aspectRatio: "4/3" }}
+          className="relative mx-auto shrink-0 overflow-hidden bg-stone-100"
+          style={{ aspectRatio: "1/1", width: "min(100%, 55svh)" }}
           onTouchStart={onCarouselTouchStart}
           onTouchEnd={onCarouselTouchEnd}
         >

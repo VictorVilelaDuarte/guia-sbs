@@ -58,7 +58,7 @@ export function GaleriaFotos({
               // no-op fora de páginas de comércio (ex.: pontos turísticos)
               trackCtx("galeria_view");
             }}
-            className="relative h-44 w-64 shrink-0 rounded-xl overflow-hidden snap-start bg-muted cursor-zoom-in"
+            className="relative h-52 w-52 shrink-0 rounded-xl overflow-hidden snap-start bg-muted cursor-zoom-in"
           >
             <Image
               src={foto.url}

@@ -136,8 +136,8 @@ function GaleriaFotos({ fotos, nome }: { fotos: string[]; nome: string }) {
   return (
     <div style={{ margin: "0 -20px 14px", overflowX: "auto", display: "flex", gap: 8, padding: "0 20px", scrollbarWidth: "none" }}>
       {fotos.map((url, i) => (
-        <div key={i} style={{ flexShrink: 0, width: 100, height: 80, borderRadius: 10, overflow: "hidden", position: "relative" }}>
-          <Image src={url} alt={`${nome} foto ${i + 1}`} fill style={{ objectFit: "cover" }} sizes="100px" />
+        <div key={i} style={{ flexShrink: 0, width: 96, height: 96, borderRadius: 10, overflow: "hidden", position: "relative" }}>
+          <Image src={url} alt={`${nome} foto ${i + 1}`} fill style={{ objectFit: "cover" }} sizes="96px" />
         </div>
       ))}
     </div>
@@ -315,8 +315,8 @@ function PontoContent({ data, userLocation }: { data: PontoMapa; userLocation: {
       {data.fotos.length > 0 ? (
         <div style={{ margin: "0 -20px 14px", overflowX: "auto", display: "flex", gap: 8, padding: "0 20px", scrollbarWidth: "none" }}>
           {data.fotos.map((url, i) => (
-            <div key={i} style={{ flexShrink: 0, width: data.fotos.length === 1 ? "calc(100vw - 40px)" : 160, height: 130, borderRadius: 12, overflow: "hidden", position: "relative" }}>
-              <Image src={url} alt={`${data.nome} foto ${i + 1}`} fill style={{ objectFit: "cover" }} sizes="160px" />
+            <div key={i} style={{ flexShrink: 0, width: 140, height: 140, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+              <Image src={url} alt={`${data.nome} foto ${i + 1}`} fill style={{ objectFit: "cover" }} sizes="140px" />
             </div>
           ))}
         </div>

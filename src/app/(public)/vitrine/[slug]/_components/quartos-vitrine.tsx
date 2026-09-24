@@ -37,7 +37,7 @@ export function QuartosVitrine({ quartos, whatsapp, comercioNome }: Props) {
             onClick={() => setSelecionado(q)}
             className="group flex flex-col rounded-2xl overflow-hidden bg-white border border-border shadow-soft cursor-pointer active:scale-[0.99] transition-transform"
           >
-            <div className="relative w-full bg-stone-100" style={{ aspectRatio: "4/3" }}>
+            <div className="relative aspect-square w-full bg-stone-100">
               {q.fotos[0] ? (
                 <Image src={q.fotos[0]} alt={q.nome} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-500" />
               ) : (

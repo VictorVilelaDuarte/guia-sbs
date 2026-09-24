@@ -5,6 +5,8 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Loader2, Upload, X } from "lucide-react"
+import { useRecorteQuadrado } from "@/components/imagem/recorte-quadrado"
+import { ACCEPT_IMAGENS } from "@/lib/imagem/heic"
 
 interface LogoUploaderProps {
   logoAtual: string | null
@@ -20,8 +22,11 @@ export function LogoUploader({
   const [logo, setLogo] = useState<string | null>(logoAtual)
   const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const { recortar, cropper } = useRecorteQuadrado({ preservarTransparencia: true })
 
-  async function handleFile(file: File) {
+  async function handleFile(original: File) {
+    const [file] = await recortar([original])
+    if (!file) return
     setLoading(true)
 
     const form = new FormData()
@@ -111,13 +116,13 @@ export function LogoUploader({
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">JPEG, PNG ou WebP · máx. 5MB</p>
+        <p className="text-xs text-muted-foreground">JPEG, PNG, WebP ou HEIC · recortada em quadrado</p>
       </div>
 
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept={ACCEPT_IMAGENS}
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0]
@@ -125,6 +130,7 @@ export function LogoUploader({
           e.target.value = ""
         }}
       />
+      {cropper}
     </div>
   )
 }
