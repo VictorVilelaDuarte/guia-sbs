@@ -10,6 +10,10 @@ export const metadata: Metadata = {
     "Explore comércios e pontos turísticos de São Bento do Sapucaí no mapa interativo.",
 };
 
+// ISR de 3 min (igual à home): sem isso a página seria estática do build — comércio
+// ou ponto novo só entraria no próximo deploy e o "aberto agora" ficaria congelado.
+export const revalidate = 180;
+
 export default async function MapaPage() {
   const [comercios, pontos] = await Promise.all([
     prisma.comercio.findMany({

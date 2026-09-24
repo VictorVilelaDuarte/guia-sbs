@@ -24,6 +24,8 @@ async function main() {
     },
   })
 
+  // `update: {}` de propósito: rodar o seed de novo não mexe em plano que o admin
+  // já ajustou. As features abaixo só valem para banco novo.
   await prisma.plan.upsert({
     where: { slug: "premium" },
     update: {},
@@ -40,6 +42,11 @@ async function main() {
         analytics: true,
         qr_code: true,
         cardapio: true,
+        catalogo: true,
+        pedido_online: true,
+        gestao_equipe: true,
+        gestao_clientes: true,
+        gestao_relatorios: true,
       },
     },
   })

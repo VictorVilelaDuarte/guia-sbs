@@ -47,6 +47,10 @@ Configuradas: `DATABASE_URL`, `DIRECT_URL`, `NEXT_PUBLIC_SUPABASE_URL`,
 `SUPABASE_SERVICE_ROLE_KEY`, `NEXTAUTH_URL`, `NEXTAUTH_SECRET`,
 `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
 
+Opcional: `NEXT_PUBLIC_CONTATO_EMAIL` — e-mail público do guia (rodapé, `/sobre` e canal dos
+titulares em `/privacidade`). Sem ela o link "Contato" não aparece; como é `NEXT_PUBLIC_`,
+precisa de redeploy depois de definida.
+
 ### Pendências conhecidas (adiadas por decisão do dono em 2026-09-23)
 
 **1. `NEXT_PUBLIC_SITE_URL` não está definida.** `SITE_URL` (`src/lib/seo/site.ts`) cai no

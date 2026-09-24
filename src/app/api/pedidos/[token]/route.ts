@@ -47,6 +47,7 @@ export async function GET(
           precoUnit: true,
           quantidade: true,
           observacao: true,
+          complementos: { select: { id: true, nome: true, quantidade: true } },
         },
       },
       comercio: {

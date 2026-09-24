@@ -179,6 +179,8 @@ export function CatalogoView({
 
   return (
     <div className="min-h-screen bg-[#F5EFE4]">
+      {/* Coluna central: no desktop o conteúdo não se espalha pela tela inteira. */}
+      <div className="mx-auto max-w-3xl">
       {/* Header */}
       <div className="px-4 pt-4 pb-5">
         <Link
@@ -377,6 +379,7 @@ export function CatalogoView({
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

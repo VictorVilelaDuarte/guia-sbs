@@ -6,3 +6,7 @@ export const SITE_URL =
 
 export const SITE_NAME = "Guia SBS"
 export const CIDADE = "São Bento do Sapucaí"
+
+// Canal de contato público (rodapé, Sobre e pedidos de titulares na política de
+// privacidade). Enquanto não for definido, o link "Contato" não aparece.
+export const CONTATO_EMAIL = process.env.NEXT_PUBLIC_CONTATO_EMAIL || null

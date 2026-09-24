@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
+import { negarLimiteTags } from "@/lib/plan-limites"
 
 export async function GET() {
   const ctx = await getComercioCtx()
@@ -29,6 +30,9 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: "Tag inválida." }, { status: 400 })
 
   const nome = parsed.data.nome.toLowerCase().trim()
+
+  const limite = await negarLimiteTags(ctx.comercioId, ctx.features)
+  if (limite) return limite
 
   try {
     const tag = await prisma.tag.create({

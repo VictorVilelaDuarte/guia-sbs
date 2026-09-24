@@ -58,6 +58,7 @@ export function MesaCliente({ inicial, cardapio, token }: { inicial: ContaDaMesa
   // Pedir exige cardápio liberado e, sem conta aberta, que a loja deixe o cliente abrir.
   const podePedir = conta.permite.pedido && !!cardapio && (!!c || conta.permite.abrirConta)
   const aguardando = c?.itens.filter((i) => i.estado === "aguardando") ?? []
+  const linhas = c ? agruparItens(c.itens) : []
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-stone-50 text-stone-900">
@@ -110,7 +111,7 @@ export function MesaCliente({ inicial, cardapio, token }: { inicial: ContaDaMesa
               <span className="text-xs text-stone-500">aberta às {hora(c.abertaEm)}</span>
             </div>
             <ul className="mt-3 divide-y divide-stone-100">
-              {c.itens.map((i) => {
+              {linhas.map((i) => {
                 const e = ESTADO[i.estado]
                 return (
                   <li key={i.id} className="flex items-start justify-between gap-3 py-2 text-sm">
@@ -221,6 +222,22 @@ export function MesaCliente({ inicial, cardapio, token }: { inicial: ContaDaMesa
       )}
     </div>
   )
+}
+
+type ItemConta = NonNullable<ContaDaMesa["comanda"]>["itens"][number]
+
+// Mesmo item pedido em rodadas diferentes (3 polentas + 3 polentas) vira uma
+// linha só na tela do cliente. Estado, observação e complementos entram na chave:
+// o que ainda está "confirmando" continua separado do que já foi para a cozinha.
+function agruparItens(itens: ItemConta[]): ItemConta[] {
+  const grupos = new Map<string, ItemConta>()
+  for (const i of itens) {
+    const chave = [i.titulo, i.variacaoNome ?? "", i.complementos.join("|"), i.observacao ?? "", i.estado].join("¦")
+    const g = grupos.get(chave)
+    if (g) grupos.set(chave, { ...g, quantidade: g.quantidade + i.quantidade, valor: Math.round((g.valor + i.valor) * 100) / 100 })
+    else grupos.set(chave, i)
+  }
+  return [...grupos.values()]
 }
 
 function Linha({ rotulo, valor, classe }: { rotulo: string; valor: string; classe?: string }) {

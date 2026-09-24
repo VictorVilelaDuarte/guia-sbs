@@ -269,7 +269,7 @@ export function ProdutoBottomSheet({
       {/* Sheet */}
       <div
         className={cn(
-          "absolute left-0 right-0 bottom-0 flex flex-col rounded-t-3xl overflow-hidden bg-white",
+          "absolute left-0 right-0 bottom-0 mx-auto flex max-w-2xl flex-col rounded-t-3xl overflow-hidden bg-white",
           "max-h-[96svh] transition-transform duration-[380ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
           isVisible ? "translate-y-0" : "translate-y-full",
         )}
@@ -289,14 +289,16 @@ export function ProdutoBottomSheet({
           <div className="h-1 w-10 rounded-full bg-stone-200" />
         </div>
 
-        {/* Carrossel */}
+        {/* Carrossel — só com foto; sem foto, o sheet abre direto no conteúdo
+            (um quadrado vazio com a inicial ocupava meia tela). */}
+        {imagens.length > 0 ? (
         <div
-          className="relative w-full shrink-0 overflow-hidden bg-stone-100"
-          style={{ aspectRatio: "4/3" }}
+          className="relative mx-auto shrink-0 overflow-hidden bg-stone-100"
+          style={{ aspectRatio: "1/1", width: "min(100%, 55svh)" }}
           onTouchStart={onCarouselTouchStart}
           onTouchEnd={onCarouselTouchEnd}
         >
-          {imagens.length > 0 ? (
+          {(
             <>
               {/* Slides — absolute inset-0 garante que cada slide tenha
                   exatamente a largura do container, e translateX(n*100%)
@@ -368,13 +370,6 @@ export function ProdutoBottomSheet({
                 </div>
               )}
             </>
-          ) : (
-            /* Placeholder sem foto */
-            <div className="h-full w-full flex items-center justify-center bg-stone-100">
-              <span className="font-serif text-5xl text-stone-300">
-                {titulo[0]}
-              </span>
-            </div>
           )}
 
           {/* Botão fechar */}
@@ -386,6 +381,17 @@ export function ProdutoBottomSheet({
             <X className="h-4 w-4" />
           </button>
         </div>
+        ) : (
+          <div className="flex shrink-0 justify-end px-3">
+            <button
+              onClick={onClose}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200"
+              aria-label="Fechar"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* Thumbnails */}
         {temMultiImagens && (

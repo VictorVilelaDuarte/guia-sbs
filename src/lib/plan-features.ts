@@ -7,7 +7,7 @@ export const FEATURES_DISPONIVEIS = [
   {
     key: "fotos_ilimitadas",
     label: "Fotos ilimitadas",
-    descricao: "Upload sem limite de quantidade de fotos (plano FREE tem limite de 5)",
+    descricao: "Sem limite de fotos, palavras-chave, itens do catálogo e quartos (o plano Gratuito tem limite)",
   },
   {
     key: "destaque_busca",

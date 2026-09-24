@@ -128,7 +128,7 @@ export function QuartoBottomSheet({ quarto, whatsappUrl, onClose }: Props) {
       />
       <div
         className={cn(
-          "absolute left-0 right-0 bottom-0 flex flex-col rounded-t-3xl overflow-hidden bg-white",
+          "absolute left-0 right-0 bottom-0 mx-auto flex max-w-2xl flex-col rounded-t-3xl overflow-hidden bg-white",
           "max-h-[96svh] transition-transform duration-[380ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
           isVisible ? "translate-y-0" : "translate-y-full",
         )}

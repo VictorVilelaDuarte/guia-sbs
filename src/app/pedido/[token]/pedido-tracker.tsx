@@ -21,6 +21,7 @@ interface ItemData {
   precoUnit: number;
   quantidade: number;
   observacao: string | null;
+  complementos: { id: string; nome: string; quantidade: number }[];
 }
 
 export interface PedidoData {
@@ -280,6 +281,11 @@ export function PedidoTracker({ initial }: { initial: PedidoData }) {
                   {i.titulo}
                   {i.variacaoNome && (
                     <span className="text-stone-400"> · {i.variacaoNome}</span>
+                  )}
+                  {i.complementos.length > 0 && (
+                    <span className="block text-xs text-stone-500">
+                      + {i.complementos.map((c) => (c.quantidade > 1 ? `${c.quantidade}× ${c.nome}` : c.nome)).join(", ")}
+                    </span>
                   )}
                   {i.observacao && (
                     <span className="block text-xs text-stone-400">{i.observacao}</span>

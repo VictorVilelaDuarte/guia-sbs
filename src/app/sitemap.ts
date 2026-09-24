@@ -29,6 +29,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/pontos-turisticos`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE_URL}/mapa`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/para-comerciantes`, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${SITE_URL}/sobre`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${SITE_URL}/termos`, changeFrequency: "yearly", priority: 0.1 },
+    { url: `${SITE_URL}/privacidade`, changeFrequency: "yearly", priority: 0.1 },
   ]
 
   // Rotas dedicadas de categoria (/gastronomia, /hospedagem, …) — Fase 3

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import { negarSemRecurso } from "@/lib/plan-limites"
 import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 import { deleteFile } from "@/lib/supabase-storage"
@@ -37,6 +38,9 @@ export async function PATCH(
   const { id } = await params
   const check = await ownerCheck(id, "vitrine:editar")
   if ("erro" in check) return check.erro
+  // Editar exige o recurso no plano; excluir não (loja rebaixada consegue limpar).
+  const semRecurso = negarSemRecurso(check.ctx.features, "eventos", "Eventos")
+  if (semRecurso) return semRecurso
 
   let body: unknown
   try {

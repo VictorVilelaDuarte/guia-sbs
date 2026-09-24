@@ -32,6 +32,7 @@ export default async function PaginaPedido({
           precoUnit: true,
           quantidade: true,
           observacao: true,
+          complementos: { select: { id: true, nome: true, quantidade: true } },
         },
       },
       // Só status + horário: nome de quem mudou o status nunca vai para o cliente.

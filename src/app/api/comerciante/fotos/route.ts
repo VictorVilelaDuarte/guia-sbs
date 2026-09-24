@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { z } from "zod"
+import { negarLimiteFotos } from "@/lib/plan-limites"
 
 const createSchema = z.object({
   url: z.string().url(),
@@ -17,6 +18,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const parsed = createSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
+
+  const limite = await negarLimiteFotos(ctx.comercioId, ctx.features)
+  if (limite) return limite
 
   const count = await prisma.foto.count({ where: { comercioId: ctx.comercioId } })
 

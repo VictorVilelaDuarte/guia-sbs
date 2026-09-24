@@ -73,7 +73,11 @@ export function SubcategoriasManager({ agrupadas, categoriaLabels }: Props) {
       body: JSON.stringify({ nome: editNome }),
     })
     setLoading(false)
-    if (!res.ok) { toast.error("Erro ao salvar."); return }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error ?? "Erro ao salvar.")
+      return
+    }
     toast.success("Subcategoria atualizada.")
     setEditando(null)
     router.refresh()

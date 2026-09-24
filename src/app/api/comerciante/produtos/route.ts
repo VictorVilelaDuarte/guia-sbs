@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import { negarLimiteCatalogo } from "@/lib/plan-limites"
 import { z } from "zod"
 import { vincularGrupos } from "@/lib/gestao/complementos"
 
@@ -79,6 +80,12 @@ export async function POST(req: NextRequest) {
     if (!categoria || categoria.comercioId !== ctx.comercioId || categoria.tipo !== (parsed.data.tipo ?? "PRODUTO")) {
       return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
     }
+  }
+
+  // Item do catálogo (fora do cardápio) conta no limite do plano Gratuito.
+  if (!parsed.data.categoriaCardapioId) {
+    const limite = await negarLimiteCatalogo(ctx.comercioId, ctx.features, parsed.data.tipo ?? "PRODUTO")
+    if (limite) return limite
   }
 
   const { variacoes, complementoIds, ...produtoData } = parsed.data

@@ -36,7 +36,10 @@ export function BottomNav() {
   }
 
   return (
-    <div style={{
+    // Na home o Header desktop já tem os mesmos itens: ali a barra some a partir
+    // de 768px (.bottom-nav-wrap) em vez de duplicar o menu e cobrir a busca do hero.
+    // Nas demais páginas ela é a única navegação, então fica em qualquer largura.
+    <div className={pathname === "/" ? "bottom-nav-wrap" : undefined} style={{
       position: "fixed", left: "50%", transform: "translateX(-50%)",
       bottom: 24, zIndex: 40,
       width: "calc(100% - 28px)", maxWidth: 452,

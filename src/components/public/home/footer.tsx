@@ -1,4 +1,15 @@
+import Link from "next/link";
+import { CONTATO_EMAIL } from "@/lib/seo/site";
 import { IconPeak } from "./icons";
+
+const LINKS = [
+  { label: "Sobre", href: "/sobre" },
+  // Contato só aparece com o e-mail definido (NEXT_PUBLIC_CONTATO_EMAIL).
+  ...(CONTATO_EMAIL ? [{ label: "Contato", href: `mailto:${CONTATO_EMAIL}` }] : []),
+  { label: "Para comerciantes", href: "/para-comerciantes" },
+  { label: "Termos", href: "/termos" },
+  { label: "Privacidade", href: "/privacidade" },
+];
 import { FooterTopCurve } from "./waves";
 
 export function Footer() {
@@ -67,10 +78,10 @@ export function Footer() {
             borderTop: "1px solid rgba(245,240,232,.12)",
           }}
         >
-          {["Sobre", "Contato", "Para comerciantes", "Termos"].map((l) => (
-            <a
-              key={l}
-              href="#"
+          {LINKS.map((l) => (
+            <Link
+              key={l.label}
+              href={l.href}
               style={{
                 color: "var(--sand-2)",
                 fontSize: 13,
@@ -78,8 +89,8 @@ export function Footer() {
                 fontWeight: 500,
               }}
             >
-              {l}
-            </a>
+              {l.label}
+            </Link>
           ))}
         </div>
         <div

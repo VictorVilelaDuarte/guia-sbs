@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao, pode } from "@/lib/comercio-ctx"
+import { negarLimiteCatalogo } from "@/lib/plan-limites"
 import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 import { vincularGrupos } from "@/lib/gestao/complementos"
@@ -95,6 +96,16 @@ export async function PATCH(
     if (!categoria || categoria.comercioId !== produto.comercioId || categoria.tipo !== tipoAlvo) {
       return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
     }
+  }
+
+  // Entrar no catálogo (saindo do cardápio) ou trocar de aba conta no limite do plano.
+  const tipoFinal = parsed.data.tipo ?? produto.tipo
+  const cardapioFinal =
+    parsed.data.categoriaCardapioId !== undefined ? parsed.data.categoriaCardapioId : produto.categoriaCardapioId
+  const entraNaAba = !cardapioFinal && (produto.categoriaCardapioId || tipoFinal !== produto.tipo)
+  if (entraNaAba) {
+    const limite = await negarLimiteCatalogo(produto.comercioId, ctx.features, tipoFinal, produto.id)
+    if (limite) return limite
   }
 
   const { variacoes, complementoIds, ...produtoData } = parsed.data

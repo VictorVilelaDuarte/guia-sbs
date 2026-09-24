@@ -43,6 +43,12 @@ export async function POST(req: NextRequest) {
     _max: { ordem: true },
   })
 
+  const repetida = await prisma.subcategoria.findUnique({
+    where: { nome_categoria: { nome: parsed.data.nome, categoria: parsed.data.categoria } },
+    select: { id: true },
+  })
+  if (repetida) return NextResponse.json({ error: "Já existe uma subcategoria com esse nome nesta categoria." }, { status: 409 })
+
   const subcategoria = await prisma.subcategoria.create({
     data: {
       nome: parsed.data.nome,

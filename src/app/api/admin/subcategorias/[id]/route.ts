@@ -24,6 +24,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: "Dados inválidos." }, { status: 400 })
 
+  // Renomear para um nome que já existe na mesma categoria (único por nome + categoria).
+  if (parsed.data.nome) {
+    const atual = await prisma.subcategoria.findUnique({ where: { id }, select: { categoria: true } })
+    if (!atual) return NextResponse.json({ error: "Subcategoria não encontrada." }, { status: 404 })
+    const repetida = await prisma.subcategoria.findFirst({
+      where: { nome: parsed.data.nome, categoria: atual.categoria, id: { not: id } },
+      select: { id: true },
+    })
+    if (repetida) return NextResponse.json({ error: "Já existe uma subcategoria com esse nome nesta categoria." }, { status: 409 })
+  }
+
   const subcategoria = await prisma.subcategoria.update({
     where: { id },
     data: parsed.data,

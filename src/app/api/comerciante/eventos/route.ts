@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
+import { negarSemRecurso } from "@/lib/plan-limites"
 import { z } from "zod"
 
 const createSchema = z.object({
@@ -31,7 +32,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const ctx = await getComercioCtx()
   if (!ctx) return NextResponse.json({ error: "Não autorizado." }, { status: 401 })
-  const negado = negarSemPermissao(ctx, "vitrine:editar")
+  const negado = negarSemPermissao(ctx, "vitrine:editar") ?? negarSemRecurso(ctx.features, "eventos", "Eventos")
   if (negado) return negado
 
   let body: unknown

@@ -54,6 +54,7 @@ SUPABASE_SERVICE_ROLE_KEY="..."
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="..."
 NEXT_PUBLIC_SITE_URL="http://localhost:3000"  # produção: domínio final (usado por metadataBase, sitemap, robots e JSON-LD)
+NEXT_PUBLIC_CONTATO_EMAIL=""                  # e-mail público do guia (rodapé, /sobre, /privacidade); vazio = link "Contato" some
 ```
 
 ## Stack
@@ -305,9 +306,9 @@ Rota única `/api/comerciante/upload` com parâmetro `tipo` (`logo`, `produto`, 
 
 **Upload por admin:** a rota aceita roles ADMIN e SUPER_ADMIN além de COMERCIANTE. Quando o admin faz upload fora do painel (ex.: `LogoUploader` em `/admin/comercios/[id]`), inclui `comercioId` no formData e a rota só confere que o comércio existe. Sem `comercioId`, resolve via `getComercioCtx()` — cobre tanto o comerciante no próprio painel quanto o admin no painel de gestão (cookie `admin_comercio_id`).
 
-**heic2any só com import dinâmico:** o módulo executa `window.__heic2any__worker = new Worker(...)` na carga — import estático num Client Component quebra o SSR do build de produção com `ReferenceError: window is not defined` (o `next dev` **não** acusa; só `next start`). Sempre `const { default: heic2any } = await import("heic2any")` dentro da função de conversão.
 **Toda imagem cadastrada é quadrada (1:1).** O recorte acontece no navegador, antes do upload, pelo hook `useRecorteQuadrado()` (`src/components/imagem/recorte-quadrado.tsx`, com `react-easy-crop`): `const prontos = await recortar(arquivos)` converte HEIC, abre o cropper para cada arquivo (fila "1 de N", com "Pular esta") e devolve os arquivos já quadrados — máx. 1600 px, JPEG com fundo branco. A logo usa `preservarTransparencia` (PNG/WebP sai PNG). Usado na logo, fotos da vitrine, produto/cardápio, eventos, quartos e fotos de pontos turísticos. **Ponto de upload novo deve passar por esse hook** (e usar `ACCEPT_IMAGENS`/`ehImagem` de `src/lib/imagem/heic.ts`). Nas telas, foto de conteúdo é exibida em quadrado (`aspect-square` + `object-cover`); só heros de largura total seguem largos. O servidor não confere a proporção.
 
+**heic2any só com import dinâmico:** o módulo executa `window.__heic2any__worker = new Worker(...)` na carga — import estático num Client Component quebra o SSR do build de produção com `ReferenceError: window is not defined` (o `next dev` **não** acusa; só `next start`). Sempre `const { default: heic2any } = await import("heic2any")` dentro da função de conversão.
 
 **Upload de fotos de produtos (cardápio):** o componente `produto-dialog.tsx` suporta múltiplos arquivos simultâneos, drag-and-drop e conversão de HEIC/HEIF para JPEG antes do envio (via `heic2any`). A detecção de HEIC usa tanto o MIME type quanto a extensão do arquivo (iOS Safari às vezes omite o MIME type). A quantidade máxima de slots disponíveis (`MAX_IMAGENS - imagens.length`) limita dinamicamente tanto o seletor de arquivos (`multiple` é `false` quando só resta 1 slot) quanto o drop handler.
 
@@ -338,7 +339,7 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 - **`Footer`** — rodapé com curva `FooterTopCurve from="var(--sand-1)"` fixa (neutro para qualquer fundo de página)
 - **`BottomNav`** — barra de navegação fixa no rodapé, estilo app mobile
 
-**`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` em `/pontos-turisticos/*`, `"map"` em `/mapa`, `"cidade"` em `/sao-bento-do-sapucai`. O item "Você" foi substituído por **"A cidade"** (2026-06-11) — quando favoritos/avaliações existirem, "Você" pode voltar como quinto item. O `Header` desktop da home espelha os mesmos itens (`IconLandmark` em `icons.tsx`). Rotas listadas em `HIDDEN_PREFIXES` (hoje: `/para-comerciantes`) retornam `null` — o nav some sem tirar a página do route group (que ainda fornece o Footer).
+**`BottomNav`** (`src/components/public/home/bottom-nav.tsx`) é um Client Component autônomo — sem props. Na home (`/`) ele recebe `.bottom-nav-wrap` e some a partir de 768px (o `Header` desktop já tem os mesmos itens); nas demais páginas é a única navegação e aparece em qualquer largura. Usa `usePathname()` para determinar o item ativo: `"home"` acende em `/`, `"pt"` em `/pontos-turisticos/*`, `"map"` em `/mapa`, `"cidade"` em `/sao-bento-do-sapucai`. O item "Você" foi substituído por **"A cidade"** (2026-06-11) — quando favoritos/avaliações existirem, "Você" pode voltar como quinto item. O `Header` desktop da home espelha os mesmos itens (`IconLandmark` em `icons.tsx`). Rotas listadas em `HIDDEN_PREFIXES` (hoje: `/para-comerciantes`) retornam `null` — o nav some sem tirar a página do route group (que ainda fornece o Footer).
 
 **`Footer`** (`src/components/public/home/footer.tsx`) renderiza a curva de transição com `from="var(--footer-curve-from, var(--sand-1))"`. O fallback é `sand-1`, que é o esperado por todas as páginas. A home page computa `footerFrom` dinamicamente no servidor e sobrescreve via `<style>{`:root { --footer-curve-from: ${footerFrom}; }`}</style>` — a tag `<style>` é removida automaticamente pelo Next.js na navegação para outras rotas. A lógica: `pontos.length > 0 → sand-1` (última seção é Pontos), `eventos.length > 0 → sand-2` (última seção é Events), caso contrário `sand-1`. Qualquer página que termine em cor diferente de `sand-1` deve usar esse padrão de CSS var ou adicionar um `<Wave>` ao final do conteúdo. Nunca passe props diretos ao `Footer` para mudar a cor.
 
@@ -404,7 +405,7 @@ Todas as páginas públicas (`/`, `/vitrine/*`, `/pontos-turisticos/*`) estão a
 
 ### Mapa interativo (`/mapa`)
 
-Página full-screen em `src/app/mapa/` — fora do route group `(public)/` para não receber Footer nem BottomNav do layout (o BottomNav é renderizado diretamente dentro do `MapaClient`). Variável de ambiente obrigatória: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
+Página full-screen em `src/app/mapa/` — `revalidate = 180` (ISR, como a home: sem isso seria estática do build, com comércios e "aberto agora" congelados até o próximo deploy) — fora do route group `(public)/` para não receber Footer nem BottomNav do layout (o BottomNav é renderizado diretamente dentro do `MapaClient`). Variável de ambiente obrigatória: `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
 
 **Dependências:** `@googlemaps/js-api-loader` (v2 — API funcional) + `@googlemaps/markerclusterer`.
 
@@ -500,7 +501,7 @@ Features disponíveis (definidas em `src/lib/plan-features.ts`):
 
 A função `temFeature(features, key)` verifica se uma feature está ativa. Usada no perfil público e no dashboard para controlar acesso às abas e seções.
 
-Limites do plano FREE (definidos em `LIMITES_FREE` no mesmo arquivo): `fotos: 3`, `tags: 5`, `produtos: 3`.
+Limites do plano FREE (definidos em `LIMITES_FREE` no mesmo arquivo): `fotos: 3`, `tags: 5`, `produtos: 3` (itens do catálogo **por aba**, fora do cardápio), `quartos: 2`. `fotos_ilimitadas` remove todos. **Aplicados no servidor** por `src/lib/plan-limites.ts` (`negarLimiteFotos`, `negarLimiteTags`, `negarLimiteCatalogo`, `negarSemRecurso` para recurso fora do plano, ex.: eventos) — a tela mostra os mesmos números, mas a API é quem garante. Rota nova que crie item limitado pelo plano deve usar esses helpers.
 
 ### Subcategorias
 
@@ -568,6 +569,10 @@ src/app/(public)/comercios/
 **Paginação:** `PAGE_SIZE = 12`. URL usa `?page=N` preservando `?categoria` e `?subcategoria`. A função `pageUrl()` monta a URL corretamente para todos os casos. A ordenação "abertos primeiro" é aplicada client-side dentro da página atual (não afeta a estabilidade da paginação pois o skip/take é feito por nome no DB).
 
 **Filtros:** sem categoria → chips de categoria. Com categoria → chips de subcategoria (buscados via Prisma filtrados por `categoriaFiltro`). Subcategoria inválida ou não pertencente à categoria é ignorada.
+
+### Páginas institucionais (`/sobre`, `/termos`, `/privacidade`)
+
+Texto corrido sobre `PaginaTexto` (`src/components/public/pagina-texto.tsx`), linkadas no rodapé e no sitemap. A política de privacidade descreve o que o sistema **de fato** coleta (analytics anônimo por `sessionStorage`, dados do pedido que vão para a loja, cadastro de clientes por loja, fornecedores) — **mudou a coleta de dados (campo novo no checkout, cookie, integração), atualize `/privacidade`**. O e-mail de contato vem de `CONTATO_EMAIL` (`src/lib/seo/site.ts`, env `NEXT_PUBLIC_CONTATO_EMAIL`); sem ele, o link "Contato" do rodapé não aparece. Os textos são um ponto de partida — revisão jurídica recomendada.
 
 ### Página da cidade (`/sao-bento-do-sapucai`)
 
