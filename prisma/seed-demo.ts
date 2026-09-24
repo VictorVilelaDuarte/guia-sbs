@@ -557,9 +557,16 @@ async function main() {
 
   // ---- visitas no guia (analytics e conversão dos relatórios)
   const eventos: Prisma.AnalyticsEventCreateManyInput[] = []
+  // Visitas crescendo ao longo dos dois meses (0,6× → 1,4×), com pouca variação
+  // diária: a semana atual fica acima da anterior no Início ("+x% na semana").
+  // Fim de semana tem mais movimento, como nas vendas.
   for (let d = DIAS; d >= 0; d--) {
     const dia = diaBase(d)
-    for (let i = 0; i < entre(20, 60); i++) {
+    const diaSemana = new Date(dia.getTime() + 3 * 3600000).getUTCDay()
+    const tendencia = 0.6 + 0.8 * (1 - d / DIAS)
+    const fimDeSemana = diaSemana === 0 || diaSemana === 6 ? 1.3 : 1
+    const visitasDoDia = Math.round(38 * tendencia * fimDeSemana * (0.9 + 0.2 * rnd()))
+    for (let i = 0; i < visitasDoDia; i++) {
       const quando = emHoras(dia, entre(9, 22))
       if (quando > agora) continue
       const visitante = `demo-v${entre(1, 400)}`
