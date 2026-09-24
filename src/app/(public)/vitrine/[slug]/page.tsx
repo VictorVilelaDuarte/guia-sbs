@@ -120,7 +120,7 @@ export default async function PaginaComercio({
       fotos: { orderBy: { ordem: "asc" } },
       tags: { orderBy: { nome: "asc" } },
       produtos: {
-        where: { disponivel: true, destaque: true, categoriaCardapioId: null },
+        where: { disponivel: true, arquivado: false, mostrarNaVitrine: true, destaque: true, categoriaCardapioId: null },
         orderBy: { ordem: "asc" },
         include: { variacoes: { orderBy: { ordem: "asc" } } },
       },
@@ -135,7 +135,7 @@ export default async function PaginaComercio({
         orderBy: { ordem: "asc" },
         include: {
           produtos: {
-            where: { disponivel: true, destaque: true },
+            where: { disponivel: true, arquivado: false, mostrarNaVitrine: true, destaque: true },
             orderBy: { ordem: "asc" },
             include: { variacoes: { orderBy: { ordem: "asc" } } },
           },

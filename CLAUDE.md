@@ -737,6 +737,17 @@ Feature controlada pelo plano (`key: "catalogo"`). Produtos e serviços são ins
 - `src/components/public/cardapio-destaques-vitrine.tsx` — carrossel de destaques para a vitrine (Client Component wrapper necessário pois a vitrine é Server Component)
 - `src/components/comerciante/produtos-manager.tsx` — lista de produtos/serviços do catálogo no painel, com prop `tipo` para filtrar. Agrupa por `CatalogoCategoria` (+ bloco "Outros"), com gestão de categorias inline (criar/renomear/excluir). Recebe `categoriasCatalogoIniciais` já filtradas por tipo pela página `/comerciante/gestao/produtos`. Durante a busca, exibe lista plana (ignora agrupamento).
 
+### Cadastro de produto: códigos, custo e onde aparece
+
+Campos de 2026-09-24 no `Produto` (todos opcionais): `codigoBarras` (EAN/GTIN), `codigoInterno` (SKU curto), `marca`, `precoCusto`, `unidade` (enum `UnidadeProduto`: UN, KG, G, L, ML, CX, PCT — **só exibição**, "R$ 89,90 / kg"; venda por peso está no roadmap), `mostrarNaVitrine` e `arquivado`. `CardapioVariacao` também tem `codigoBarras`, `codigoInterno` e `precoCusto` (cada tamanho com o seu código).
+
+- **Códigos únicos por loja entre todos os campos** (produto e variação, barras e interno): `conflitoDeCodigos()` em `src/lib/produtos-codigos.ts` (o banco só garante `@@unique` dentro de `produtos`). Chegam normalizados por `normalizarCodigo()` (sem espaços, maiúsculos). Campos e schema Zod compartilhados em `src/lib/produto-campos.ts`.
+- **Onde aparece:** `mostrarNaVitrine = false` → item só de balcão (sacola, gelo): some da vitrine, do cardápio online, do checkout e do QR da mesa, mas **vende no PDV**. `arquivado = true` → fora de linha: some de tudo (inclusive PDV); nas listas do painel vai para o bloco recolhido "Arquivados". **Consulta pública nova de produto filtra `arquivado: false, mostrarNaVitrine: true`**; venda do PDV recusa arquivado em `resolverItens()`.
+- **Snapshot na venda:** `PedidoItem.codigo` e `custoUnit` (Decimal) gravados por `cadastroDoItem()` em todos os canais (checkout, venda rápida, comanda, QR da mesa) — margem de venda antiga não muda quando o custo é atualizado. Base para o relatório de margem (ideia 1.3).
+- **Leitura de código de barras:** `LeitorCodigoBarras` (`src/components/comerciante/leitor-codigo-barras.tsx`) — câmera do celular com `BarcodeDetector` nativo (Chrome/Android) e fallback `@zxing/browser` por import dinâmico (Safari/iPhone); câmera exige HTTPS ou localhost; sempre há campo para digitar. Usado no formulário do produto (produto e cada variação), no botão **Escanear** das listas de Cardápio e Produtos (código existente abre o item; novo abre o cadastro com o código preenchido — prop `codigoInicial` do `ProdutoDialog`) e no PDV.
+- **PDV:** a busca acha por título, marca e códigos (prefixo); leitor USB/Bluetooth "digita" o código + Enter e a câmera usa o mesmo caminho — **código exato lança o item direto**, já na variação daquele código (abre a escolha só se houver complementos).
+- **Deploy:** `npm run db:push` (aditivo: colunas novas, enum `UnidadeProduto`, índices únicos por loja) **antes** de publicar — as consultas novas usam as colunas.
+
 ### Hospedagem (vitrine e gestão específicas)
 
 Negócios de **categoria HOSPEDAGEM** têm vitrine e painel próprios, no modelo Booking/Airbnb:

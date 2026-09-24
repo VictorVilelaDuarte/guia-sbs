@@ -42,6 +42,18 @@ enum Categoria {
   ENTRETENIMENTO
 }
 
+// Unidade de venda: por ora só exibição ("R$ 89,90 / kg"). Venda por peso
+// (quantidade decimal no pedido) está no roadmap.
+enum UnidadeProduto {
+  UN
+  KG
+  G
+  L
+  ML
+  CX
+  PCT
+}
+
 enum TipoProduto {
   PRODUTO
   SERVICO
@@ -330,8 +342,24 @@ model Produto {
   comercioId          String
   categoriaCardapioId String?
   categoriaCatalogoId String?
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+
+  // Identificação (2026-09-24). Códigos únicos por loja — o mesmo código não
+  // pode estar num produto e numa variação ao mesmo tempo (validado no código,
+  // src/lib/produtos-codigos.ts: o banco não expressa unicidade entre tabelas).
+  codigoBarras     String? // EAN/GTIN — leitor no PDV ou câmera do celular
+  codigoInterno    String? // SKU curto para digitar no PDV
+  marca            String?
+  // Preço e margem (opcionais). Custo em Float, como o preço do produto — o
+  // valor que conta é o snapshot do pedido (PedidoItem.custoUnit, Decimal).
+  precoCusto       Float?
+  unidade          UnidadeProduto @default(UN)
+  // Onde aparece: fora da vitrine = só PDV/comanda (sacola, gelo);
+  // arquivado = fora de linha, some de todo lugar sem apagar o histórico.
+  mostrarNaVitrine Boolean        @default(true)
+  arquivado        Boolean        @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   comercio          Comercio             @relation(fields: [comercioId], references: [id], onDelete: Cascade)
   complementos      ProdutoComplemento[]
@@ -339,6 +367,8 @@ model Produto {
   categoriaCatalogo CatalogoCategoria?   @relation(fields: [categoriaCatalogoId], references: [id], onDelete: SetNull)
   variacoes         CardapioVariacao[]
 
+  @@unique([comercioId, codigoBarras])
+  @@unique([comercioId, codigoInterno])
   @@map("produtos")
 }
 
@@ -375,12 +405,16 @@ model CatalogoCategoria {
 }
 
 model CardapioVariacao {
-  id        String  @id @default(cuid())
-  nome      String
-  preco     Float
-  ordem     Int     @default(0)
-  produtoId String
-  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  id            String  @id @default(cuid())
+  nome          String
+  preco         Float
+  ordem         Int     @default(0)
+  // Cada tamanho pode ter o próprio código (refrigerante 350ml ≠ 600ml).
+  codigoBarras  String?
+  codigoInterno String?
+  precoCusto    Float?
+  produtoId     String
+  produto       Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
 
   @@map("cardapio_variacoes")
 }
@@ -605,15 +639,19 @@ model PedidoHistorico {
 }
 
 model PedidoItem {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   pedidoId     String
   produtoId    String? // referência fraca (sem FK forte) — só rastreio
   titulo       String // snapshot
   variacaoNome String? // snapshot da variação escolhida
-  precoUnit    Decimal @db.Decimal(10, 2) // snapshot do preço unitário
+  precoUnit    Decimal  @db.Decimal(10, 2) // snapshot do preço unitário
+  // Snapshots do cadastro na hora da venda: margem de venda antiga não muda
+  // quando o custo é atualizado.
+  codigo       String? // código de barras ou interno do item vendido
+  custoUnit    Decimal? @db.Decimal(10, 2)
   quantidade   Int
   observacao   String?
-  desconto     Decimal @default(0) @db.Decimal(10, 2) // desconto na linha (valor)
+  desconto     Decimal  @default(0) @db.Decimal(10, 2) // desconto na linha (valor)
 
   // Pedido feito pelo cliente no QR da mesa: fica na comanda SEM contar no total
   // até o atendente aprovar (solicitadoEm sem aprovadoEm = aguardando).

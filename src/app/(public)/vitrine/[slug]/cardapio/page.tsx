@@ -120,7 +120,7 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
         orderBy: { ordem: "asc" },
         include: {
           produtos: {
-            where: { disponivel: true },
+            where: { disponivel: true, arquivado: false, mostrarNaVitrine: true },
             orderBy: { ordem: "asc" },
             include: {
               variacoes: { orderBy: { ordem: "asc" } },
@@ -197,6 +197,7 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
             preco: v.preco,
           })),
           complementos: p.complementos.map((c) => c.grupo).filter((g) => g.opcoes.length > 0),
+          unidade: p.unidade,
         })),
       }))}
     />

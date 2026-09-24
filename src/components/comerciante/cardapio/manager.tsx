@@ -19,7 +19,11 @@ import {
   X,
   Star,
   Tag,
+  ScanBarcode,
+  Archive,
+  Store,
 } from "lucide-react"
+import { LeitorCodigoBarras } from "@/components/comerciante/leitor-codigo-barras"
 import { cn } from "@/lib/utils"
 import {
   DndContext,
@@ -37,7 +41,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import type { CardapioCategoria, Produto } from "./types"
-import { displayPreco } from "./utils"
+import { codigosDe, displayPreco } from "./utils"
 import { CategoriaDialog } from "./categoria-dialog"
 import { ProdutoDialog } from "./produto-dialog"
 import { SortableCategoriaWrapper, SortableItemWrapper } from "./sortable-wrappers"
@@ -64,23 +68,34 @@ export function CardapioManager({
   const [busca, setBusca] = useState("")
 
   const buscaAtiva = busca.trim().length > 0
+  const [lendo, setLendo] = useState(false)
+  const [codigoNovo, setCodigoNovo] = useState<string | undefined>(undefined)
+  const [verArquivados, setVerArquivados] = useState(false)
+
+  // Arquivados (fora de linha) saem das categorias e ficam num bloco recolhido.
+  // A ordenação por arrastar trabalha sobre esta lista filtrada.
+  const visiveis = categorias.map((c) => ({ ...c, produtos: c.produtos.filter((p) => !p.arquivado) }))
+  const arquivados = categorias.flatMap((c) => c.produtos.filter((p) => p.arquivado))
 
   // Durante busca: filtra categorias e produtos que dão match
   const categoriasFiltradas = buscaAtiva
-    ? categorias
+    ? visiveis
         .map((cat) => {
           const q = busca.toLowerCase()
+          const qCodigo = busca.replace(/\s+/g, "").toUpperCase()
           const catMatch = cat.nome.toLowerCase().includes(q)
           const produtosFiltrados = cat.produtos.filter(
             (p) =>
               p.titulo.toLowerCase().includes(q) ||
-              p.descricao?.toLowerCase().includes(q)
+              p.descricao?.toLowerCase().includes(q) ||
+              p.marca?.toLowerCase().includes(q) ||
+              codigosDe(p).some((c) => c.startsWith(qCodigo))
           )
           if (!catMatch && produtosFiltrados.length === 0) return null
           return { ...cat, produtos: catMatch ? cat.produtos : produtosFiltrados }
         })
         .filter(Boolean) as CardapioCategoria[]
-    : categorias
+    : visiveis
 
   function toggleColapso(id: string) {
     setColapsadas((prev) => {
@@ -152,12 +167,15 @@ export function CardapioManager({
     }
 
     if (activeId.startsWith("item-") && overId.startsWith("item-")) {
-      for (const cat of categorias) {
+      for (const cat of visiveis) {
         const ids = cat.produtos.map((p) => `item-${p.id}`)
         if (ids.includes(activeId) && ids.includes(overId)) {
           const novosProdutos = arrayMove(cat.produtos, ids.indexOf(activeId), ids.indexOf(overId))
+          // Arquivados da categoria voltam para o fim (não aparecem na lista).
           setCategorias((prev) =>
-            prev.map((c) => (c.id === cat.id ? { ...c, produtos: novosProdutos } : c))
+            prev.map((c) =>
+              c.id === cat.id ? { ...c, produtos: [...novosProdutos, ...c.produtos.filter((p) => p.arquivado)] } : c,
+            )
           )
           salvarOrdemItens(cat.id, novosProdutos)
           return
@@ -238,10 +256,18 @@ export function CardapioManager({
           )}
         </div>
         {!somenteDisponibilidade && (
-          <Button size="sm" onClick={() => { setEditandoCat(null); setCatDialog(true) }}>
-            <FolderPlus className="h-4 w-4 mr-1.5" />
-            Nova categoria
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            {categorias.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => setLendo(true)} title="Ler código de barras">
+                <ScanBarcode className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Escanear</span>
+              </Button>
+            )}
+            <Button size="sm" onClick={() => { setEditandoCat(null); setCatDialog(true) }}>
+              <FolderPlus className="h-4 w-4 mr-1.5" />
+              Nova categoria
+            </Button>
+          </div>
         )}
       </div>
 
@@ -396,6 +422,11 @@ export function CardapioManager({
                                   {/* Info */}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{produto.titulo}</p>
+                                    {(produto.marca || produto.codigoBarras || produto.codigoInterno) && (
+                                      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                                        {[produto.marca, produto.codigoBarras ?? produto.codigoInterno].filter(Boolean).join(" · ")}
+                                      </p>
+                                    )}
                                     {produto.descricao && (
                                       <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{produto.descricao}</p>
                                     )}
@@ -413,6 +444,12 @@ export function CardapioManager({
                                       )}>
                                         {produto.disponivel ? "Visível" : "Oculto"}
                                       </span>
+                                      {produto.mostrarNaVitrine === false && (
+                                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600 flex items-center gap-1">
+                                          <Store className="h-2.5 w-2.5" />
+                                          Só PDV
+                                        </span>
+                                      )}
                                       {produto.destaque && (
                                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 flex items-center gap-1">
                                           <Star className="h-2.5 w-2.5" />
@@ -489,13 +526,70 @@ export function CardapioManager({
         onSaved={handleCatSaved}
       />
 
+      {arquivados.length > 0 && !buscaAtiva && (
+        <div className="space-y-2 border-t border-input pt-4">
+          <button
+            type="button"
+            onClick={() => setVerArquivados((v) => !v)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            <Archive className="h-4 w-4" />
+            Arquivados ({arquivados.length})
+            <ChevronDown className={cn("h-4 w-4 transition-transform", verArquivados && "rotate-180")} />
+          </button>
+          {verArquivados && (
+            <ul className="divide-y divide-input rounded-lg border border-input opacity-70">
+              {arquivados.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                  <span className="min-w-0 truncate">
+                    {p.titulo}
+                    <span className="ml-2 text-xs text-muted-foreground">{p.categoriaCardapio?.nome}</span>
+                  </span>
+                  {!somenteDisponibilidade && (
+                    <button
+                      type="button"
+                      onClick={() => { setEditandoItem(p); setCodigoNovo(undefined); setItemDialog(true) }}
+                      className="shrink-0 text-xs font-medium text-primary hover:underline"
+                    >
+                      Editar
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
+      <LeitorCodigoBarras
+        aberto={lendo}
+        onFechar={() => setLendo(false)}
+        onLido={(codigo) => {
+          // Código existente: abre o item; novo: cadastro com o código preenchido.
+          setLendo(false)
+          const c = codigo.replace(/\s+/g, "").toUpperCase()
+          const existente = categorias.flatMap((cat) => cat.produtos).find((p) => codigosDe(p).includes(c))
+          if (existente) {
+            toast.info(`Código já cadastrado em "${existente.titulo}".`)
+            setEditandoItem(existente)
+            setCodigoNovo(undefined)
+          } else {
+            setEditandoItem(null)
+            setDefaultCatId(categorias[0]?.id)
+            setCodigoNovo(c)
+          }
+          setItemDialog(true)
+        }}
+      />
+
       <ProdutoDialog
         gruposComplemento={gruposComplemento}
         open={itemDialog}
         produto={editandoItem}
         categorias={categorias}
         defaultCategoriaId={defaultCatId}
-        onClose={() => { setItemDialog(false); setDefaultCatId(undefined) }}
+        codigoInicial={codigoNovo}
+        onClose={() => { setItemDialog(false); setDefaultCatId(undefined); setCodigoNovo(undefined) }}
         onSaved={handleProdutoSaved}
       />
     </div>

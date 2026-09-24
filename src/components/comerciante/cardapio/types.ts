@@ -4,6 +4,9 @@ export interface CardapioVariacao {
   preco: number
   ordem: number
   produtoId: string
+  codigoBarras?: string | null
+  codigoInterno?: string | null
+  precoCusto?: number | null
 }
 
 export type TipoProduto = "PRODUTO" | "SERVICO"
@@ -28,6 +31,14 @@ export interface Produto {
   variacoes: CardapioVariacao[]
   // Grupos de complementos do produto ("Borda", "Adicionais").
   complementos?: { grupoId: string }[]
+  // Identificação, custo e onde aparece (opcionais no cadastro).
+  codigoBarras?: string | null
+  codigoInterno?: string | null
+  marca?: string | null
+  precoCusto?: number | null
+  unidade?: string
+  mostrarNaVitrine?: boolean
+  arquivado?: boolean
   createdAt: Date | string
   updatedAt: Date | string
 }
@@ -57,8 +68,15 @@ export interface ProdutoFormState {
   destaque: boolean
   precoPromo: string
   promoFim: string
-  variacoes: { nome: string; preco: string }[]
+  variacoes: { nome: string; preco: string; codigoBarras: string; precoCusto: string }[]
   complementoIds: string[]
+  codigoBarras: string
+  codigoInterno: string
+  marca: string
+  precoCusto: string
+  unidade: string
+  mostrarNaVitrine: boolean
+  arquivado: boolean
   incluirNoCardapio: boolean
   categoriaCardapioId: string
   categoriaCatalogoId: string

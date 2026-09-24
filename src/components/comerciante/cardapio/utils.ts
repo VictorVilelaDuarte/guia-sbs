@@ -1,3 +1,4 @@
+import type { Produto } from "./types"
 export function formatPreco(value: string) {
   const digits = value.replace(/\D/g, "")
   if (!digits) return ""
@@ -13,4 +14,12 @@ export function parsePreco(formatted: string): number | null {
 
 export function displayPreco(preco: number) {
   return preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+}
+
+// Todos os códigos do produto e das variações (já normalizados pelo servidor):
+// a busca e o "Escanear" das listas do painel procuram em todos.
+export function codigosDe(p: Produto): string[] {
+  return [p.codigoBarras, p.codigoInterno, ...p.variacoes.flatMap((v) => [v.codigoBarras, v.codigoInterno])].filter(
+    (c): c is string => !!c,
+  )
 }

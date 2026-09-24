@@ -22,7 +22,12 @@ import {
   UtensilsCrossed,
   Star,
   Tag,
+  ScanBarcode,
+  Archive,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { LeitorCodigoBarras } from "@/components/comerciante/leitor-codigo-barras";
+import { UNIDADES_PRODUTO } from "@/lib/unidades";
 import { cn } from "@/lib/utils";
 import type { Produto, CardapioCategoria, CatalogoCategoria, ProdutoFormState, TipoProduto } from "./types";
 import { formatPreco, parsePreco } from "./utils";
@@ -30,6 +35,18 @@ import { useRecorteQuadrado } from "@/components/imagem/recorte-quadrado";
 import { ACCEPT_IMAGENS, ehImagem } from "@/lib/imagem/heic";
 
 const MAX_IMAGENS = 3;
+
+// Número do banco → texto do campo ("12,50"); vazio quando não há valor.
+const reais = (v: number | null | undefined) =>
+  v != null ? v.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) : "";
+
+// Margem sobre o preço de venda: (preço − custo) / preço.
+function margem(preco: string, custo: string): number | null {
+  const p = parsePreco(preco);
+  const c = parsePreco(custo);
+  if (!p || c == null || p <= 0) return null;
+  return Math.round(((p - c) / p) * 100);
+}
 
 interface ProdutoDialogProps {
   open: boolean;
@@ -40,6 +57,8 @@ interface ProdutoDialogProps {
   gruposComplemento?: { id: string; nome: string; minimo: number; maximo: number; opcoes: { nome: string }[] }[];
   defaultCategoriaId?: string;
   defaultCategoriaCatalogoId?: string;
+  // Produto novo a partir de um código lido que não existe na loja.
+  codigoInicial?: string;
   onClose: () => void;
   onSaved: (produto: Produto) => void;
 }
@@ -53,6 +72,7 @@ export function ProdutoDialog({
   gruposComplemento = [],
   defaultCategoriaId,
   defaultCategoriaCatalogoId,
+  codigoInicial,
   onClose,
   onSaved,
 }: ProdutoDialogProps) {
@@ -76,7 +96,16 @@ export function ProdutoDialog({
     incluirNoCardapio: false,
     categoriaCardapioId: "",
     categoriaCatalogoId: "",
+    codigoBarras: "",
+    codigoInterno: "",
+    marca: "",
+    precoCusto: "",
+    unidade: "UN",
+    mostrarNaVitrine: true,
+    arquivado: false,
   });
+  // Campo que recebe o código lido pela câmera: o do produto ou o de uma variação.
+  const [lendoCodigo, setLendoCodigo] = useState<null | "produto" | number>(null);
   const [uploading, setUploading] = useState(false);
   const { recortar, cropper } = useRecorteQuadrado();
   const [saving, setSaving] = useState(false);
@@ -116,12 +145,21 @@ export function ProdutoDialog({
         variacoes: produto.variacoes.map((v) => ({
           nome: v.nome,
           preco: v.preco.toLocaleString("pt-BR", { minimumFractionDigits: 2 }),
+          codigoBarras: v.codigoBarras ?? "",
+          precoCusto: reais(v.precoCusto),
         })),
         complementoIds: produto.complementos?.map((c) => c.grupoId) ?? [],
         incluirNoCardapio: !!produto.categoriaCardapioId,
         categoriaCardapioId:
           produto.categoriaCardapioId ?? categorias[0]?.id ?? "",
         categoriaCatalogoId: produto.categoriaCatalogoId ?? "",
+        codigoBarras: produto.codigoBarras ?? "",
+        codigoInterno: produto.codigoInterno ?? "",
+        marca: produto.marca ?? "",
+        precoCusto: reais(produto.precoCusto),
+        unidade: produto.unidade ?? "UN",
+        mostrarNaVitrine: produto.mostrarNaVitrine ?? true,
+        arquivado: produto.arquivado ?? false,
       });
     } else {
       const catId = defaultCategoriaId ?? categorias[0]?.id ?? "";
@@ -140,9 +178,16 @@ export function ProdutoDialog({
         incluirNoCardapio: !!defaultCategoriaId,
         categoriaCardapioId: catId,
         categoriaCatalogoId: defaultCategoriaCatalogoId ?? "",
+        codigoBarras: codigoInicial ?? "",
+        codigoInterno: "",
+        marca: "",
+        precoCusto: "",
+        unidade: "UN",
+        mostrarNaVitrine: true,
+        arquivado: false,
       });
     }
-  }, [open, produto, defaultCategoriaId, defaultCategoriaCatalogoId, categorias]);
+  }, [open, produto, defaultCategoriaId, defaultCategoriaCatalogoId, categorias, codigoInicial]);
 
   function handleOpenChange(isOpen: boolean) {
     if (!isOpen) onClose();
@@ -218,7 +263,7 @@ export function ProdutoDialog({
   function addVariacao() {
     setForm((f) => ({
       ...f,
-      variacoes: [...f.variacoes, { nome: "", preco: "" }],
+      variacoes: [...f.variacoes, { nome: "", preco: "", codigoBarras: "", precoCusto: "" }],
     }));
   }
 
@@ -231,21 +276,26 @@ export function ProdutoDialog({
 
   function updateVariacao(
     index: number,
-    field: "nome" | "preco",
+    field: "nome" | "preco" | "codigoBarras" | "precoCusto",
     value: string,
   ) {
     setForm((f) => {
       const next = [...f.variacoes];
       next[index] = {
         ...next[index],
-        [field]: field === "preco" ? formatPreco(value) : value,
+        [field]: field === "preco" || field === "precoCusto" ? formatPreco(value) : value,
       };
       return { ...f, variacoes: next };
     });
   }
 
   function ativarVariacoes() {
-    setForm((f) => ({ ...f, variacoes: [{ nome: "", preco: f.preco }] }));
+    // A primeira variação herda preço, custo e código do produto.
+    setForm((f) => ({
+      ...f,
+      variacoes: [{ nome: "", preco: f.preco, codigoBarras: f.codigoBarras, precoCusto: f.precoCusto }],
+      codigoBarras: "",
+    }));
   }
 
   function desativarVariacoes() {
@@ -296,8 +346,18 @@ export function ProdutoDialog({
       variacoes: form.variacoes.map((v) => ({
         nome: v.nome.trim(),
         preco: parsePreco(v.preco) ?? 0,
+        codigoBarras: v.codigoBarras.trim() || null,
+        precoCusto: parsePreco(v.precoCusto) ?? null,
       })),
       complementoIds: form.complementoIds,
+      // Com variações, o código de barras fica em cada variação.
+      codigoBarras: temVariacoes ? null : form.codigoBarras.trim() || null,
+      codigoInterno: form.codigoInterno.trim() || null,
+      marca: form.marca.trim() || null,
+      precoCusto: temVariacoes ? null : parsePreco(form.precoCusto) ?? null,
+      unidade: form.unidade,
+      mostrarNaVitrine: form.mostrarNaVitrine,
+      arquivado: form.arquivado,
     };
 
     const res = await fetch(
@@ -314,7 +374,9 @@ export function ProdutoDialog({
     setSaving(false);
 
     if (!res.ok) {
-      toast.error("Erro ao salvar produto.");
+      // Ex.: "O código 789… já está no produto Coca-Cola 350ml."
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error ?? "Erro ao salvar produto.");
       return;
     }
 
@@ -499,10 +561,8 @@ export function ProdutoDialog({
                   <span />
                 </div>
                 {form.variacoes.map((v, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-[1fr_7rem_2rem] gap-2 items-center"
-                  >
+                  <div key={i} className="space-y-1.5 rounded-md border border-input/60 p-2">
+                  <div className="grid grid-cols-[1fr_7rem_2rem] gap-2 items-center">
                     <Input
                       placeholder="Ex: Pequeno, Cápsula..."
                       maxLength={80}
@@ -534,6 +594,41 @@ export function ProdutoDialog({
                       <X className="h-4 w-4" />
                     </button>
                   </div>
+                  {/* Código e custo da variação: cada tamanho tem o seu. */}
+                  <div className="grid grid-cols-[1fr_7rem_2rem] gap-2 items-center">
+                    <div className="relative">
+                      <Input
+                        placeholder="Código de barras"
+                        inputMode="numeric"
+                        maxLength={40}
+                        className="h-8 pr-9 text-xs"
+                        value={v.codigoBarras}
+                        onChange={(e) => updateVariacao(i, "codigoBarras", e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setLendoCodigo(i)}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+                        aria-label={`Ler código de barras de ${v.nome || "variação"}`}
+                      >
+                        <ScanBarcode className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">custo</span>
+                      <Input
+                        inputMode="numeric"
+                        placeholder="0,00"
+                        className="h-8 pl-10 text-xs"
+                        value={v.precoCusto}
+                        onChange={(e) => updateVariacao(i, "precoCusto", e.target.value)}
+                      />
+                    </div>
+                    <span className="text-center text-[10px] text-muted-foreground">
+                      {margem(v.preco, v.precoCusto) != null ? `${margem(v.preco, v.precoCusto)}%` : ""}
+                    </span>
+                  </div>
+                  </div>
                 ))}
                 <button
                   type="button"
@@ -544,6 +639,120 @@ export function ProdutoDialog({
                   Adicionar variação
                 </button>
               </div>
+            )}
+          </div>
+
+          {/* Códigos e custo — tudo opcional. Com variações, código de barras e
+              custo ficam em cada variação (acima). */}
+          <div className="space-y-3 rounded-lg border border-input/70 p-3">
+            <p className="text-sm font-medium">Códigos e custo <span className="font-normal text-muted-foreground">(opcional)</span></p>
+            {!temVariacoes && (
+              <div className="space-y-1.5">
+                <Label htmlFor="codigo-barras" className="text-xs text-muted-foreground">Código de barras</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="codigo-barras"
+                    inputMode="numeric"
+                    maxLength={40}
+                    placeholder="Ex: 7891000100103"
+                    value={form.codigoBarras}
+                    onChange={(e) => setForm((f) => ({ ...f, codigoBarras: e.target.value }))}
+                  />
+                  <Button type="button" variant="outline" onClick={() => setLendoCodigo("produto")} className="shrink-0">
+                    <ScanBarcode className="mr-1.5 h-4 w-4" /> Ler
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="codigo-interno" className="text-xs text-muted-foreground">Código interno</Label>
+                <Input
+                  id="codigo-interno"
+                  maxLength={30}
+                  placeholder="Ex: 123"
+                  value={form.codigoInterno}
+                  onChange={(e) => setForm((f) => ({ ...f, codigoInterno: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="marca" className="text-xs text-muted-foreground">Marca</Label>
+                <Input
+                  id="marca"
+                  maxLength={60}
+                  placeholder="Ex: Da casa"
+                  value={form.marca}
+                  onChange={(e) => setForm((f) => ({ ...f, marca: e.target.value }))}
+                />
+              </div>
+              {!temVariacoes && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="preco-custo" className="text-xs text-muted-foreground">Preço de custo</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                    <Input
+                      id="preco-custo"
+                      inputMode="numeric"
+                      placeholder="0,00"
+                      className="pl-9"
+                      value={form.precoCusto}
+                      onChange={(e) => setForm((f) => ({ ...f, precoCusto: formatPreco(e.target.value) }))}
+                    />
+                  </div>
+                  {margem(form.preco, form.precoCusto) != null && (
+                    <p className={cn("text-xs", (margem(form.preco, form.precoCusto) ?? 0) < 0 ? "text-destructive" : "text-muted-foreground")}>
+                      Margem de {margem(form.preco, form.precoCusto)}% sobre o preço
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label htmlFor="unidade" className="text-xs text-muted-foreground">Vendido por</Label>
+                <select
+                  id="unidade"
+                  value={form.unidade}
+                  onChange={(e) => setForm((f) => ({ ...f, unidade: e.target.value }))}
+                  className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {UNIDADES_PRODUTO.map((u) => (
+                    <option key={u.valor} value={u.valor}>{u.rotulo}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Onde aparece */}
+          <div className="space-y-2 rounded-lg border border-input/70 p-3">
+            <p className="text-sm font-medium">Onde aparece</p>
+            <label className="flex items-start justify-between gap-3 text-sm">
+              <span>
+                Mostrar na vitrine e no cardápio online
+                <span className="block text-xs text-muted-foreground">
+                  Desligado, o item só aparece no PDV (ex.: sacola, gelo, embalagem).
+                </span>
+              </span>
+              <Switch
+                checked={form.mostrarNaVitrine}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, mostrarNaVitrine: v }))}
+              />
+            </label>
+            {isEdicao && (
+              <label className="flex items-start justify-between gap-3 border-t border-input/60 pt-2 text-sm">
+                <span className="flex items-start gap-2">
+                  <Archive className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span>
+                    Arquivado (fora de linha)
+                    <span className="block text-xs text-muted-foreground">
+                      Some da vitrine e do PDV. O histórico de vendas continua.
+                    </span>
+                  </span>
+                </span>
+                <Switch
+                  checked={form.arquivado}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, arquivado: v }))}
+                />
+              </label>
             )}
           </div>
 
@@ -848,6 +1057,15 @@ export function ProdutoDialog({
       </DialogContent>
     </Dialog>
     {cropper}
+    <LeitorCodigoBarras
+      aberto={lendoCodigo !== null}
+      onFechar={() => setLendoCodigo(null)}
+      onLido={(codigo) => {
+        if (lendoCodigo === "produto") setForm((f) => ({ ...f, codigoBarras: codigo }));
+        else if (typeof lendoCodigo === "number") updateVariacao(lendoCodigo, "codigoBarras", codigo);
+        setLendoCodigo(null);
+      }}
+    />
     </>
   );
 }

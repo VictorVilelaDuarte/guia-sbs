@@ -5,12 +5,10 @@ import { negarLimiteCatalogo } from "@/lib/plan-limites"
 import type { Permissao } from "@/lib/gestao/permissoes"
 import { z } from "zod"
 import { vincularGrupos } from "@/lib/gestao/complementos"
+import { camposCadastroSchema, variacaoSchema } from "@/lib/produto-campos"
+import { conflitoDeCodigos } from "@/lib/produtos-codigos"
 import { deleteFile } from "@/lib/supabase-storage"
 
-const variacaoSchema = z.object({
-  nome: z.string().min(1).max(80),
-  preco: z.number().nonnegative(),
-})
 
 const patchSchema = z.object({
   tipo: z.enum(["PRODUTO", "SERVICO"]).optional(),
@@ -26,6 +24,7 @@ const patchSchema = z.object({
   categoriaCatalogoId: z.string().optional().nullable(),
   variacoes: z.array(variacaoSchema).optional(),
   complementoIds: z.array(z.string()).max(10).optional(), // grupos de complementos do produto
+  ...camposCadastroSchema, // códigos, marca, custo, unidade, onde aparece
 })
 
 // Cardápio e catálogo compartilham o model Produto: a permissão de edição
@@ -65,8 +64,10 @@ export async function PATCH(
   // Só ligar/desligar a disponibilidade (botão Visível/Oculto) é liberado para
   // quem tem itens:disponibilidade (ex.: atendente). Qualquer outro campo exige
   // editar o cardápio/catálogo — na origem e no destino, se o item mudar de lugar.
-  const soDisponibilidade =
-    Object.keys(parsed.data).length === 1 && parsed.data.disponivel !== undefined
+  // Conta só os campos enviados: os opcionais com transform (códigos, marca)
+  // podem voltar do Zod como chave com valor undefined.
+  const enviados = Object.entries(parsed.data).filter(([, v]) => v !== undefined)
+  const soDisponibilidade = enviados.length === 1 && parsed.data.disponivel !== undefined
   if (!(soDisponibilidade && pode(ctx, "itens:disponibilidade"))) {
     const origem = permissaoDeEdicao(produto.categoriaCardapioId)
     const destino =
@@ -96,6 +97,23 @@ export async function PATCH(
     if (!categoria || categoria.comercioId !== produto.comercioId || categoria.tipo !== tipoAlvo) {
       return NextResponse.json({ error: "Categoria não encontrada." }, { status: 404 })
     }
+  }
+
+  // Códigos: confere o estado final (o que veio no PATCH, senão o atual).
+  const mexeEmCodigos =
+    parsed.data.codigoBarras !== undefined || parsed.data.codigoInterno !== undefined || parsed.data.variacoes !== undefined
+  if (mexeEmCodigos) {
+    const conflito = await conflitoDeCodigos(
+      prisma,
+      produto.comercioId,
+      {
+        codigoBarras: parsed.data.codigoBarras !== undefined ? parsed.data.codigoBarras : produto.codigoBarras,
+        codigoInterno: parsed.data.codigoInterno !== undefined ? parsed.data.codigoInterno : produto.codigoInterno,
+        variacoes: parsed.data.variacoes ?? produto.variacoes,
+      },
+      produto.id,
+    )
+    if (conflito) return NextResponse.json({ error: conflito }, { status: 409 })
   }
 
   // Entrar no catálogo (saindo do cardápio) ou trocar de aba conta no limite do plano.

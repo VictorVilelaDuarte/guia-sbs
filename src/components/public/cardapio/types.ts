@@ -32,6 +32,7 @@ export interface Produto {
   imagens: string[];
   variacoes: Variacao[];
   complementos?: GrupoComplementoPublico[];
+  unidade?: string; // "KG" → preço exibido "/ kg"
 }
 
 export interface Categoria {

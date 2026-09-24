@@ -11,6 +11,7 @@ import { parseHorarios, getDiaAtual, estaAbertoAgora } from "@/lib/horarios"
 import { vincularCliente } from "@/lib/gestao/clientes"
 import { gruposDosProdutos, resolverComplementos, type SnapshotComplemento } from "@/lib/gestao/complementos"
 import { ErroVenda } from "@/lib/gestao/vendas"
+import { cadastroDoItem } from "@/lib/produtos-codigos"
 
 // Rota PÚBLICA — sem auth. O servidor é a autoridade: ignora qualquer preço
 // vindo do cliente, recarrega itens do banco e recalcula subtotal/total.
@@ -111,6 +112,9 @@ export async function POST(req: NextRequest) {
       id: { in: ids },
       comercioId: comercio.id,
       disponivel: true,
+      // Cliente só pede o que aparece no cardápio público.
+      arquivado: false,
+      mostrarNaVitrine: true,
       categoriaCardapioId: { not: null },
     },
     include: { variacoes: true },
@@ -125,6 +129,8 @@ export async function POST(req: NextRequest) {
     quantidade: number
     observacao: string | null
     complementos: SnapshotComplemento[]
+    codigo: string | null
+    custo: number | null
   }[] = []
 
   // Grupos de complementos dos itens do carrinho (mesma validação do PDV).
@@ -136,12 +142,14 @@ export async function POST(req: NextRequest) {
 
     let precoUnit: number
     let variacaoNome: string | null = null
+    let cadastro = cadastroDoItem(p)
 
     if (p.variacoes.length > 0) {
       const v = p.variacoes.find((v) => v.id === item.variacaoId)
       if (!v) return erro(`Escolha uma opção para "${p.titulo}".`)
       precoUnit = v.preco
       variacaoNome = v.nome
+      cadastro = cadastroDoItem(p, v)
     } else {
       const efetivo = precoEfetivo(p)
       if (efetivo == null) return erro(`"${p.titulo}" está sem preço e não pode ser pedido.`)
@@ -166,6 +174,7 @@ export async function POST(req: NextRequest) {
       quantidade: item.quantidade,
       observacao: item.observacao?.trim() || null,
       complementos,
+      ...cadastro,
     })
   }
 
@@ -223,9 +232,10 @@ export async function POST(req: NextRequest) {
         taxaEntrega: deCentavos(taxaC),
         total: deCentavos(totalC),
         itens: {
-          create: snapshots.map(({ complementos, ...s }) => ({
+          create: snapshots.map(({ complementos, custo, ...s }) => ({
             ...s,
             precoUnit: deCentavos(centavosDe(s.precoUnit)),
+            custoUnit: custo != null ? deCentavos(centavosDe(custo)) : null,
             complementos: { create: complementos.map((c) => ({ grupoNome: c.grupoNome, nome: c.nome, precoUnit: deCentavos(c.precoC), quantidade: c.quantidade })) },
           })),
         },

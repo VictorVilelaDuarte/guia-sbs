@@ -538,6 +538,12 @@ fase de que depende estiver em produção e houver demanda real.
 | Fiscal (NFC-e / NF-e) | Fase 3 | Via provedor de emissão (API), nunca integração direta com SEFAZ |
 | E-mail transacional | Fase 1 | Destrava convite de membro por e-mail e recuperação de senha |
 | PDV de balcão com hardware | Fases 3 e 4 | Só se a venda manual pelo celular não bastar |
+| Estoque no cadastro do produto (`controlaEstoque`, `estoqueMinimo`) | Fase 4 | Pedido de 2026-09-24: o saldo vem da tabela de movimentos da Fase 4; sem ela os campos não fariam nada |
+| Dados fiscais do produto (NCM, CEST, CFOP, origem) | Fiscal | Pedido de 2026-09-24: seção recolhida "Dados fiscais" no formulário, quando a NFC-e entrar |
+| Venda por peso (quantidade decimal: 1,250 kg) | Cadastro (2026-09-24) | `unidade` já existe (só exibição); falta quantidade decimal em carrinho, PDV, `PedidoItem` e relatórios |
+| Importar produtos por planilha (CSV) | Cadastro (2026-09-24) | Com código de barras no cadastro, loja que já tem sistema chega com centenas de itens |
+| Nome e foto do produto pelo código de barras | Cadastro (2026-09-24) | Consulta a base externa de EAN (ex.: Cosmos/Bluesoft, exige token) ao ler um código novo |
+| Relatório de margem por produto | `PedidoItem.custoUnit` (2026-09-24) | O custo já é guardado em cada venda; falta a tela (ideia 1.3 do banco de ideias) |
 
 O `docs/integracao-erp.md` (arquivado) tem desenho reaproveitável se algum dia for preciso expor
 API para sistemas de terceiros: auth de máquina, webhook assinado com HMAC, reconciliação

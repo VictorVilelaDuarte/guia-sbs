@@ -24,7 +24,11 @@ export interface ItemCatalogoPdv {
   grupoOrdem: number
   disponivel: boolean
   preco: number | null // preço vigente (promoção considerada); null quando há variações
-  variacoes: { id: string; nome: string; preco: number }[]
+  // Código de barras e código interno — a busca acha por eles e a leitura exata lança direto.
+  codigos: string[]
+  marca: string | null
+  unidade: string
+  variacoes: { id: string; nome: string; preco: number; codigos: string[] }[]
   complementos: GrupoComplementoPdv[]
 }
 

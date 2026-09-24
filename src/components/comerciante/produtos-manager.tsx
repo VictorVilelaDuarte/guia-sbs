@@ -8,10 +8,12 @@ import { toast } from "sonner"
 import {
   Plus, Pencil, Trash2, Loader2,
   PackageOpen, Eye, EyeOff, UtensilsCrossed, Search, X, Star, Tag, Wrench, Check, FolderPlus,
+  ScanBarcode, Archive, ChevronDown, Store,
 } from "lucide-react"
+import { LeitorCodigoBarras } from "./leitor-codigo-barras"
 import { cn } from "@/lib/utils"
 import type { Produto, CardapioCategoria, CatalogoCategoria, TipoProduto } from "./cardapio/types"
-import { displayPreco } from "./cardapio/utils"
+import { codigosDe, displayPreco } from "./cardapio/utils"
 import { ProdutoDialog } from "./cardapio/produto-dialog"
 
 export function ProdutosManager({
@@ -56,31 +58,57 @@ export function ProdutosManager({
   const [editandoCategoriaId, setEditandoCategoriaId] = useState<string | null>(null)
   const [nomeEdicaoCategoria, setNomeEdicaoCategoria] = useState("")
 
+  // Limite conta arquivados também (o servidor conta todos os itens da aba).
   const atingiuLimite = limite !== undefined && produtos.length >= limite
+  // Arquivado = fora de linha: sai da lista principal e fica num bloco recolhido.
+  const ativos = produtos.filter((p) => !p.arquivado)
+  const arquivados = produtos.filter((p) => p.arquivado)
+  const [verArquivados, setVerArquivados] = useState(false)
+  const [lendo, setLendo] = useState(false)
+  const [codigoNovo, setCodigoNovo] = useState<string | undefined>(undefined)
 
   const produtosFiltrados = busca.trim()
-    ? produtos.filter((p) => {
+    ? ativos.filter((p) => {
         const q = busca.toLowerCase()
+        const qCodigo = busca.replace(/\s+/g, "").toUpperCase()
         return (
           p.titulo.toLowerCase().includes(q) ||
-          p.descricao?.toLowerCase().includes(q)
+          p.descricao?.toLowerCase().includes(q) ||
+          p.marca?.toLowerCase().includes(q) ||
+          codigosDe(p).some((c) => c.startsWith(qCodigo))
         )
       })
-    : produtos
+    : ativos
 
-  function abrirNovo(catId?: string) {
+  function abrirNovo(catId?: string, codigo?: string) {
     if (atingiuLimite) {
       toast.warning(`Limite de ${limite} ${labelPlural} atingido. Faça upgrade para o plano Premium.`)
       return
     }
     setEditando(null)
     setDefaultCatId(catId)
+    setCodigoNovo(codigo)
     setDialogOpen(true)
+  }
+
+  // Leu um código pela câmera: se já existe nesta aba, abre o produto; se não,
+  // abre o cadastro novo com o código preenchido (cadastro rápido pelo celular).
+  function codigoLido(codigo: string) {
+    setLendo(false)
+    const c = codigo.replace(/\s+/g, "").toUpperCase()
+    const existente = produtos.find((p) => codigosDe(p).includes(c))
+    if (existente) {
+      toast.info(`Código já cadastrado em "${existente.titulo}".`)
+      abrirEdicao(existente)
+    } else {
+      abrirNovo(undefined, c)
+    }
   }
 
   function abrirEdicao(produto: Produto) {
     setEditando(produto)
     setDefaultCatId(undefined)
+    setCodigoNovo(undefined)
     setDialogOpen(true)
   }
 
@@ -193,6 +221,11 @@ export function ProdutosManager({
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{p.titulo}</p>
+          {(p.marca || p.codigoBarras || p.codigoInterno) && (
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              {[p.marca, p.codigoBarras ?? p.codigoInterno].filter(Boolean).join(" · ")}
+            </p>
+          )}
           {p.descricao && (
             <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{p.descricao}</p>
           )}
@@ -210,6 +243,12 @@ export function ProdutosManager({
             )}>
               {p.disponivel ? "Visível" : "Oculto"}
             </span>
+            {p.mostrarNaVitrine === false && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600 flex items-center gap-1">
+                <Store className="h-2.5 w-2.5" />
+                Só PDV
+              </span>
+            )}
             {p.destaque && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 flex items-center gap-1">
                 <Star className="h-2.5 w-2.5" />
@@ -271,7 +310,7 @@ export function ProdutosManager({
 
   // Itens sem categoria (ou cuja categoria não existe mais) → bloco "Outros"
   const catIds = new Set(categorias.map((c) => c.id))
-  const semCategoria = produtos.filter(
+  const semCategoria = ativos.filter(
     (p) => !p.categoriaCatalogoId || !catIds.has(p.categoriaCatalogoId),
   )
   const buscaAtiva = busca.trim().length > 0
@@ -300,6 +339,10 @@ export function ProdutosManager({
         </div>
         {!somenteDisponibilidade && (
           <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={() => setLendo(true)} title="Ler código de barras">
+              <ScanBarcode className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Escanear</span>
+            </Button>
             <Button size="sm" variant="outline" onClick={() => setCriandoCategoria(true)}>
               <FolderPlus className="h-4 w-4 mr-1.5" />
               Categoria
@@ -387,7 +430,7 @@ export function ProdutosManager({
         // Agrupado por categoria + bloco "Outros" no fim
         <div className="space-y-6">
           {categorias.map((cat) => {
-            const itens = produtos.filter((p) => p.categoriaCatalogoId === cat.id)
+            const itens = ativos.filter((p) => p.categoriaCatalogoId === cat.id)
             return (
               <div key={cat.id} className="space-y-3">
                 <div className="flex items-center justify-between gap-2 border-b border-input pb-1.5">
@@ -491,10 +534,32 @@ export function ProdutosManager({
         </div>
       )}
 
+      {arquivados.length > 0 && (
+        <div className="space-y-3 border-t border-input pt-4">
+          <button
+            type="button"
+            onClick={() => setVerArquivados((v) => !v)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            <Archive className="h-4 w-4" />
+            Arquivados ({arquivados.length})
+            <ChevronDown className={cn("h-4 w-4 transition-transform", verArquivados && "rotate-180")} />
+          </button>
+          {verArquivados && (
+            <div className="grid gap-3 opacity-70 sm:grid-cols-2">
+              {arquivados.map((p) => <ItemRow key={p.id} p={p} />)}
+            </div>
+          )}
+        </div>
+      )}
+
+      <LeitorCodigoBarras aberto={lendo} onFechar={() => setLendo(false)} onLido={codigoLido} />
+
       <ProdutoDialog
         gruposComplemento={gruposComplemento}
         open={dialogOpen}
         produto={editando}
+        codigoInicial={codigoNovo}
         tipo={tipo}
         categorias={tipo === "PRODUTO" ? categoriasCardapio : []}
         categoriasCatalogo={categorias}

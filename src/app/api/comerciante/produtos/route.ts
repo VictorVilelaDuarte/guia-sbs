@@ -4,11 +4,9 @@ import { getComercioCtx, negarSemPermissao } from "@/lib/comercio-ctx"
 import { negarLimiteCatalogo } from "@/lib/plan-limites"
 import { z } from "zod"
 import { vincularGrupos } from "@/lib/gestao/complementos"
+import { camposCadastroSchema, variacaoSchema } from "@/lib/produto-campos"
+import { conflitoDeCodigos } from "@/lib/produtos-codigos"
 
-const variacaoSchema = z.object({
-  nome: z.string().min(1).max(80),
-  preco: z.number().nonnegative(),
-})
 
 const createSchema = z.object({
   tipo: z.enum(["PRODUTO", "SERVICO"]).optional(),
@@ -24,6 +22,7 @@ const createSchema = z.object({
   categoriaCatalogoId: z.string().optional().nullable(),
   variacoes: z.array(variacaoSchema).optional(),
   complementoIds: z.array(z.string()).max(10).optional(), // grupos de complementos do produto
+  ...camposCadastroSchema, // códigos, marca, custo, unidade, onde aparece
 })
 
 export async function GET() {
@@ -87,6 +86,9 @@ export async function POST(req: NextRequest) {
     const limite = await negarLimiteCatalogo(ctx.comercioId, ctx.features, parsed.data.tipo ?? "PRODUTO")
     if (limite) return limite
   }
+
+  const conflito = await conflitoDeCodigos(prisma, ctx.comercioId, parsed.data)
+  if (conflito) return NextResponse.json({ error: conflito }, { status: 409 })
 
   const { variacoes, complementoIds, ...produtoData } = parsed.data
   const count = await prisma.produto.count({ where: { comercioId: ctx.comercioId } })

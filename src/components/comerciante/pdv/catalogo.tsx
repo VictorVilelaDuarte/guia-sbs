@@ -1,15 +1,19 @@
 "use client"
 
 import { forwardRef, useMemo, useState } from "react"
-import { Minus, PackagePlus, Plus, Search, X } from "lucide-react"
+import { Minus, PackagePlus, Plus, ScanBarcode, Search, X } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { brl, centavos, parseReais, type ComplementoPdv, type ItemCatalogoPdv } from "./tipos"
+import { LeitorCodigoBarras } from "@/components/comerciante/leitor-codigo-barras"
+import { sufixoUnidade } from "@/lib/unidades"
 
 type Variacao = ItemCatalogoPdv["variacoes"][number]
 
 // Grade de produtos do PDV: busca, categorias e botões grandes (toque e mouse).
 // Enter na busca adiciona o primeiro resultado; produto com variações abre a escolha.
+// Código de barras/interno: leitor USB/Bluetooth (digita + Enter) ou a câmera do
+// celular — código exato lança o item direto, já na variação daquele código.
 export const CatalogoPdv = forwardRef<HTMLInputElement, {
   itens: ItemCatalogoPdv[]
   onAdicionar: (item: ItemCatalogoPdv, variacao?: Variacao, complementos?: ComplementoPdv[]) => void
@@ -17,7 +21,9 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
 }>(function CatalogoPdv({ itens, onAdicionar, onAvulso }, buscaRef) {
   const [busca, setBusca] = useState("")
   const [grupo, setGrupo] = useState<string | null>(null)
-  const [escolhendo, setEscolhendo] = useState<ItemCatalogoPdv | null>(null)
+  const [escolhendo, setEscolhendo] = useState<{ item: ItemCatalogoPdv; variacao?: Variacao } | null>(null)
+  const [camera, setCamera] = useState(false)
+  const [naoAchado, setNaoAchado] = useState<string | null>(null)
   const [avulso, setAvulso] = useState<{ titulo: string; preco: string } | null>(null)
 
   const grupos = useMemo(() => {
@@ -28,8 +34,15 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
 
   const visiveis = useMemo(() => {
     const q = busca.trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{Diacritic}/gu, "")
+    const qCodigo = busca.replace(/\s+/g, "").toUpperCase()
+    const semAcento = (t: string) => t.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{Diacritic}/gu, "")
     const base = q
-      ? itens.filter((i) => i.titulo.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{Diacritic}/gu, "").includes(q))
+      ? itens.filter(
+          (i) =>
+            semAcento(i.titulo).includes(q) ||
+            (i.marca && semAcento(i.marca).includes(q)) ||
+            [...i.codigos, ...i.variacoes.flatMap((v) => v.codigos)].some((c) => c.startsWith(qCodigo)),
+        )
       : grupo
         ? itens.filter((i) => i.grupo === grupo)
         : itens
@@ -39,8 +52,35 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
   function tocar(item: ItemCatalogoPdv) {
     if (!item.disponivel) return
     // Variação e/ou complementos: abre a escolha antes de lançar.
-    if (item.variacoes.length > 0 || item.complementos.length > 0) setEscolhendo(item)
+    if (item.variacoes.length > 0 || item.complementos.length > 0) setEscolhendo({ item })
     else onAdicionar(item)
+  }
+
+  // Código exato (produto ou variação) → lança. Devolve false se não achou.
+  function lancarCodigo(bruto: string): boolean {
+    const codigo = bruto.replace(/\s+/g, "").toUpperCase()
+    if (!codigo) return false
+    for (const item of itens) {
+      const variacao = item.variacoes.find((v) => v.codigos.includes(codigo))
+      if (!variacao && !item.codigos.includes(codigo)) continue
+      if (!item.disponivel) return true // achou, mas está indisponível: não lança
+      const precisaEscolher = item.complementos.length > 0 || (!variacao && item.variacoes.length > 0)
+      if (precisaEscolher) setEscolhendo({ item, variacao })
+      else onAdicionar(item, variacao)
+      return true
+    }
+    return false
+  }
+
+  function lido(codigo: string) {
+    setCamera(false)
+    if (lancarCodigo(codigo)) {
+      setBusca("")
+      setNaoAchado(null)
+    } else {
+      setBusca(codigo)
+      setNaoAchado(codigo)
+    }
   }
 
   function confirmarAvulso() {
@@ -59,9 +99,18 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
           <input
             ref={buscaRef}
             value={busca}
-            onChange={(e) => setBusca(e.target.value)}
+            onChange={(e) => {
+              setBusca(e.target.value)
+              setNaoAchado(null)
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
+                // Leitor de código de barras "digita" o código e aperta Enter.
+                if (lancarCodigo(busca)) {
+                  setBusca("")
+                  setNaoAchado(null)
+                  return
+                }
                 const primeiro = visiveis.find((i) => i.disponivel)
                 if (primeiro) {
                   tocar(primeiro)
@@ -70,14 +119,24 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
               }
               if (e.key === "Escape") setBusca("")
             }}
-            placeholder="Buscar produto  ( / )"
-            className="h-11 w-full rounded-xl border border-stone-200 bg-stone-50 pl-9 pr-9 text-[16px] outline-none focus:border-stone-400 focus:bg-white"
+            placeholder="Buscar produto ou código  ( / )"
+            className="h-11 w-full rounded-xl border border-stone-200 bg-stone-50 pl-9 pr-20 text-[16px] outline-none focus:border-stone-400 focus:bg-white"
           />
-          {busca && (
-            <button type="button" aria-label="Limpar busca" onClick={() => setBusca("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400">
-              <X className="h-4 w-4" />
+          <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+            {busca && (
+              <button type="button" aria-label="Limpar busca" onClick={() => { setBusca(""); setNaoAchado(null) }} className="rounded-md p-1.5 text-stone-400">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Ler código de barras com a câmera"
+              onClick={() => setCamera(true)}
+              className="rounded-md p-1.5 text-stone-600 hover:bg-stone-100"
+            >
+              <ScanBarcode className="h-5 w-5" />
             </button>
-          )}
+          </div>
         </div>
         {!busca && grupos.length > 1 && (
           <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-0.5 scrollbar-none">
@@ -119,7 +178,7 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
                   ? "Indisponível"
                   : i.variacoes.length > 0
                     ? `${i.variacoes.length} opções · a partir de ${brl(centavos(Math.min(...i.variacoes.map((v) => v.preco))))}`
-                    : brl(centavos(i.preco ?? 0))}
+                    : brl(centavos(i.preco ?? 0)) + sufixoUnidade(i.unidade)}
               </span>
             </button>
           ))}
@@ -133,26 +192,35 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
           </button>
         </div>
         {visiveis.length === 0 && (
-          <p className="py-8 text-center text-sm text-stone-500">Nenhum produto encontrado. Use o item avulso para vender algo fora do cardápio.</p>
+          <p className="py-8 text-center text-sm text-stone-500">
+            {naoAchado
+              ? `Nenhum produto com o código ${naoAchado}. Cadastre o código no produto ou use o item avulso.`
+              : "Nenhum produto encontrado. Use o item avulso para vender algo fora do cardápio."}
+          </p>
         )}
       </div>
 
       <Dialog open={!!escolhendo} onOpenChange={(o) => !o && setEscolhendo(null)}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{escolhendo?.titulo}</DialogTitle>
+            <DialogTitle>{escolhendo?.item.titulo}</DialogTitle>
           </DialogHeader>
           {escolhendo && (
             <EscolhaItem
-              item={escolhendo}
+              // key: abrir outro item (ou outra variação lida) recomeça a escolha
+              key={`${escolhendo.item.id}:${escolhendo.variacao?.id ?? ""}`}
+              item={escolhendo.item}
+              variacaoInicial={escolhendo.variacao}
               onConfirmar={(variacao, complementos) => {
-                onAdicionar(escolhendo, variacao, complementos)
+                onAdicionar(escolhendo.item, variacao, complementos)
                 setEscolhendo(null)
               }}
             />
           )}
         </DialogContent>
       </Dialog>
+
+      <LeitorCodigoBarras aberto={camera} onFechar={() => setCamera(false)} onLido={lido} />
 
       <Dialog open={!!avulso} onOpenChange={(o) => !o && setAvulso(null)}>
         <DialogContent className="sm:max-w-sm">
@@ -197,8 +265,16 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
 
 
 // Escolha de variação e complementos antes de lançar o item (PDV).
-function EscolhaItem({ item, onConfirmar }: { item: ItemCatalogoPdv; onConfirmar: (variacao?: Variacao, complementos?: ComplementoPdv[]) => void }) {
-  const [variacao, setVariacao] = useState<Variacao | null>(item.variacoes[0] ?? null)
+function EscolhaItem({
+  item,
+  variacaoInicial,
+  onConfirmar,
+}: {
+  item: ItemCatalogoPdv
+  variacaoInicial?: Variacao
+  onConfirmar: (variacao?: Variacao, complementos?: ComplementoPdv[]) => void
+}) {
+  const [variacao, setVariacao] = useState<Variacao | null>(variacaoInicial ?? item.variacoes[0] ?? null)
   const [escolhas, setEscolhas] = useState<Record<string, number>>({})
 
   const baseC = centavos(variacao?.preco ?? item.preco ?? 0)

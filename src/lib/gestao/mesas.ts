@@ -12,6 +12,7 @@ import { novoToken } from "@/lib/gestao/mesas-token"
 export { novoToken }
 import { autorNomeDe, ErroVenda, proximoNumero } from "@/lib/gestao/vendas"
 import { temFeature } from "@/lib/plan-features"
+import { cadastroDoItem } from "@/lib/produtos-codigos"
 
 // Mesas com QR Code (docs/gestao-ideias.md 5.2). O QR é fixo e aponta para
 // /mesa/[token]: o cliente vê a conta da mesa em tempo real, chama o garçom e
@@ -344,7 +345,8 @@ export async function cardapioDaMesa(token: string): Promise<CardapioDaMesa | nu
       id: true,
       nome: true,
       produtos: {
-        where: { disponivel: true },
+        // Pedido do cliente na mesa: mesma regra do cardápio público.
+        where: { disponivel: true, arquivado: false, mostrarNaVitrine: true },
         orderBy: [{ ordem: "asc" }, { titulo: "asc" }],
         select: {
           id: true, titulo: true, descricao: true, preco: true, precoPromo: true, promoFim: true, destaque: true, imagens: true,
@@ -421,7 +423,7 @@ export async function pedirNaMesa(token: string, input: PedidoDaMesaInput) {
   // Preço e disponibilidade sempre do banco — o celular do cliente nunca manda valor.
   const ids = [...new Set(input.itens.map((i) => i.produtoId))]
   const produtos = await prisma.produto.findMany({
-    where: { id: { in: ids }, comercioId: mesa.comercioId, disponivel: true, categoriaCardapioId: { not: null } },
+    where: { id: { in: ids }, comercioId: mesa.comercioId, disponivel: true, arquivado: false, mostrarNaVitrine: true, categoriaCardapioId: { not: null } },
     include: { variacoes: true },
   })
   const mapa = new Map(produtos.map((p) => [p.id, p]))
@@ -436,7 +438,8 @@ export async function pedirNaMesa(token: string, input: PedidoDaMesaInput) {
       throw new ErroVenda(`Escolha uma opção para "${p.titulo}".`)
     }
     const extras = resolverComplementos(p.titulo, gruposPorProduto.get(p.id) ?? [], item.complementos)
-    const base = { produtoId: p.id, quantidade: item.quantidade, observacao: item.observacao?.trim().slice(0, 140) || null, complementos: extras.snapshots }
+    const va = p.variacoes.find((x) => x.id === item.variacaoId) ?? null
+    const base = { produtoId: p.id, quantidade: item.quantidade, observacao: item.observacao?.trim().slice(0, 140) || null, complementos: extras.snapshots, ...cadastroDoItem(p, va) }
     if (p.variacoes.length > 0) {
       const v = p.variacoes.find((x) => x.id === item.variacaoId)!
       return { ...base, titulo: p.titulo, variacaoNome: v.nome, precoC: centavosDe(v.preco) + extras.extraC }
@@ -504,6 +507,8 @@ export async function pedirNaMesa(token: string, input: PedidoDaMesaInput) {
           titulo: l.titulo,
           variacaoNome: l.variacaoNome,
           precoUnit: deCentavos(l.precoC),
+          codigo: l.codigo,
+          custoUnit: l.custo != null ? deCentavos(centavosDe(l.custo)) : null,
           quantidade: l.quantidade,
           observacao: l.observacao,
           solicitadoPor: nome,

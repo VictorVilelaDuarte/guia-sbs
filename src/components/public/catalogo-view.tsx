@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronLeft, MessageCircle, Search, X, PackageOpen, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProdutoBottomSheet, type ProdutoSheet } from "./cardapio/produto-bottom-sheet";
+import { sufixoUnidade } from "@/lib/unidades";
 
 interface Variacao {
   id: string;
@@ -25,6 +26,7 @@ interface Item {
   imagens: string[];
   categoriaCatalogoId: string | null;
   variacoes: Variacao[];
+  unidade?: string;
 }
 
 interface CategoriaRef {
@@ -107,7 +109,7 @@ function ItemCard({ item, now, onClick }: { item: Item; now: number; onClick: ()
             </p>
           ) : precoExibido != null ? (
             <div className="flex items-baseline gap-1.5 flex-wrap">
-              <span className="text-sm font-bold text-stone-900">{formatBRL(precoExibido)}</span>
+              <span className="text-sm font-bold text-stone-900">{formatBRL(precoExibido)}{sufixoUnidade(item.unidade)}</span>
               {promoAtiva && precoBase != null && precoBase !== precoExibido && (
                 <span className="text-xs text-stone-400 line-through">{formatBRL(precoBase)}</span>
               )}

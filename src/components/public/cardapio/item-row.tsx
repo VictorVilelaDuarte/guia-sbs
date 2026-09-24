@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { type Produto, formatBRL, isPromoAtiva } from "./types";
+import { sufixoUnidade } from "@/lib/unidades";
 
 interface Props {
   produto: Produto & { categoriaNome?: string };
@@ -50,6 +51,7 @@ export function ItemRow({ produto, now, onClick, noPedido = 0 }: Props) {
             <div className="flex items-baseline gap-2">
               <span className="text-sm font-bold text-stone-900">
                 {formatBRL(promoAtiva ? produto.precoPromo! : produto.preco)}
+                {sufixoUnidade(produto.unidade)}
               </span>
               {promoAtiva && (
                 <span className="text-xs text-stone-400 line-through">

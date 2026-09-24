@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { type Produto, formatBRL, isPromoAtiva } from "./types";
+import { sufixoUnidade } from "@/lib/unidades";
 
 const DIAMOND = "✦";
 
@@ -51,6 +52,7 @@ export function DestaqueCard({ produto, now, onClick }: Props) {
           <div className="mt-2 flex items-baseline gap-1.5 flex-wrap">
             <span className="text-sm font-bold text-stone-900">
               {formatBRL(precoExibido)}
+              {sufixoUnidade(produto.unidade)}
             </span>
             {promoAtiva && precoBase != null && precoBase !== precoExibido && (
               <span className="text-xs text-stone-400 line-through">

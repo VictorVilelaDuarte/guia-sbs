@@ -231,6 +231,8 @@ export async function lancarItens(ctx: ComercioCtx, id: string, itens: ItemVenda
           titulo: s.titulo,
           variacaoNome: s.variacaoNome,
           precoUnit: deCentavos(s.precoC),
+          codigo: s.codigo,
+          custoUnit: s.custo != null ? deCentavos(centavosDe(s.custo)) : null,
           quantidade: s.quantidade,
           observacao: s.observacao,
           desconto: deCentavos(s.descontoC),

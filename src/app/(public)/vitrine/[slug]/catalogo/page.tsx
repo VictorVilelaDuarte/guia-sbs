@@ -34,7 +34,7 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
       telefone: true,
       plan: { select: { features: true } },
       produtos: {
-        where: { disponivel: true, categoriaCardapioId: null },
+        where: { disponivel: true, arquivado: false, mostrarNaVitrine: true, categoriaCardapioId: null },
         orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
         include: { variacoes: { orderBy: { ordem: "asc" } } },
       },
@@ -80,6 +80,7 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
         imagens: p.imagens,
         categoriaCatalogoId: p.categoriaCatalogoId,
         variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
+        unidade: p.unidade,
       }))}
       categoriasProdutos={categoriasProdutos}
       categoriasServicos={categoriasServicos}
@@ -95,6 +96,7 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
         imagens: p.imagens,
         categoriaCatalogoId: p.categoriaCatalogoId,
         variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
+        unidade: p.unidade,
       }))}
       now={Date.now()}
     />

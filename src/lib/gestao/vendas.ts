@@ -9,6 +9,7 @@ import { normalizarWhatsapp, vincularCliente } from "@/lib/gestao/clientes"
 import { gruposDosProdutos, resolverComplementos, type EscolhaComplemento, type SnapshotComplemento } from "@/lib/gestao/complementos"
 import { calcularTotais, MAX_PERCENTUAL_SERVICO, type DescontoConta } from "@/lib/gestao/totais"
 import { temFeature } from "@/lib/plan-features"
+import { cadastroDoItem } from "@/lib/produtos-codigos"
 
 // Venda do PDV (balcão e telefone) — Fase 3 do docs/modulo-gestao.md. Reusa o
 // modelo do pedido online: mesmo snapshot de itens, mesma numeração, mesmo
@@ -78,6 +79,9 @@ export interface SnapshotItem {
   observacao: string | null
   descontoC: number
   complementos: SnapshotComplemento[]
+  // Snapshot do cadastro (código e custo em reais) — null em item avulso.
+  codigo: string | null
+  custo: number | null
 }
 
 export async function resolverItens(ctx: ComercioCtx, itens: ItemVendaInput[]): Promise<SnapshotItem[]> {
@@ -97,14 +101,16 @@ export async function resolverItens(ctx: ComercioCtx, itens: ItemVendaInput[]): 
     if (item.produtoId) {
       const p = mapa.get(item.produtoId)
       if (!p) throw new ErroVenda("Um dos itens não existe mais no catálogo.")
+      // Arquivado = fora de linha. "Fora da vitrine" continua vendável aqui (PDV).
+      if (p.arquivado) throw new ErroVenda(`"${p.titulo}" foi arquivado e não está mais à venda.`)
       if (p.variacoes.length > 0) {
         const va = p.variacoes.find((x) => x.id === item.variacaoId)
         if (!va) throw new ErroVenda(`Escolha uma opção para "${p.titulo}".`)
-        base = { produtoId: p.id, titulo: p.titulo, variacaoNome: va.nome, precoC: centavosDe(va.preco), quantidade: item.quantidade, observacao }
+        base = { produtoId: p.id, titulo: p.titulo, variacaoNome: va.nome, precoC: centavosDe(va.preco), quantidade: item.quantidade, observacao, ...cadastroDoItem(p, va) }
       } else {
         const preco = precoEfetivo(p)
         if (preco == null) throw new ErroVenda(`"${p.titulo}" está sem preço.`)
-        base = { produtoId: p.id, titulo: p.titulo, variacaoNome: null, precoC: centavosDe(preco), quantidade: item.quantidade, observacao }
+        base = { produtoId: p.id, titulo: p.titulo, variacaoNome: null, precoC: centavosDe(preco), quantidade: item.quantidade, observacao, ...cadastroDoItem(p) }
       }
     } else {
       const titulo = item.titulo?.trim()
@@ -112,7 +118,7 @@ export async function resolverItens(ctx: ComercioCtx, itens: ItemVendaInput[]): 
       if (item.precoUnit == null || !(item.precoUnit > 0) || item.precoUnit > 99999) {
         throw new ErroVenda(`Preço inválido para "${titulo}".`)
       }
-      base = { produtoId: null, titulo, variacaoNome: null, precoC: centavosDe(item.precoUnit), quantidade: item.quantidade, observacao }
+      base = { produtoId: null, titulo, variacaoNome: null, precoC: centavosDe(item.precoUnit), quantidade: item.quantidade, observacao, codigo: null, custo: null }
     }
     // Complementos entram no preço unitário; o detalhe vira snapshot no item.
     const grupos = item.produtoId ? gruposPorProduto.get(item.produtoId) ?? [] : []
@@ -307,6 +313,8 @@ export async function registrarVenda(ctx: ComercioCtx, v: VendaInput) {
             titulo: s.titulo,
             variacaoNome: s.variacaoNome,
             precoUnit: deCentavos(s.precoC),
+            codigo: s.codigo,
+            custoUnit: s.custo != null ? deCentavos(centavosDe(s.custo)) : null,
             quantidade: s.quantidade,
             observacao: s.observacao,
             desconto: deCentavos(s.descontoC),

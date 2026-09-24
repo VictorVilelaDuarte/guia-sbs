@@ -20,13 +20,15 @@ export default async function PdvPage() {
 
   const [produtos, zonas, config, comandas, usuario, mesas, chamados, solicitacoes, mapa] = await Promise.all([
     prisma.produto.findMany({
-      where: { comercioId: comercio.id },
+      // Arquivado sai do PDV; "fora da vitrine" continua (item só de balcão).
+      where: { comercioId: comercio.id, arquivado: false },
       orderBy: [{ ordem: "asc" }, { titulo: "asc" }],
       select: {
         id: true, titulo: true, preco: true, precoPromo: true, promoFim: true, tipo: true, disponivel: true,
+        codigoBarras: true, codigoInterno: true, marca: true, unidade: true,
         categoriaCardapio: { select: { nome: true, ordem: true } },
         categoriaCatalogo: { select: { nome: true, ordem: true } },
-        variacoes: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true } },
+        variacoes: { orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true, codigoBarras: true, codigoInterno: true } },
         complementos: {
           orderBy: { ordem: "asc" },
           where: { grupo: { ativo: true } },
@@ -71,7 +73,15 @@ export default async function PdvPage() {
         grupoOrdem: grupo.ordem,
         disponivel: p.disponivel,
         preco: p.variacoes.length > 0 ? null : precoEfetivo(p),
-        variacoes: p.variacoes,
+        codigos: [p.codigoBarras, p.codigoInterno].filter((c): c is string => !!c),
+        marca: p.marca,
+        unidade: p.unidade,
+        variacoes: p.variacoes.map((v) => ({
+          id: v.id,
+          nome: v.nome,
+          preco: v.preco,
+          codigos: [v.codigoBarras, v.codigoInterno].filter((c): c is string => !!c),
+        })),
         complementos: p.complementos.map((c) => c.grupo).filter((g) => g.opcoes.length > 0),
       }
     })
