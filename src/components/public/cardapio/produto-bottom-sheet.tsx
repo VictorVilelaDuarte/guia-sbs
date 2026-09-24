@@ -289,12 +289,26 @@ export function ProdutoBottomSheet({
           <div className="h-1 w-10 rounded-full bg-stone-200" />
         </div>
 
+        {/* Fechar — no canto do sheet, fora da foto (a foto é menor que a largura
+            e fica centralizada), no mesmo lugar com ou sem foto. */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200"
+          aria-label="Fechar"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
         {/* Carrossel — só com foto; sem foto, o sheet abre direto no conteúdo
             (um quadrado vazio com a inicial ocupava meia tela). */}
         {imagens.length > 0 ? (
         <div
-          className="relative mx-auto shrink-0 overflow-hidden bg-stone-100"
-          style={{ aspectRatio: "1/1", width: "min(100%, 55svh)" }}
+          // Quadrado de ~1/3 da altura da tela (máx. 300px): no celular a foto em
+          // largura total empurrava variações, complementos e quantidade para
+          // baixo da dobra e o pedido exigia rolar.
+          className="relative mx-auto shrink-0 overflow-hidden rounded-2xl bg-stone-100"
+          style={{ aspectRatio: "1/1", width: "min(100% - 2.5rem, 34svh, 300px)" }}
           onTouchStart={onCarouselTouchStart}
           onTouchEnd={onCarouselTouchEnd}
         >
@@ -372,30 +386,17 @@ export function ProdutoBottomSheet({
             </>
           )}
 
-          {/* Botão fechar */}
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-sm hover:bg-black/70 transition-colors"
-            aria-label="Fechar"
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
         ) : (
-          <div className="flex shrink-0 justify-end px-3">
-            <button
-              onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-100 text-stone-600 transition-colors hover:bg-stone-200"
-              aria-label="Fechar"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          // Sem foto: espaço para o X não encostar na linha da categoria.
+          <div className="h-5 shrink-0" aria-hidden />
         )}
 
         {/* Thumbnails */}
         {temMultiImagens && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-none px-4 py-3 shrink-0 border-b border-stone-100">
+          // No celular, pontos + arrastar já navegam entre as fotos: as miniaturas
+          // só ocupariam mais altura antes do conteúdo.
+          <div className="hidden gap-2 overflow-x-auto scrollbar-none px-4 py-3 shrink-0 border-b border-stone-100 sm:flex">
             {imagens.map((url, i) => (
               <button
                 key={i}
