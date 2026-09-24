@@ -1,29 +1,15 @@
-import { notFound } from "next/navigation"
-import { VitrineTabs } from "@/components/comerciante/vitrine-tabs"
-import { getPainelBase, getVitrineData } from "@/lib/painel/queries"
+import { redirect } from "next/navigation"
+import { getPainelBase } from "@/lib/painel/queries"
 import { temPermissao } from "@/lib/gestao/permissoes"
+import { rotaAbaVitrine } from "@/lib/painel/rotas"
 
-export default async function VitrinePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string }>
-}) {
+// A vitrine virou páginas próprias (/comerciante/vitrine/perfil, /fotos…).
+// Esta rota só redireciona: ?tab= de links salvos vai para a página
+// equivalente; sem ele, para a primeira que o papel pode ver.
+export default async function VitrinePage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const [{ tab }, base] = await Promise.all([searchParams, getPainelBase()])
   if (!base) return null
-  if (!temPermissao(base.permissoes, "vitrine:editar", "analytics:ver")) notFound()
-
-  const { comercio, subcategoriasDisponiveis, produtosCount, analytics } =
-    await getVitrineData(base.comercio.id)
-  if (!comercio) notFound()
-
-  return (
-    <VitrineTabs
-      comercio={comercio}
-      subcategoriasDisponiveis={subcategoriasDisponiveis}
-      analytics={analytics}
-      produtosCount={produtosCount}
-      permissoes={base.permissoes}
-      abaInicial={tab}
-    />
-  )
+  const legada = rotaAbaVitrine(tab)
+  if (legada) redirect(legada)
+  redirect(temPermissao(base.permissoes, "vitrine:editar") ? "/comerciante/vitrine/perfil" : "/comerciante/vitrine/visitas")
 }

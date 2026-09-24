@@ -88,11 +88,10 @@ export default async function GestaoClientesPage({ searchParams }: { searchParam
       <CardHeader className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base">Clientes</CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <CardTitle className="text-base">
               {total} {total === 1 ? "cliente" : "clientes"}
-              {filtro || params.q || params.tag ? " encontrados" : ""}
-            </p>
+              {filtro || params.q || params.tag ? (total === 1 ? " encontrado" : " encontrados") : ""}
+            </CardTitle>
           </div>
           {podeEditar && <ClienteDialog />}
         </div>

@@ -12,10 +12,23 @@ const ABA_GESTAO: Record<string, string> = {
   hospedagem: "/comerciante/gestao/acomodacoes",
 }
 
-const ABAS_VITRINE = new Set(["informacoes", "analytics", "fotos", "eventos", "tags"])
+// Abas da antiga página única da vitrine (?tab=) → página própria (2026-09-24).
+// Usado pelo middleware (links /comerciante/dashboard?tab=) e por
+// /comerciante/vitrine, que redireciona o ?tab= de links salvos.
+const ABA_VITRINE: Record<string, string> = {
+  informacoes: "/comerciante/vitrine/perfil",
+  analytics: "/comerciante/vitrine/visitas",
+  fotos: "/comerciante/vitrine/fotos",
+  hospedagem: "/comerciante/vitrine/comodidades",
+  eventos: "/comerciante/vitrine/eventos",
+  tags: "/comerciante/vitrine/palavras-chave",
+}
+
+export function rotaAbaVitrine(tab: string | null | undefined): string | null {
+  return (tab && ABA_VITRINE[tab]) || null
+}
 
 export function rotaPainelLegada(tab: string | null | undefined): string {
   if (tab && ABA_GESTAO[tab]) return ABA_GESTAO[tab]
-  if (tab && ABAS_VITRINE.has(tab)) return `/comerciante/vitrine?tab=${tab}`
-  return "/comerciante"
+  return rotaAbaVitrine(tab) ?? "/comerciante"
 }

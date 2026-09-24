@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { QuartosManager } from "@/components/comerciante/hospedagem/quartos-manager"
 import { getPainelBase, getQuartosData } from "@/lib/painel/queries"
 import { temFeature, LIMITES_FREE } from "@/lib/plan-features"
@@ -20,7 +20,6 @@ export default async function GestaoAcomodacoesPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Acomodações</CardTitle>
         <p className="text-sm text-muted-foreground">
           Tipos de quarto exibidos na sua vitrine. Comodidades e políticas da casa
           ficam em Minha vitrine.

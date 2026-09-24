@@ -51,17 +51,17 @@ const produtoInclude = {
 
 // --- Vitrine -----------------------------------------------------------------
 
-export async function getVitrineData(comercioId: string) {
-  const [comercio, subcategoriasDisponiveis, produtosCount, analytics] = await Promise.all([
+// Cada página da vitrine (/comerciante/vitrine/*) busca só o que exibe.
+
+export async function getPerfilData(comercioId: string) {
+  const [comercio, subcategoriasDisponiveis] = await Promise.all([
     prisma.comercio.findUnique({
       where: { id: comercioId },
-      include: {
-        plan: true,
-        fotos: { orderBy: { ordem: "asc" } },
-        tags: { orderBy: { createdAt: "asc" }, select: { id: true, nome: true } },
+      select: {
+        id: true, nome: true, descricao: true, categorias: true, logo: true,
+        cep: true, endereco: true, numero: true, bairro: true, cidade: true, estado: true, lat: true, lng: true,
+        telefone: true, whatsapp: true, email: true, website: true, instagram: true, horarios: true,
         subcategorias: { select: { id: true, nome: true, categoria: true } },
-        eventos: { orderBy: { dataInicio: "asc" } },
-        hospedagemPerfil: true,
       },
     }),
     prisma.subcategoria.findMany({
@@ -69,10 +69,46 @@ export async function getVitrineData(comercioId: string) {
       orderBy: [{ categoria: "asc" }, { ordem: "asc" }, { nome: "asc" }],
       select: { id: true, nome: true, categoria: true },
     }),
-    prisma.produto.count({ where: { comercioId } }),
-    getAnalyticsResumo(comercioId),
   ])
-  return { comercio, subcategoriasDisponiveis, produtosCount, analytics }
+  return { comercio, subcategoriasDisponiveis }
+}
+
+export function getFotosVitrine(comercioId: string) {
+  return prisma.foto.findMany({ where: { comercioId }, orderBy: { ordem: "asc" } })
+}
+
+export function getEventosVitrine(comercioId: string) {
+  return prisma.evento.findMany({ where: { comercioId }, orderBy: { dataInicio: "asc" } })
+}
+
+export function getTagsVitrine(comercioId: string) {
+  return prisma.tag.findMany({ where: { comercioId }, orderBy: { createdAt: "asc" }, select: { id: true, nome: true } })
+}
+
+export function getHospedagemPerfil(comercioId: string) {
+  return prisma.hospedagemPerfil.findUnique({ where: { comercioId } })
+}
+
+// Visitas da vitrine + o que alimenta o box "Melhore seus números" (completude).
+export async function getVisitasData(comercioId: string) {
+  const [analytics, comercio, fotos, tags, produtos] = await Promise.all([
+    getAnalyticsResumo(comercioId),
+    prisma.comercio.findUnique({ where: { id: comercioId }, select: { descricao: true, horarios: true, logo: true } }),
+    prisma.foto.count({ where: { comercioId } }),
+    prisma.tag.count({ where: { comercioId } }),
+    prisma.produto.count({ where: { comercioId } }),
+  ])
+  return {
+    analytics,
+    perfil: {
+      fotos,
+      temDescricao: !!comercio?.descricao,
+      produtos,
+      tags,
+      temHorarios: !!comercio?.horarios,
+      temLogo: !!comercio?.logo,
+    },
+  }
 }
 
 // --- Gestão: cardápio ----------------------------------------------------------

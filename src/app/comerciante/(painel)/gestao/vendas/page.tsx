@@ -78,10 +78,10 @@ export default async function VendasPage({ searchParams }: { searchParams: Promi
       <CardHeader className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base">Vendas</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {concluidas.length} concluída(s){verValores ? ` · ${brl(totalC)}` : ""}
-            </p>
+            <CardTitle className="text-base">
+              {concluidas.length} {concluidas.length === 1 ? "concluída" : "concluídas"}
+              {verValores ? ` · ${brl(totalC)}` : ""}
+            </CardTitle>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {verValores && (

@@ -32,7 +32,7 @@ export default async function GestaoCardapioPage() {
     <div className="space-y-4">
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Cardápio</CardTitle>
+        <CardTitle className="text-base">Categorias e itens</CardTitle>
         <p className="text-sm text-muted-foreground">
           {podeEditar
             ? "Organize itens por categoria e defina a ordem de exibição no perfil."

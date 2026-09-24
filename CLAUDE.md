@@ -103,17 +103,23 @@ if (!session || session.user.role !== "COMERCIANTE") return 401
 
 ### Painel do comerciante (`/comerciante`)
 
-Dividido em duas áreas (Fase 0 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md)): **Minha vitrine** (o que existe para o comércio ser encontrado no guia) e **Gestão** (operação). Rotas reais em vez de abas para a Gestão — estado na URL e cada página buscando só o que exibe.
+**Um menu só, agrupado por assunto** (redesenho de 2026-09-24, substituiu o switch "Minha vitrine | Gestão" + abas): Início · Operação (Pedidos, PDV ↗, Produção, Vendas, Mesas) · Cardápio e produtos · Clientes e equipe · Resultados (Relatórios, Visitas da vitrine) · Minha vitrine (Perfil, Fotos, Comodidades, Eventos, Palavras-chave, Ver vitrine pública ↗). **Sidebar fixa no desktop** (`PainelSidebar`, conteúdo até `max-w-5xl`) e, no celular, **barra inferior com 4 atalhos + "Mais"** (`PainelBottomNav`; o "Mais" abre o menu completo numa folha). A configuração é **uma lista só** (`GRUPOS` em `src/components/comerciante/painel/painel-nav.tsx`) lida pelos três lugares; os atalhos do celular saem de `PRIORIDADE_MOBILE` (os 4 primeiros visíveis e liberados pelo plano). `PainelTitulo` mostra o nome da tela atual no topo do conteúdo — por isso cartões não repetem o nome da tela (use a descrição ou um subtítulo da seção). **Recursos fora do plano** saem dos grupos e vão para o grupo recolhido "Recursos Premium" no fim do menu (abre sozinho quando a tela atual é um deles). Rotas reais em tudo — estado na URL e cada página buscando só o que exibe. **Etapa pendente do redesenho:** Início unificado com cartões por plano (hoje a entrada `/comerciante` ainda manda para a Gestão ou para a Vitrine).
 
 ```
 src/app/comerciante/
   trocar-senha/           — troca de senha (obrigatória com senha temporária) — FORA do (painel)
   (painel)/               — route group (não afeta URLs) com o shell abaixo
-  layout.tsx              — shell: header, banner de admin, AreaSwitch, GestaoTabs (desktop),
-                            GestaoBottomNav (mobile), PedidosAlertaProvider, estado "sem comércio"
+  layout.tsx              — shell: PainelSidebar (desktop), topo com o nome da loja + PainelBottomNav
+                            (celular), banner de admin, PainelTitulo, PedidosAlertaProvider, estado
+                            "sem comércio". "Sair"/"Alterar senha" vão prontos (server) no rodapé do menu
   page.tsx                — entrada: pedido_online ativo → /gestao; senão → /vitrine
-  vitrine/page.tsx        — <VitrineTabs> (?tab=): Informações, Analytics, Fotos,
-                            Comodidades e políticas (só HOSPEDAGEM), Eventos, Palavras-chave
+  vitrine/page.tsx        — só redireciona: ?tab= antigo → página nova (rotaAbaVitrine); sem ele →
+                            /perfil (ou /visitas para quem só tem analytics:ver)
+  vitrine/perfil          — logo + EditarComercioForm (vitrine:editar)
+  vitrine/fotos, /eventos, /palavras-chave — FotosUploader, EventosManager (feature eventos, senão
+                            <RecursoBloqueado>), TagsEditor
+  vitrine/comodidades     — PerfilForm de hospedagem (categoria HOSPEDAGEM; fora dela, 404)
+  vitrine/visitas         — AnalyticsPanel (analytics:ver; o Gratuito vê o teaser)
   gestao/page.tsx         — resumo do dia (pedidos por grupo, faturamento de hoje no fuso SP, atalhos)
   gestao/cardapio         — CardapioManager (feature cardapio; sem ela, <RecursoBloqueado>)
   gestao/produtos         — ProdutosManager com ?tipo=servico (key={tipo} — reseta estado ao trocar)
@@ -128,10 +134,10 @@ src/app/comerciante/
 > existe para o `trocar-senha` ficar fora do shell: o layout do painel redireciona para lá quando o
 > usuário tem `trocarSenha`, e dentro do shell o redirect cairia em loop.
 
-- **Loaders:** `src/lib/painel/queries.ts` — um por página (`getVitrineData`, `getCardapioData`, `getCatalogoData`, `getPedidosData`, `getQuartosData`, `getResumoData`) + `getPainelBase()` (ctx + dados mínimos do comércio, com `React.cache` para deduplicar layout e página). Toda página resolve o comércio por `getPainelBase()` → `getComercioCtx()`, nunca por `session.user.id`.
+- **Loaders:** `src/lib/painel/queries.ts` — um por página (vitrine: `getPerfilData`, `getFotosVitrine`, `getEventosVitrine`, `getTagsVitrine`, `getHospedagemPerfil`, `getVisitasData`; gestão: `getCardapioData`, `getCatalogoData`, `getPedidosData`, `getQuartosData`, `getResumoData`) + `getPainelBase()` (ctx + dados mínimos do comércio, com `React.cache` para deduplicar layout e página). Toda página resolve o comércio por `getPainelBase()` → `getComercioCtx()`, nunca por `session.user.id`.
 - **Gates:** item de feature bloqueada continua no menu com cadeado e a página mostra `<RecursoBloqueado>` (não 404); item de categoria só aparece para a categoria.
 - **Alerta de pedidos** (`src/components/comerciante/painel/pedidos-alerta.tsx`): vive no layout — som, título piscando e badge (switch "Gestão", item Pedidos) valem em **qualquer tela** do painel. Faz polling leve em `GET /api/comerciante/pedidos/resumo?desde=` (devolve `aguardando`, `novos` e `agora` do servidor, reenviado como `desde` — janelas contíguas, sem depender do relógio do navegador). O `PedidosManager` só faz polling da lista e chama `usePedidosAlerta()?.refresh()` ao mudar status; **não** toca som (evita aviso duplicado).
-- **Links antigos:** `/comerciante/dashboard?tab=X` não tem página — o middleware redireciona (308) via `rotaPainelLegada()` (`src/lib/painel/rotas.ts`, sem imports, Edge-safe). Necessário porque o service worker de push antigo abre `?tab=pedidos` até o navegador atualizá-lo.
+- **Links antigos:** `/comerciante/dashboard?tab=X` não tem página — o middleware redireciona (308) via `rotaPainelLegada()`; `/comerciante/vitrine?tab=X` redireciona pela própria página via `rotaAbaVitrine()` (ambos em `src/lib/painel/rotas.ts`, sem imports, Edge-safe). Necessário porque o service worker de push antigo abre `?tab=pedidos` até o navegador atualizá-lo.
 - **Push:** a notificação aponta para `/comerciante/gestao/pedidos`. Com o painel já aberto, o `sw-push.js` foca a aba e manda `postMessage({ type: "navegar", url })`; o `PedidosAlertaProvider` faz o `router.push`. `client.navigate()` não serve — o SW não controla as páginas.
 
 ### Vitrine pública
@@ -199,7 +205,7 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 - remover apaga a **conta** junto quando a pessoa não tem vínculo em outro comércio nem é titular.
 - Flag **`gestao_equipe`**: sem ela, `getComercioCtx()` ignora vínculos não-DONO (o dado fica guardado). Ligada no `premium` por `prisma/migrate-flag-gestao-equipe.ts`.
 - **`trocarSenha`**: o layout do painel redireciona para `/comerciante/trocar-senha` e `getComercioCtx()` devolve `null` (APIs bloqueadas). A troca é `POST /api/comerciante/conta/senha` (usa a sessão, não o ctx). Nada disso vai no JWT — lido do banco a cada request, então remover/desativar/rebaixar vale na próxima requisição. Todo comerciante tem o link "Alterar senha" no cabeçalho.
-- Item "Equipe" fica **fora da barra inferior do mobile** (`somenteDesktop`); no celular o caminho é o atalho do Resumo.
+- Item "Equipe" fica no grupo "Clientes e equipe" do menu (no celular, pelo "Mais").
 
 **Permissões por papel** (matriz fixa em `src/lib/gestao/permissoes.ts` — módulo sem runtime, usado também no client):
 
@@ -214,7 +220,7 @@ Fase 1 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
 
 - **Toda rota de `/api/comerciante/*` chama `getComercioCtx()` e depois `negarSemPermissao(ctx, ...permissões)`** (403; passa se tiver ALGUMA). Admin passa sempre. Rota nova sem guard de permissão é bug.
 - Casos que decidem pelo dado: `produtos`/`produtos/[id]` (item com `categoriaCardapioId` → `cardapio:editar`, senão `catalogo:editar`; PATCH só com `disponivel` aceita `itens:disponibilidade`); `upload` (pelo `tipo`).
-- **Interface:** `getPainelBase()` expõe `permissoes`; itens sem permissão **somem** (nav, abas, atalhos, cards) — diferente de feature fora do plano, que mostra cadeado. Página acessada direto sem permissão ⇒ `notFound()`. Quem não tem `vitrine:editar` nem `analytics:ver` não vê o switch de área e entra direto na Gestão. `CardapioManager`/`ProdutosManager` têm `somenteDisponibilidade`.
+- **Interface:** `getPainelBase()` expõe `permissoes`; itens sem permissão **somem** (nav, abas, atalhos, cards) — diferente de feature fora do plano, que mostra cadeado. Página acessada direto sem permissão ⇒ `notFound()`. Quem não tem `vitrine:editar` nem `analytics:ver` não vê o grupo "Minha vitrine" nem "Visitas da vitrine" (grupo sem itens visíveis some). `CardapioManager`/`ProdutosManager` têm `somenteDisponibilidade`.
 
 ### Clientes da loja (`Cliente`)
 
@@ -232,7 +238,7 @@ Fase 2 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) — plano de execuç�
   - **Registro de acesso do admin** (`AcessoDadosCliente`, só inserção, **sem nome de cliente**): `registrarAcessoAdmin(ctx, acao)` em lista, detalhe, cadastro, edição e exclusão — no-op para comerciante; lista registra no máximo 1× a cada 30 min por admin/loja. Visível para o dono (`equipe:gerenciar`) na tela de Clientes e na edição do comércio no admin.
   - **Prévia do plano grátis** (`ClientesPrevia`): números reais agregados (`resumoClientesPrevia`) e lista **fictícia** borrada — blur é só CSS, dado real no HTML vazaria pelo inspetor. Nunca renderizar dado pessoal atrás de blur.
   - Checkout mostra "Seus dados ficam com {loja} para preparar e entregar o seu pedido." (informativo, sem checkbox).
-- **Permissões:** `clientes:ver` (dono, gerente, atendente), `clientes:editar` (dono, gerente). Flag `gestao_clientes` ligada no premium por `prisma/migrate-flag-gestao-clientes.ts`. No mobile, "Clientes" ocupa a vaga de "Produtos" na barra inferior.
+- **Permissões:** `clientes:ver` (dono, gerente, atendente), `clientes:editar` (dono, gerente). Flag `gestao_clientes` ligada no premium por `prisma/migrate-flag-gestao-clientes.ts`. No celular, "Clientes" é um dos 4 atalhos da barra inferior para quem tem a permissão.
 - **Deploy:** `npm run db:push` → `npx tsx prisma/migrate-clientes-pedidos.ts` (backfill idempotente a partir dos pedidos existentes) → `npx tsx prisma/migrate-flag-gestao-clientes.ts` → publicar.
 
 ### Dinheiro dos pedidos (`Decimal`)
@@ -254,7 +260,7 @@ Fase 3 do [`docs/modulo-gestao.md`](docs/modulo-gestao.md) (§13.2 venda manual,
 - **Divisão da conta** (`src/lib/gestao/divisao.ts`, sem runtime): igual (centavos que sobram → primeira pessoa), por itens (linha inteira ou por unidade, parte compartilhada dividida igualmente; desconto/serviço/entrega rateados na proporção do consumo) e por valor. Rateio por maiores restos — soma sempre exata. O servidor não valida a divisão (só que os pagamentos fecham); na comanda o plano é salvo em `Pedido.divisao`.
 - **Comandas** (`src/lib/gestao/comandas.ts`): `status ABERTA` + `origem COMANDA`, `mesa` livre (uma comanda aberta por mesa, com `pg_advisory_xact_lock`). **Toda mudança trava a linha do pedido (`SELECT … FOR UPDATE`) e chama `recalcular()`**, que recusa (409) deixar o total abaixo do já pago. Itens entram como pendentes na tela e são lançados ("Lançar" / "Lançar e enviar p/ produção" → `rodada`, `enviadoEm`). Pagamento parcial por pessoa; fecha quando o saldo zera (`fechadaEm`, `CONCLUIDO`). Transferir mesa, juntar (itens e pagamentos passam; a origem vira `CANCELADO` com `juntadaEmId`), cancelar (vazia: qualquer um; com itens: `vendas:cancelar` + motivo, sem pagamento ativo). Eventos sem troca de status vão para `PedidoHistorico.descricao`. API: `GET/POST /api/comerciante/gestao/comandas` e `GET/POST .../comandas/[id]` com `{ acao }` (lancar, enviar, alterarItem, removerItem, atualizar, pagar, estornar, fechar, cancelar, juntar).
 - **Comanda aberta não é pedido da fila:** `GET /api/comerciante/pedidos` e `getPedidosData` excluem `ABERTA`; o alerta de "novos" só conta `ONLINE` ou `AGUARDANDO` (venda do PDV não apita).
-- **Produção:** `/comerciante/gestao/producao` (`pedidos:operar` + flag) lista rodadas enviadas e não prontas (`prontoEm`), com polling e bipe; `POST /api/comerciante/gestao/producao` marca a rodada pronta. Na barra inferior só para quem não tem `cardapio:editar`/`vendas:registrar` (`mobileSemPermissoes`).
+- **Produção:** `/comerciante/gestao/producao` (`pedidos:operar` + flag) lista rodadas enviadas e não prontas (`prontoEm`), com polling e bipe; `POST /api/comerciante/gestao/producao` marca a rodada pronta. Atalho da barra inferior do celular só para quem não tem `cardapio:editar`/`vendas:registrar` (a cozinha); os demais acham no "Mais".
 - **Regras sensíveis:** desconto (item ou conta) exige `vendas:desconto`; reduzir/tirar item já enviado e estornar pagamento exigem `vendas:cancelar` + motivo — checados em `vendas.ts`/`comandas.ts`, não só na tela. Cliente só é criado/vinculado com WhatsApp. Loja sem pedido online ganha `PedidoConfig` sob demanda (`proximoNumero`, `aceitaPedidos: false`), onde também fica `taxaServicoPct` (`PATCH /api/comerciante/gestao/pdv`, `pedidos:configurar`).
 - **Cupom não fiscal 80mm:** `/comerciante/pdv/cupom/[id]` (`?imprimir=1` abre a impressão; `?tipo=conferencia` para comanda, com a divisão por pessoa). NFC-e fica no roadmap fiscal.
 - **Rotas do PDV** usam `guardPdv(...)` e `responder()` de `src/lib/gestao/pdv-api.ts` (flag `gestao_relatorios` + permissão; `ErroVenda` vira JSON com status).

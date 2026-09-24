@@ -122,10 +122,10 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
       <Card>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-base font-semibold">Relatórios</h2>
-            <p className="text-sm text-muted-foreground">
-              {periodo.de === periodo.ate ? dataCurta(periodo.de) : `${dataCurta(periodo.de)} a ${dataCurta(periodo.ate)}`} · {dias} dia(s)
-            </p>
+            <h2 className="text-base font-semibold">
+              {periodo.de === periodo.ate ? dataCurta(periodo.de) : `${dataCurta(periodo.de)} a ${dataCurta(periodo.ate)}`}
+            </h2>
+            <p className="text-sm text-muted-foreground">{dias} dia(s)</p>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {ATALHOS.map((a) => (

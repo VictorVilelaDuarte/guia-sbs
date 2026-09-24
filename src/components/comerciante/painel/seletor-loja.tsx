@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, ChevronsUpDown, Loader2, Store } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,16 +21,20 @@ export function SeletorLoja({
   lojas,
   atualId,
   nomeAtual,
+  compacto = false,
 }: {
   lojas: { id: string; nome: string }[]
   atualId: string
   nomeAtual: string
+  // Na sidebar/menu do painel: nome menor, sem virar título da página.
+  compacto?: boolean
 }) {
+  const nomeCls = compacto ? "text-base font-semibold truncate" : "text-2xl font-bold truncate"
   const router = useRouter()
   const [trocando, setTrocando] = useState(false)
 
   if (lojas.length < 2) {
-    return <h1 className="text-2xl font-bold truncate">{nomeAtual}</h1>
+    return compacto ? <p className={nomeCls}>{nomeAtual}</p> : <h1 className={nomeCls}>{nomeAtual}</h1>
   }
 
   async function trocar(id: string) {
@@ -62,11 +67,11 @@ export function SeletorLoja({
         className="flex max-w-full items-center gap-2 rounded-md text-left outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="Trocar de loja"
       >
-        <span className="text-2xl font-bold truncate">{nomeAtual}</span>
+        <span className={nomeCls}>{nomeAtual}</span>
         {trocando ? (
-          <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+          <Loader2 className={cn("shrink-0 animate-spin", compacto ? "h-4 w-4" : "h-5 w-5")} />
         ) : (
-          <ChevronsUpDown className="h-5 w-5 shrink-0" />
+          <ChevronsUpDown className={cn("shrink-0", compacto ? "h-4 w-4" : "h-5 w-5")} />
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-auto min-w-64">
