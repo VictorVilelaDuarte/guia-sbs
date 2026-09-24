@@ -2,9 +2,13 @@
  * Loja de DEMONSTRAÇÃO — dados fictícios para apresentar o sistema
  *
  * Cria um restaurante fictício ("Cantinho da Serra") com cardápio, equipe,
- * clientes, três semanas de vendas (balcão, telefone, comandas e pedido online),
- * comandas abertas com itens na produção, pedidos na fila e visitas no analytics.
- * Serve para mostrar o painel, o PDV e os relatórios com a tela cheia de vida.
+ * clientes, dois meses de vendas até a hora em que roda (balcão, telefone,
+ * comandas e pedido online) e visitas no analytics. Serve para apresentar o
+ * painel, o PDV e os relatórios com a tela cheia de vida.
+ *
+ * Nenhuma venda fica em aberto: todas terminam concluídas, canceladas ou
+ * recusadas — sem comanda aberta, fila de pedidos ou item na produção. Para a
+ * apresentação mostrar vendas "de hoje", rode o seed pouco antes.
  *
  * Nada aqui é dado real: nomes de loja, pessoas e telefones são inventados.
  *
@@ -24,7 +28,7 @@ const prisma = new PrismaClient()
 const SENHA = "demo123"
 const SUFIXO = "@guiasbs.local"
 const NOME_LOJA = "Cantinho da Serra"
-const DIAS = 21 // histórico de vendas
+const DIAS = 60 // histórico de vendas (cobre o "mês anterior" dos relatórios)
 const TZ = "America/Sao_Paulo"
 
 // Sorteio determinístico: rodar duas vezes gera a mesma demo.
@@ -54,6 +58,8 @@ const CARDAPIO = [
       { titulo: "Pão de queijo da serra (6 un.)", preco: 1800, descricao: "Feito na hora com queijo canastra", destaque: true },
       { titulo: "Bolinho de bacalhau (4 un.)", preco: 3200 },
       { titulo: "Polenta frita com queijo", preco: 2600, descricao: "Porção para dois" },
+      { titulo: "Caldo de mandioquinha", preco: 2200, descricao: "Com torradas de alho" },
+      { titulo: "Pastel de palmito (4 un.)", preco: 2800 },
     ],
   },
   {
@@ -63,6 +69,10 @@ const CARDAPIO = [
       { titulo: "Costelinha com polenta cremosa", preco: 7900, descricao: "Cozida por 6 horas" },
       { titulo: "Frango caipira com quiabo", preco: 6900 },
       { titulo: "Risoto de cogumelos da serra", preco: 7200, promo: 5900 },
+      { titulo: "Filé ao molho de pinhão", preco: 9800, descricao: "Com purê rústico de batata", destaque: true },
+      { titulo: "Truta ao molho de amêndoas", preco: 9400 },
+      { titulo: "Parmegiana da casa", preco: 7400, descricao: "Serve bem uma pessoa" },
+      { titulo: "Nhoque de batata com ragu", preco: 6400 },
       { titulo: "Feijoada da casa (sábado)", preco: 8500, disponivel: false },
     ],
   },
@@ -72,6 +82,8 @@ const CARDAPIO = [
       { titulo: "Sanduíche de pernil", preco: 3400, destaque: true },
       { titulo: "Tábua de frios da serra", preco: 9800, descricao: "Queijos e embutidos da região" },
       { titulo: "Torta de palmito", preco: 2400 },
+      { titulo: "Misto quente", preco: 1900 },
+      { titulo: "Hambúrguer artesanal", preco: 4200, descricao: "Blend da casa, queijo canastra e maionese de ervas" },
     ],
   },
   {
@@ -83,6 +95,10 @@ const CARDAPIO = [
       { titulo: "Chopp artesanal", preco: 1800, variacoes: [{ nome: "300ml", preco: 1800 }, { nome: "500ml", preco: 2500 }] },
       { titulo: "Água mineral", preco: 600 },
       { titulo: "Vinho da serra (taça)", preco: 2800 },
+      { titulo: "Refrigerante lata", preco: 700 },
+      { titulo: "Cerveja long neck", preco: 1300 },
+      { titulo: "Chá de hortelã da horta", preco: 900 },
+      { titulo: "Chocolate quente", preco: 1600, variacoes: [{ nome: "Tradicional", preco: 1600 }, { nome: "Com chantilly", preco: 1900 }] },
     ],
   },
   {
@@ -91,6 +107,8 @@ const CARDAPIO = [
       { titulo: "Pudim de leite", preco: 1800, destaque: true },
       { titulo: "Brownie com sorvete", preco: 2400 },
       { titulo: "Doce de leite com queijo", preco: 1600 },
+      { titulo: "Petit gâteau", preco: 2800 },
+      { titulo: "Torta de maçã com canela", preco: 2200 },
     ],
   },
 ] as const
@@ -108,6 +126,14 @@ const CLIENTES = [
   ["Marcelo Antunes", "12988120010", ["turista"]],
   ["Patrícia Nunes", "12988120011", ["frequente"]],
   ["Rodrigo Campos", "12988120012", []],
+  ["Sílvia Rocha", "12988120013", ["frequente", "vinho"]],
+  ["Tiago Barreto", "12988120014", ["turista"]],
+  ["Vanessa Pires", "12988120015", ["delivery"]],
+  ["Wagner Lopes", "12988120016", []],
+  ["Beatriz Almeida", "12988120017", ["turista", "vinho"]],
+  ["Otávio Fernandes", "12988120018", ["frequente"]],
+  ["Luana Siqueira", "12988120019", ["aniversariante"]],
+  ["Renato Guimarães", "12988120020", ["delivery"]],
 ] as const
 
 const RUAS = ["Rua das Hortênsias", "Rua Cel. Rosa", "Av. Sebastião de Melo", "Rua do Mirante", "Travessa da Pedra"]
@@ -314,7 +340,11 @@ async function main() {
     data: [
       { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Geleia de amora (250g)", preco: 32, tipo: "PRODUTO", destaque: true },
       { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Café em grãos (500g)", preco: 45, tipo: "PRODUTO" },
+      { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Queijo canastra (500g)", preco: 58, tipo: "PRODUTO", destaque: true },
+      { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Doce de leite caseiro (400g)", preco: 28, tipo: "PRODUTO" },
+      { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Cachaça artesanal (700ml)", preco: 79, tipo: "PRODUTO" },
       { comercioId: comercio.id, titulo: "Reserva do salão para eventos", preco: 0, tipo: "SERVICO" },
+      { comercioId: comercio.id, titulo: "Café colonial para grupos (por pessoa)", preco: 89, tipo: "SERVICO" },
     ],
   })
 
@@ -360,19 +390,17 @@ async function main() {
   async function criarVenda(opts: {
     origem: "ONLINE" | "BALCAO" | "TELEFONE" | "COMANDA"
     quando: Date
-    status: "CONCLUIDO" | "CANCELADO" | "ABERTA" | "AGUARDANDO" | "EM_PREPARO" | "PRONTO"
+    // Só status terminais: a demo não deixa venda em aberto.
+    status: "CONCLUIDO" | "CANCELADO" | "RECUSADO"
     itens: ItemVenda[]
     mesa?: string | null
     clienteIdx?: number | null
     entrega?: boolean
     servico?: boolean
     descontoPct?: number
-    // "conta" = uma forma só; "dividido" = duas pessoas; "nenhum" = cancelada/aberta
+    // "conta" = uma forma só; "dividido" = duas pessoas; "nenhum" = cancelada/recusada
     pagamento?: "conta" | "dividido" | "nenhum"
-    pagamentoParcialC?: number // comanda aberta: quanto já foi pago
     motivo?: string
-    rodadaEnviada?: boolean
-    rodadaPronta?: boolean
   }) {
     const cliente = opts.clienteIdx != null ? clientes[opts.clienteIdx] : null
     const zona = opts.entrega ? escolher(zonas) : null
@@ -381,8 +409,12 @@ async function main() {
     const servicoC = opts.servico ? Math.round((brutoC - descontoC) / 10) : 0
     const entregaC = zona ? Math.round(Number(zona.taxa) * 100) : 0
     const totalC = brutoC - descontoC + servicoC + entregaC
-    const concluida = opts.status === "CONCLUIDO"
-    const encerrada = concluida || opts.status === "CANCELADO"
+    // Comanda concluída passou pela cozinha: rodada enviada e pronta (a tela
+    // Produção fica vazia, sem item pendurado).
+    const passouNaCozinha = opts.origem === "COMANDA" && opts.status === "CONCLUIDO"
+    // "n minutos depois de aberta", mas nunca no futuro: venda aberta há pouco
+    // fecha "agora" (senão contaria como não encerrada no dia de hoje).
+    const depois = (min: number) => new Date(Math.min(opts.quando.getTime() + min * 60000, Date.now()))
 
     // Os pagamentos fecham exatamente o total (itens − desconto + serviço + entrega).
     const modo = opts.pagamento ?? "conta"
@@ -396,8 +428,6 @@ async function main() {
     } else if (modo === "conta") {
       const forma = escolher(["pix", "pix", "dinheiro", "credito", "credito", "debito"])
       pagamentos = [{ forma, valorC: totalC, ...(forma === "dinheiro" ? { recebidoC: Math.ceil((totalC + entre(0, 2000)) / 500) * 500 } : {}) }]
-    } else if (opts.pagamentoParcialC) {
-      pagamentos = [{ forma: "pix", valorC: opts.pagamentoParcialC, pagante: "Ana" }]
     }
     const autor = opts.origem === "ONLINE" ? null : escolher(autores)
 
@@ -416,7 +446,10 @@ async function main() {
         endereco: zona ? escolher(RUAS) : null,
         numeroEnd: zona ? String(entre(10, 900)) : null,
         bairro: zona?.nome ?? null,
-        formaPagamento: opts.status === "ABERTA" ? "" : [...new Set(pagamentos.map((p) => p.forma))].length === 1 ? pagamentos[0].forma : "multiplas",
+        formaPagamento:
+          pagamentos.length === 0
+            ? escolher(["pix", "dinheiro", "credito"]) // cancelada/recusada: a forma escolhida no pedido
+            : [...new Set(pagamentos.map((p) => p.forma))].length === 1 ? pagamentos[0].forma : "multiplas",
         observacoes: chance(0.12) ? escolher(["Sem cebola, por favor.", "Aniversário — trazer vela.", "Embalar para viagem."]) : null,
         subtotal: dec(brutoC), // já líquido de desconto por item (a demo não usa); o desconto da conta é separado
         desconto: dec(descontoC),
@@ -430,7 +463,8 @@ async function main() {
         criadoPorNome: autor?.nome ?? null,
         createdAt: opts.quando,
         updatedAt: opts.quando,
-        fechadaEm: encerrada ? new Date(opts.quando.getTime() + entre(20, 90) * 60000) : null,
+        // Toda venda da demo termina: a data de encerramento é o que conta nos relatórios.
+        fechadaEm: depois(opts.status === "RECUSADO" ? entre(2, 6) : entre(20, 90)),
         itens: {
           create: opts.itens.map((i) => ({
             produtoId: i.produtoId,
@@ -439,9 +473,9 @@ async function main() {
             precoUnit: dec(i.precoC),
             quantidade: i.quantidade,
             createdAt: opts.quando,
-            rodada: opts.rodadaEnviada ? 1 : null,
-            enviadoEm: opts.rodadaEnviada ? new Date(opts.quando.getTime() + 60000) : null,
-            prontoEm: opts.rodadaPronta ? new Date(opts.quando.getTime() + 15 * 60000) : null,
+            rodada: passouNaCozinha ? 1 : null,
+            enviadoEm: passouNaCozinha ? depois(1) : null,
+            prontoEm: passouNaCozinha ? depois(15) : null,
           })),
         },
         pagamentos: { create: pagamentos.map((p) => ({ comercioId: comercio.id, forma: p.forma, valor: dec(p.valorC), recebido: p.recebidoC ? dec(p.recebidoC) : null, pagante: p.pagante ?? null, autorNome: autor?.nome ?? null, createdAt: opts.quando })) },
@@ -451,17 +485,20 @@ async function main() {
     // Linha do tempo coerente com o status
     const historico: Prisma.PedidoHistoricoCreateManyInput[] = []
     const reg = (status: Prisma.PedidoHistoricoCreateManyInput["status"], min: number, extra: Partial<Prisma.PedidoHistoricoCreateManyInput> = {}) =>
-      historico.push({ pedidoId: pedido.id, status, origem: opts.origem === "ONLINE" && status === "AGUARDANDO" ? "CLIENTE" : "LOJA", autorNome: status === "AGUARDANDO" && opts.origem === "ONLINE" ? cliente?.nome ?? "Cliente" : autor?.nome ?? null, createdAt: new Date(opts.quando.getTime() + min * 60000), ...extra })
+      historico.push({ pedidoId: pedido.id, status, origem: opts.origem === "ONLINE" && status === "AGUARDANDO" ? "CLIENTE" : "LOJA", autorNome: status === "AGUARDANDO" && opts.origem === "ONLINE" ? cliente?.nome ?? "Cliente" : autor?.nome ?? null, createdAt: depois(min), ...extra })
 
     if (opts.origem === "ONLINE") {
       reg("AGUARDANDO", 0)
-      if (["EM_PREPARO", "PRONTO", "CONCLUIDO"].includes(opts.status)) reg("ACEITO", 2)
-      if (["EM_PREPARO", "PRONTO", "CONCLUIDO"].includes(opts.status)) reg("EM_PREPARO", 5)
-      if (["PRONTO", "CONCLUIDO"].includes(opts.status)) reg("PRONTO", 25)
-      if (opts.status === "CONCLUIDO") reg("CONCLUIDO", 40)
-    } else if (opts.status === "ABERTA") {
-      reg("ABERTA", 0, { descricao: null })
-      if (opts.rodadaEnviada) reg("ABERTA", 1, { descricao: `Lançou ${opts.itens.reduce((a, i) => a + i.quantidade, 0)} item(ns) e enviou para a produção (rodada 1)` })
+      if (opts.status === "RECUSADO") reg("RECUSADO", 3, { motivo: opts.motivo ?? null })
+      if (opts.status === "CONCLUIDO" || opts.status === "CANCELADO") {
+        reg("ACEITO", 2)
+        reg("EM_PREPARO", 5)
+      }
+      if (opts.status === "CONCLUIDO") {
+        reg("PRONTO", 25)
+        reg("CONCLUIDO", 40)
+      }
+      if (opts.status === "CANCELADO") reg("CANCELADO", 15, { motivo: opts.motivo ?? null })
     } else {
       reg(opts.status === "CANCELADO" ? "CONCLUIDO" : "CONCLUIDO", 0)
       if (opts.status === "CANCELADO") reg("CANCELADO", 30, { motivo: opts.motivo ?? null })
@@ -470,13 +507,15 @@ async function main() {
     return pedido
   }
 
-  // Histórico dos últimos dias (movimento maior na sexta e no sábado)
+  // Histórico dos últimos dias (movimento maior na sexta e no sábado, e
+  // crescendo ao longo dos dois meses — o gráfico conta uma história de alta).
   const agora = new Date()
   for (let d = DIAS; d >= 0; d--) {
     const dia = diaBase(d)
     const diaSemana = new Date(dia.getTime() + 3 * 3600000).getUTCDay()
     if (diaSemana === 1) continue // fecha segunda
-    const base = diaSemana === 5 || diaSemana === 6 ? entre(16, 24) : entre(8, 15)
+    const crescimento = 0.7 + 0.5 * (1 - d / DIAS) // 0,7× há dois meses → 1,2× hoje
+    const base = Math.round((diaSemana === 5 || diaSemana === 6 ? entre(18, 26) : entre(9, 16)) * crescimento)
     for (let i = 0; i < base; i++) {
       const almoco = chance(0.55)
       const quando = emHoras(dia, almoco ? entre(11, 14) : entre(18, 21))
@@ -485,7 +524,9 @@ async function main() {
       const origem = sorteio < 0.4 ? "BALCAO" : sorteio < 0.72 ? "COMANDA" : sorteio < 0.87 ? "TELEFONE" : "ONLINE"
       const itens = sortearItens(origem === "COMANDA" ? 5 : 3)
       const clienteIdx = chance(0.55) ? entre(0, clientes.length - 1) : null
-      const cancelada = chance(0.03)
+      // Pedido online pode ser recusado pela loja (a fila da demo termina vazia).
+      const recusada = origem === "ONLINE" && chance(0.08)
+      const cancelada = !recusada && chance(0.03)
       const servico = origem === "COMANDA" && chance(0.85)
       const descontoPct = chance(0.08) ? escolher([5, 10]) : 0
       const dividido = origem === "COMANDA" && chance(0.35)
@@ -493,46 +534,24 @@ async function main() {
       await criarVenda({
         origem,
         quando,
-        status: cancelada ? "CANCELADO" : "CONCLUIDO",
+        status: recusada ? "RECUSADO" : cancelada ? "CANCELADO" : "CONCLUIDO",
         itens,
         mesa: origem === "COMANDA" ? escolher(MESAS) : null,
         clienteIdx,
         entrega: (origem === "TELEFONE" || origem === "ONLINE") && chance(0.6),
         servico,
         descontoPct,
-        pagamento: cancelada ? "nenhum" : dividido ? "dividido" : "conta",
-        motivo: cancelada ? escolher(["Cliente desistiu", "Lançada em duplicidade", "Erro no pedido"]) : undefined,
+        pagamento: recusada || cancelada ? "nenhum" : dividido ? "dividido" : "conta",
+        motivo: recusada
+          ? escolher(["Fora da área de entrega", "Item esgotado", "Cozinha fechando"])
+          : cancelada
+            ? escolher(["Cliente desistiu", "Lançada em duplicidade", "Erro no pedido"])
+            : undefined,
       })
     }
   }
 
-  // ---- situação de agora: comandas abertas, fila e produção -------------------------
-
-  const inicioHoje = diaBase(0)
   const horaAgora = Number(new Intl.DateTimeFormat("pt-BR", { timeZone: TZ, hour: "2-digit", hour12: false }).format(agora))
-  const recente = (minAtras: number) => new Date(Math.max(agora.getTime() - minAtras * 60000, inicioHoje.getTime()))
-
-  // Mesa 3: itens já na produção (aparece na tela Produção)
-  await criarVenda({ origem: "COMANDA", quando: recente(25), status: "ABERTA", itens: sortearItens(4), mesa: "3", servico: true, rodadaEnviada: true, pagamento: "nenhum" })
-  await criarVenda({ origem: "COMANDA", quando: recente(14), status: "ABERTA", itens: sortearItens(3), mesa: "Varanda 1", servico: true, rodadaEnviada: true, pagamento: "nenhum", clienteIdx: 6 })
-  // Varanda 2: rodada pronta e um pagamento parcial (divisão em andamento)
-  const varanda = await criarVenda({
-    origem: "COMANDA", quando: recente(70), status: "ABERTA", mesa: "Varanda 2", servico: true, clienteIdx: 2,
-    itens: sortearItens(4), rodadaEnviada: true, rodadaPronta: true,
-    pagamento: "nenhum", pagamentoParcialC: 4000,
-  })
-  await prisma.pedido.update({
-    where: { id: varanda.id },
-    data: { divisao: { modo: "igual", pessoas: [{ id: "p1", nome: "Ana" }, { id: "p2", nome: "Bia" }, { id: "p3", nome: "Caio" }], itens: {}, valores: {} } },
-  })
-  // Mesa 6: acabou de abrir, sem nada lançado
-  await criarVenda({ origem: "COMANDA", quando: recente(6), status: "ABERTA", itens: [], mesa: "6", servico: true, pagamento: "nenhum" })
-
-  // Fila de pedidos online
-  await criarVenda({ origem: "ONLINE", quando: recente(4), status: "AGUARDANDO", itens: sortearItens(2), clienteIdx: 1, entrega: true })
-  await criarVenda({ origem: "ONLINE", quando: recente(12), status: "AGUARDANDO", itens: sortearItens(2), clienteIdx: 5 })
-  await criarVenda({ origem: "ONLINE", quando: recente(22), status: "EM_PREPARO", itens: sortearItens(3), clienteIdx: 8, entrega: true })
-  await criarVenda({ origem: "TELEFONE", quando: recente(35), status: "PRONTO", itens: sortearItens(2), clienteIdx: 3, entrega: true })
 
   await prisma.pedidoConfig.update({ where: { comercioId: comercio.id }, data: { proximoNumero: numero } })
 
@@ -556,12 +575,21 @@ async function main() {
   const [vendas] = await prisma.$queryRaw<{ n: number; total: string }[]>`
     SELECT COUNT(*)::int AS n, COALESCE(SUM(total), 0)::text AS total
     FROM pedidos WHERE "comercioId" = ${comercio.id} AND status = 'CONCLUIDO'`
-  const abertas = await prisma.pedido.count({ where: { comercioId: comercio.id, status: "ABERTA" } })
-  const fila = await prisma.pedido.count({ where: { comercioId: comercio.id, status: { in: ["AGUARDANDO", "EM_PREPARO", "PRONTO"] } } })
+  // Garantia da demo: nada em aberto (comanda, fila, produção).
+  const emAberto = await prisma.pedido.count({
+    where: { comercioId: comercio.id, status: { notIn: ["CONCLUIDO", "CANCELADO", "RECUSADO"] } },
+  })
+  if (emAberto > 0) throw new Error(`${emAberto} venda(s) ficaram em aberto — a demo deve terminar sem nenhuma.`)
+  const [hoje] = await prisma.$queryRaw<{ n: number; total: string }[]>`
+    SELECT COUNT(*)::int AS n, COALESCE(SUM(total), 0)::text AS total
+    FROM pedidos WHERE "comercioId" = ${comercio.id} AND status = 'CONCLUIDO' AND "fechadaEm" >= ${diaBase(0)}`
+  const recusadas = await prisma.pedido.count({ where: { comercioId: comercio.id, status: "RECUSADO" } })
+  const canceladas = await prisma.pedido.count({ where: { comercioId: comercio.id, status: "CANCELADO" } })
 
   console.log(`\n✅ Loja de demonstração criada: ${NOME_LOJA} (fictícia)`)
   console.log(`   ${vendas.n} vendas concluídas · R$ ${Number(vendas.total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} em ${DIAS} dias`)
-  console.log(`   ${abertas} comanda(s) aberta(s) · ${fila} pedido(s) na fila · ${eventos.length} visitas no guia · hora local ${horaAgora}h`)
+  console.log(`   hoje até ${horaAgora}h: ${hoje.n} vendas · R$ ${Number(hoje.total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`)
+  console.log(`   ${canceladas} cancelada(s) · ${recusadas} recusada(s) · nenhuma em aberto · ${eventos.length} visitas no guia`)
   console.log(`\n   Acesso (senha ${SENHA} para todos):`)
   console.log(`   dono       demo-dono${SUFIXO}        (vê tudo: relatórios, equipe, vitrine)`)
   console.log(`   gerente    demo-gerente${SUFIXO}     (tudo da operação, sem equipe)`)
