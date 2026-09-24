@@ -346,7 +346,7 @@ export async function cardapioDaMesa(token: string): Promise<CardapioDaMesa | nu
       nome: true,
       produtos: {
         // Pedido do cliente na mesa: mesma regra do cardápio público.
-        where: { disponivel: true, arquivado: false, mostrarNaVitrine: true },
+        where: { disponivel: true, arquivado: false },
         orderBy: [{ ordem: "asc" }, { titulo: "asc" }],
         select: {
           id: true, titulo: true, descricao: true, preco: true, precoPromo: true, promoFim: true, destaque: true, imagens: true,
@@ -423,7 +423,7 @@ export async function pedirNaMesa(token: string, input: PedidoDaMesaInput) {
   // Preço e disponibilidade sempre do banco — o celular do cliente nunca manda valor.
   const ids = [...new Set(input.itens.map((i) => i.produtoId))]
   const produtos = await prisma.produto.findMany({
-    where: { id: { in: ids }, comercioId: mesa.comercioId, disponivel: true, arquivado: false, mostrarNaVitrine: true, categoriaCardapioId: { not: null } },
+    where: { id: { in: ids }, comercioId: mesa.comercioId, disponivel: true, arquivado: false, categoriaCardapioId: { not: null } },
     include: { variacoes: true },
   })
   const mapa = new Map(produtos.map((p) => [p.id, p]))

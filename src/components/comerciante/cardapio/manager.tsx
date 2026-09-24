@@ -444,10 +444,10 @@ export function CardapioManager({
                                       )}>
                                         {produto.disponivel ? "Visível" : "Oculto"}
                                       </span>
-                                      {produto.mostrarNaVitrine === false && (
+                                      {produto.noCatalogo && (
                                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600 flex items-center gap-1">
                                           <Store className="h-2.5 w-2.5" />
-                                          Só PDV
+                                          Também no catálogo
                                         </span>
                                       )}
                                       {produto.destaque && (

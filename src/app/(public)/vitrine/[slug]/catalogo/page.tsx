@@ -33,10 +33,27 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
       whatsapp: true,
       telefone: true,
       plan: { select: { features: true } },
+      pedidoConfig: { select: { aceitaPedidos: true } },
       produtos: {
-        where: { disponivel: true, arquivado: false, mostrarNaVitrine: true, categoriaCardapioId: null },
+        where: { disponivel: true, arquivado: false, noCatalogo: true },
         orderBy: [{ ordem: "asc" }, { createdAt: "asc" }],
-        include: { variacoes: { orderBy: { ordem: "asc" } } },
+        include: {
+          variacoes: { orderBy: { ordem: "asc" } },
+          // Produto do catálogo também pode ser pedido online — com os mesmos
+          // complementos que teria no cardápio (validados no /api/pedidos).
+          complementos: {
+            orderBy: { ordem: "asc" },
+            where: { grupo: { ativo: true } },
+            select: {
+              grupo: {
+                select: {
+                  id: true, nome: true, minimo: true, maximo: true,
+                  opcoes: { where: { disponivel: true }, orderBy: { ordem: "asc" }, select: { id: true, nome: true, preco: true, quantidadeMax: true } },
+                },
+              },
+            },
+          },
+        },
       },
       catalogoCategorias: { orderBy: [{ tipo: "asc" }, { ordem: "asc" }] },
     },
@@ -44,6 +61,28 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
 
   if (!comercio) notFound()
   if (!temFeature(comercio.plan.features, "catalogo")) notFound()
+
+  // Campo a campo: custo e código interno nunca vão para a tela pública.
+  const paraItem = (p: (typeof comercio.produtos)[number]) => ({
+    id: p.id,
+    tipo: p.tipo as "PRODUTO" | "SERVICO",
+    titulo: p.titulo,
+    descricao: p.descricao,
+    preco: p.preco,
+    precoPromo: p.precoPromo,
+    promoFim: p.promoFim ? p.promoFim.toISOString() : null,
+    destaque: p.destaque,
+    imagens: p.imagens,
+    categoriaCatalogoId: p.categoriaCatalogoId,
+    variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
+    complementos: p.complementos.map((c) => c.grupo).filter((g) => g.opcoes.length > 0),
+    unidade: p.unidade,
+  })
+  // Pedido online: mesma regra do cardápio (plano + loja aceitando + ATIVO).
+  const pedidoAtivo =
+    comercio.status === "ATIVO" &&
+    temFeature(comercio.plan.features, "pedido_online") &&
+    !!comercio.pedidoConfig?.aceitaPedidos
 
   const produtos = comercio.produtos.filter((p) => p.tipo === "PRODUTO")
   const servicos = comercio.produtos.filter((p) => p.tipo === "SERVICO")
@@ -68,37 +107,12 @@ export default async function PaginaCatalogo({ params }: { params: Promise<{ slu
       slug={comercio.slug}
       whatsapp={comercio.whatsapp}
       telefone={comercio.telefone}
-      produtos={produtos.map((p) => ({
-        id: p.id,
-        tipo: p.tipo as "PRODUTO" | "SERVICO",
-        titulo: p.titulo,
-        descricao: p.descricao,
-        preco: p.preco,
-        precoPromo: p.precoPromo,
-        promoFim: p.promoFim ? p.promoFim.toISOString() : null,
-        destaque: p.destaque,
-        imagens: p.imagens,
-        categoriaCatalogoId: p.categoriaCatalogoId,
-        variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
-        unidade: p.unidade,
-      }))}
+      produtos={produtos.map(paraItem)}
       categoriasProdutos={categoriasProdutos}
       categoriasServicos={categoriasServicos}
-      servicos={servicos.map((p) => ({
-        id: p.id,
-        tipo: p.tipo as "PRODUTO" | "SERVICO",
-        titulo: p.titulo,
-        descricao: p.descricao,
-        preco: p.preco,
-        precoPromo: p.precoPromo,
-        promoFim: p.promoFim ? p.promoFim.toISOString() : null,
-        destaque: p.destaque,
-        imagens: p.imagens,
-        categoriaCatalogoId: p.categoriaCatalogoId,
-        variacoes: p.variacoes.map((v) => ({ id: v.id, nome: v.nome, preco: v.preco })),
-        unidade: p.unidade,
-      }))}
+      servicos={servicos.map(paraItem)}
       now={Date.now()}
+      pedidoAtivo={pedidoAtivo}
     />
     </>
   )

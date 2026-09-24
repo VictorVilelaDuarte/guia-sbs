@@ -38,12 +38,11 @@ export function ProdutosManager({
   const label = tipo === "SERVICO" ? "serviço" : "produto"
   const labelPlural = tipo === "SERVICO" ? "serviços" : "produtos"
 
-  // Filtra apenas os itens do tipo correto que não estão vinculados ao cardápio
-  const itensFiltradosPorTipo = produtosIniciais.filter(
-    (p) => p.tipo === tipo && !p.categoriaCardapioId,
-  )
-
-  const [produtos, setProdutos] = useState<Produto[]>(itensFiltradosPorTipo)
+  // Todos os itens do tipo; a tela mostra os que estão no catálogo ou só no PDV
+  // (fora do cardápio). Item só do cardápio fica na tela Cardápio — e some daqui
+  // na hora se for editado para sair do catálogo.
+  const [todos, setProdutos] = useState<Produto[]>(() => produtosIniciais.filter((p) => p.tipo === tipo))
+  const produtos = todos.filter((p) => p.noCatalogo || !p.categoriaCardapioId)
   const [categorias, setCategorias] = useState<CatalogoCategoria[]>(categoriasCatalogoIniciais)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<Produto | null>(null)
@@ -96,7 +95,7 @@ export function ProdutosManager({
   function codigoLido(codigo: string) {
     setLendo(false)
     const c = codigo.replace(/\s+/g, "").toUpperCase()
-    const existente = produtos.find((p) => codigosDe(p).includes(c))
+    const existente = todos.find((p) => codigosDe(p).includes(c))
     if (existente) {
       toast.info(`Código já cadastrado em "${existente.titulo}".`)
       abrirEdicao(existente)
@@ -243,7 +242,7 @@ export function ProdutosManager({
             )}>
               {p.disponivel ? "Visível" : "Oculto"}
             </span>
-            {p.mostrarNaVitrine === false && (
+            {!p.noCatalogo && !p.categoriaCardapioId && (
               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-600 flex items-center gap-1">
                 <Store className="h-2.5 w-2.5" />
                 Só PDV

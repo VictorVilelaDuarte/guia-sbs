@@ -346,17 +346,20 @@ model Produto {
   // Identificação (2026-09-24). Códigos únicos por loja — o mesmo código não
   // pode estar num produto e numa variação ao mesmo tempo (validado no código,
   // src/lib/produtos-codigos.ts: o banco não expressa unicidade entre tabelas).
-  codigoBarras     String? // EAN/GTIN — leitor no PDV ou câmera do celular
-  codigoInterno    String? // SKU curto para digitar no PDV
-  marca            String?
+  codigoBarras  String? // EAN/GTIN — leitor no PDV ou câmera do celular
+  codigoInterno String? // SKU curto para digitar no PDV
+  marca         String?
   // Preço e margem (opcionais). Custo em Float, como o preço do produto — o
   // valor que conta é o snapshot do pedido (PedidoItem.custoUnit, Decimal).
-  precoCusto       Float?
-  unidade          UnidadeProduto @default(UN)
-  // Onde aparece: fora da vitrine = só PDV/comanda (sacola, gelo);
-  // arquivado = fora de linha, some de todo lugar sem apagar o histórico.
-  mostrarNaVitrine Boolean        @default(true)
-  arquivado        Boolean        @default(false)
+  precoCusto    Float?
+  unidade       UnidadeProduto @default(UN)
+  // Onde aparece (caminho A, 2026-09-24): no cardápio = categoriaCardapioId
+  // preenchido; no catálogo = noCatalogo. Os dois podem valer juntos (o mesmo
+  // produto no cardápio e no catálogo); nenhum = item só de balcão (PDV).
+  // Arquivado = fora de linha, some de todo lugar sem apagar o histórico.
+  // Coluna criada e preenchida por prisma/migrate-onde-aparece.ts.
+  noCatalogo    Boolean        @default(false)
+  arquivado     Boolean        @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

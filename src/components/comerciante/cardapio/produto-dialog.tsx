@@ -24,6 +24,7 @@ import {
   Tag,
   ScanBarcode,
   Archive,
+  Package,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { LeitorCodigoBarras } from "@/components/comerciante/leitor-codigo-barras";
@@ -101,7 +102,7 @@ export function ProdutoDialog({
     marca: "",
     precoCusto: "",
     unidade: "UN",
-    mostrarNaVitrine: true,
+    noCatalogo: true,
     arquivado: false,
   });
   // Campo que recebe o código lido pela câmera: o do produto ou o de uma variação.
@@ -158,7 +159,7 @@ export function ProdutoDialog({
         marca: produto.marca ?? "",
         precoCusto: reais(produto.precoCusto),
         unidade: produto.unidade ?? "UN",
-        mostrarNaVitrine: produto.mostrarNaVitrine ?? true,
+        noCatalogo: produto.noCatalogo ?? !produto.categoriaCardapioId,
         arquivado: produto.arquivado ?? false,
       });
     } else {
@@ -183,7 +184,9 @@ export function ProdutoDialog({
         marca: "",
         precoCusto: "",
         unidade: "UN",
-        mostrarNaVitrine: true,
+        // Aberto pela tela Cardápio (com categoria): só no cardápio; pela tela
+        // Produtos e serviços: no catálogo.
+        noCatalogo: !defaultCategoriaId,
         arquivado: false,
       });
     }
@@ -338,11 +341,10 @@ export function ProdutoDialog({
           : null,
       categoriaCardapioId:
         !isServico && form.incluirNoCardapio ? form.categoriaCardapioId : null,
-      // Item no cardápio sai do catálogo, então não carrega categoria de catálogo.
-      categoriaCatalogoId:
-        !isServico && form.incluirNoCardapio
-          ? null
-          : form.categoriaCatalogoId || null,
+      // Cardápio e catálogo são independentes; a categoria do catálogo só vale
+      // para quem está no catálogo.
+      categoriaCatalogoId: form.noCatalogo ? form.categoriaCatalogoId || null : null,
+      noCatalogo: form.noCatalogo,
       variacoes: form.variacoes.map((v) => ({
         nome: v.nome.trim(),
         preco: parsePreco(v.preco) ?? 0,
@@ -356,7 +358,6 @@ export function ProdutoDialog({
       marca: form.marca.trim() || null,
       precoCusto: temVariacoes ? null : parsePreco(form.precoCusto) ?? null,
       unidade: form.unidade,
-      mostrarNaVitrine: form.mostrarNaVitrine,
       arquivado: form.arquivado,
     };
 
@@ -722,40 +723,6 @@ export function ProdutoDialog({
             </div>
           </div>
 
-          {/* Onde aparece */}
-          <div className="space-y-2 rounded-lg border border-input/70 p-3">
-            <p className="text-sm font-medium">Onde aparece</p>
-            <label className="flex items-start justify-between gap-3 text-sm">
-              <span>
-                Mostrar na vitrine e no cardápio online
-                <span className="block text-xs text-muted-foreground">
-                  Desligado, o item só aparece no PDV (ex.: sacola, gelo, embalagem).
-                </span>
-              </span>
-              <Switch
-                checked={form.mostrarNaVitrine}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, mostrarNaVitrine: v }))}
-              />
-            </label>
-            {isEdicao && (
-              <label className="flex items-start justify-between gap-3 border-t border-input/60 pt-2 text-sm">
-                <span className="flex items-start gap-2">
-                  <Archive className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span>
-                    Arquivado (fora de linha)
-                    <span className="block text-xs text-muted-foreground">
-                      Some da vitrine e do PDV. O histórico de vendas continua.
-                    </span>
-                  </span>
-                </span>
-                <Switch
-                  checked={form.arquivado}
-                  onCheckedChange={(v) => setForm((f) => ({ ...f, arquivado: v }))}
-                />
-              </label>
-            )}
-          </div>
-
           {/* Disponível */}
           <div className="space-y-2">
             <Label>Disponível</Label>
@@ -860,31 +827,45 @@ export function ProdutoDialog({
             </div>
           </button>
 
-          {/* Categoria do catálogo — para itens que ficam no catálogo
-              (serviços sempre; produtos quando não vão para o cardápio) */}
-          {(isServico || !form.incluirNoCardapio) && categoriasCatalogo.length > 0 && (
-            <div className="space-y-1.5">
-              <Label htmlFor="cat-catalogo-sel">
-                Categoria{" "}
-                <span className="text-muted-foreground font-normal">(opcional)</span>
-              </Label>
-              <select
-                id="cat-catalogo-sel"
-                value={form.categoriaCatalogoId}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, categoriaCatalogoId: e.target.value }))
-                }
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-              >
-                <option value="">Sem categoria (Outros)</option>
-                {categoriasCatalogo.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {/* Onde aparece — cardápio e catálogo são independentes: o mesmo
+              produto pode estar nos dois, em um só ou em nenhum (só PDV). */}
+          <div className="space-y-3 rounded-lg border border-input p-3">
+            <label className="flex items-start justify-between gap-3 text-sm">
+              <span className="flex items-start gap-2">
+                <Package className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>
+                  <span className="font-medium">No catálogo</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Aparece na página de produtos da vitrine e pode ser pedido online.
+                  </span>
+                </span>
+              </span>
+              <Switch
+                checked={form.noCatalogo}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, noCatalogo: v }))}
+              />
+            </label>
+            {form.noCatalogo && categoriasCatalogo.length > 0 && (
+              <div className="space-y-1.5">
+                <Label htmlFor="cat-catalogo-sel" className="text-xs text-muted-foreground">
+                  Categoria do catálogo <span className="font-normal">(opcional)</span>
+                </Label>
+                <select
+                  id="cat-catalogo-sel"
+                  value={form.categoriaCatalogoId}
+                  onChange={(e) => setForm((f) => ({ ...f, categoriaCatalogoId: e.target.value }))}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                >
+                  <option value="">Sem categoria (Outros)</option>
+                  {categoriasCatalogo.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
           {/* Incluir no cardápio — oculto para serviços */}
           {!isServico && categorias.length > 0 && (
@@ -905,7 +886,7 @@ export function ProdutoDialog({
                 <div className="flex items-center gap-2">
                   <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm font-medium">
-                    Incluir no cardápio
+                    No cardápio
                   </span>
                 </div>
                 <div
@@ -1042,6 +1023,31 @@ export function ProdutoDialog({
                 </div>
               )}
             </div>
+          )}
+
+          {/* Sem cardápio e sem catálogo: continua vendendo no PDV. */}
+          {!form.noCatalogo && !(form.incluirNoCardapio && !isServico) && (
+            <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+              Fora do cardápio e do catálogo, o item fica <strong>só no PDV</strong> (ex.: sacola, gelo, embalagem).
+            </p>
+          )}
+
+          {isEdicao && (
+            <label className="flex items-start justify-between gap-3 rounded-lg border border-input p-3 text-sm">
+              <span className="flex items-start gap-2">
+                <Archive className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span>
+                  Arquivado (fora de linha)
+                  <span className="block text-xs text-muted-foreground">
+                    Some do cardápio, do catálogo e do PDV. O histórico de vendas continua.
+                  </span>
+                </span>
+              </span>
+              <Switch
+                checked={form.arquivado}
+                onCheckedChange={(v) => setForm((f) => ({ ...f, arquivado: v }))}
+              />
+            </label>
           )}
 
           <div className="flex justify-end gap-2 pt-2">

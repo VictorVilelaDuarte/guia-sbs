@@ -37,7 +37,7 @@ export interface Produto {
   marca?: string | null
   precoCusto?: number | null
   unidade?: string
-  mostrarNaVitrine?: boolean
+  noCatalogo?: boolean // no catálogo (independente do cardápio)
   arquivado?: boolean
   createdAt: Date | string
   updatedAt: Date | string
@@ -75,7 +75,7 @@ export interface ProdutoFormState {
   marca: string
   precoCusto: string
   unidade: string
-  mostrarNaVitrine: boolean
+  noCatalogo: boolean
   arquivado: boolean
   incluirNoCardapio: boolean
   categoriaCardapioId: string

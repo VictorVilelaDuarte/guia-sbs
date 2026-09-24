@@ -43,6 +43,7 @@ interface ZonaCheckout {
 
 interface Props {
   slug: string;
+  voltarHref: string; // cardápio ou catálogo — de onde os itens vieram
   comercioId: string;
   nomeComercio: string;
   abertoAgora: boolean;
@@ -50,10 +51,10 @@ interface Props {
   config: ConfigPedido;
 }
 
-export function CheckoutForm({ slug, comercioId, nomeComercio, abertoAgora, zonas, config }: Props) {
+export function CheckoutForm({ slug, voltarHref, comercioId, nomeComercio, abertoAgora, zonas, config }: Props) {
   const router = useRouter();
   const carrinho = useCarrinho(slug);
-  const cardapioHref = `/vitrine/${slug}/cardapio`;
+  const cardapioHref = voltarHref;
 
   const [tipoEntrega, setTipoEntrega] = useState<"ENTREGA" | "RETIRADA">(
     config.entregaAtiva ? "ENTREGA" : "RETIRADA",

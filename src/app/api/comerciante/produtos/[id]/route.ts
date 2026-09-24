@@ -116,11 +116,15 @@ export async function PATCH(
     if (conflito) return NextResponse.json({ error: conflito }, { status: 409 })
   }
 
-  // Entrar no catálogo (saindo do cardápio) ou trocar de aba conta no limite do plano.
+  // Passar a aparecer na tela Produtos e serviços (entrar no catálogo, ou sair
+  // do cardápio sem ir para o catálogo) ou trocar de aba conta no limite do plano.
   const tipoFinal = parsed.data.tipo ?? produto.tipo
   const cardapioFinal =
     parsed.data.categoriaCardapioId !== undefined ? parsed.data.categoriaCardapioId : produto.categoriaCardapioId
-  const entraNaAba = !cardapioFinal && (produto.categoriaCardapioId || tipoFinal !== produto.tipo)
+  const catalogoFinal = parsed.data.noCatalogo ?? produto.noCatalogo
+  const estavaNaAba = produto.noCatalogo || !produto.categoriaCardapioId
+  const ficaNaAba = catalogoFinal || !cardapioFinal
+  const entraNaAba = ficaNaAba && (!estavaNaAba || tipoFinal !== produto.tipo)
   if (entraNaAba) {
     const limite = await negarLimiteCatalogo(produto.comercioId, ctx.features, tipoFinal, produto.id)
     if (limite) return limite

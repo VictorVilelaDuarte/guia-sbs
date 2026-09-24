@@ -31,6 +31,8 @@ export default async function PaginaCheckout({
       horarios: true,
       plan: { select: { features: true } },
       pedidoConfig: true,
+      // Loja só com catálogo (sem cardápio): "voltar" e "adicionar mais" vão ao catálogo.
+      _count: { select: { produtos: { where: { categoriaCardapioId: { not: null }, disponivel: true, arquivado: false } } } },
       zonasEntrega: {
         where: { ativo: true },
         orderBy: [{ cidade: "asc" }, { ordem: "asc" }, { nome: "asc" }],
@@ -47,8 +49,11 @@ export default async function PaginaCheckout({
     temFeature(comercio.plan.features, "pedido_online") &&
     !!cfg?.aceitaPedidos
 
-  // Sem pedido ativo, não há checkout — volta ao cardápio.
-  if (!podePedir || !cfg) redirect(`/vitrine/${slug}/cardapio`)
+  const temCardapio = temFeature(comercio.plan.features, "cardapio") && comercio._count.produtos > 0
+  const voltarHref = `/vitrine/${slug}/${temCardapio ? "cardapio" : "catalogo"}`
+
+  // Sem pedido ativo, não há checkout — volta ao cardápio (ou ao catálogo).
+  if (!podePedir || !cfg) redirect(voltarHref)
 
   // Aberto agora? Sem horário cadastrado, considera aberto (igual ao servidor).
   const horarios = parseHorarios(comercio.horarios)
@@ -61,6 +66,7 @@ export default async function PaginaCheckout({
   return (
     <CheckoutForm
       slug={slug}
+      voltarHref={voltarHref}
       comercioId={comercio.id}
       nomeComercio={comercio.nome}
       abertoAgora={abertoAgora}

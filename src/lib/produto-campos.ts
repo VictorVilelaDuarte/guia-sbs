@@ -34,6 +34,6 @@ export const camposCadastroSchema = {
     .transform((v) => (v === undefined ? undefined : v?.trim() || null)),
   precoCusto: custo,
   unidade: z.enum(UnidadeProduto).optional(),
-  mostrarNaVitrine: z.boolean().optional(),
+  noCatalogo: z.boolean().optional(),
   arquivado: z.boolean().optional(),
 }

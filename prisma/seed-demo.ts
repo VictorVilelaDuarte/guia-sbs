@@ -316,6 +316,8 @@ async function main() {
           disponivel: it.disponivel !== false,
           ordem: i,
           codigoInterno,
+          // Água mineral: no cardápio e no catálogo (também vendida "para levar").
+          noCatalogo: it.titulo === "Água mineral",
           codigoBarras: temEan && !it.variacoes ? proximoEan() : null,
           precoCusto: it.variacoes ? null : custoDe(it.preco) / 100,
           variacoes: it.variacoes
@@ -390,6 +392,7 @@ async function main() {
     codigoInterno: proximoInterno(),
     precoCusto: Math.round(precoC * 0.55) / 100, // revenda: margem menor
     marca: "Cantinho da Serra",
+    noCatalogo: true,
     ...extra,
   })
   await prisma.produto.createMany({
@@ -400,9 +403,9 @@ async function main() {
       itemCatalogo("Doce de leite caseiro (400g)", 2800),
       itemCatalogo("Cachaça artesanal (700ml)", 7900, { marca: "Alambique do Baú" }),
       // Só no balcão: não aparece na vitrine nem no cardápio online.
-      itemCatalogo("Sacola retornável", 400, { categoriaCatalogoId: null, marca: null, mostrarNaVitrine: false, precoCusto: 1.8 }),
-      { comercioId: comercio.id, titulo: "Reserva do salão para eventos", preco: 0, tipo: "SERVICO", codigoInterno: proximoInterno() },
-      { comercioId: comercio.id, titulo: "Café colonial para grupos (por pessoa)", preco: 89, tipo: "SERVICO", codigoInterno: proximoInterno() },
+      itemCatalogo("Sacola retornável", 400, { categoriaCatalogoId: null, marca: null, noCatalogo: false, precoCusto: 1.8 }),
+      { comercioId: comercio.id, titulo: "Reserva do salão para eventos", preco: 0, tipo: "SERVICO", noCatalogo: true, codigoInterno: proximoInterno() },
+      { comercioId: comercio.id, titulo: "Café colonial para grupos (por pessoa)", preco: 89, tipo: "SERVICO", noCatalogo: true, codigoInterno: proximoInterno() },
     ],
   })
   // Item fora de linha: arquivado (some do cardápio e do PDV, fica no painel).

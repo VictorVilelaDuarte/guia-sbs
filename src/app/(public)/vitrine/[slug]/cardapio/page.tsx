@@ -120,7 +120,7 @@ export default async function PaginaCardapio({ params }: { params: Promise<{ slu
         orderBy: { ordem: "asc" },
         include: {
           produtos: {
-            where: { disponivel: true, arquivado: false, mostrarNaVitrine: true },
+            where: { disponivel: true, arquivado: false },
             orderBy: { ordem: "asc" },
             include: {
               variacoes: { orderBy: { ordem: "asc" } },

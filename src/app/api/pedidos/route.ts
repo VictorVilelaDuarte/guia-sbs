@@ -112,10 +112,10 @@ export async function POST(req: NextRequest) {
       id: { in: ids },
       comercioId: comercio.id,
       disponivel: true,
-      // Cliente só pede o que aparece no cardápio público.
+      // Cliente pede o que aparece no cardápio OU no catálogo públicos.
       arquivado: false,
-      mostrarNaVitrine: true,
-      categoriaCardapioId: { not: null },
+      tipo: "PRODUTO", // serviço do catálogo não vai pelo carrinho
+      OR: [{ categoriaCardapioId: { not: null } }, { noCatalogo: true }],
     },
     include: { variacoes: true },
   })

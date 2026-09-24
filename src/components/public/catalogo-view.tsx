@@ -7,6 +7,9 @@ import { ChevronLeft, MessageCircle, Search, X, PackageOpen, Wrench } from "luci
 import { cn } from "@/lib/utils";
 import { ProdutoBottomSheet, type ProdutoSheet } from "./cardapio/produto-bottom-sheet";
 import { sufixoUnidade } from "@/lib/unidades";
+import { useCarrinho } from "@/lib/carrinho";
+import { CartBar } from "./cardapio/cart-bar";
+import type { GrupoComplementoPublico } from "./cardapio/types";
 
 interface Variacao {
   id: string;
@@ -26,6 +29,7 @@ interface Item {
   imagens: string[];
   categoriaCatalogoId: string | null;
   variacoes: Variacao[];
+  complementos?: GrupoComplementoPublico[];
   unidade?: string;
 }
 
@@ -45,6 +49,8 @@ interface Props {
   categoriasProdutos: CategoriaRef[];
   categoriasServicos: CategoriaRef[];
   now: number;
+  // Pedido online ativo: produtos (não serviços) vão para o mesmo carrinho do cardápio.
+  pedidoAtivo?: boolean;
 }
 
 type Aba = "produtos" | "servicos";
@@ -146,7 +152,10 @@ export function CatalogoView({
   categoriasProdutos,
   categoriasServicos,
   now,
+  pedidoAtivo = false,
 }: Props) {
+  const carrinho = useCarrinho(slug);
+  const mostrarCarrinho = pedidoAtivo && carrinho.mounted && carrinho.contagem > 0;
   const temProdutos = produtos.length > 0;
   const temServicos = servicos.length > 0;
 
@@ -169,6 +178,8 @@ export function CatalogoView({
     : itensAtivos;
 
   const grupos = agrupar(itensAtivos, categoriasAtivas);
+
+  const ehServico = (id: string) => servicos.some((s) => s.id === id);
 
   function toSheet(item: Item): ProdutoSheet {
     const cats = item.tipo === "SERVICO" ? categoriasServicos : categoriasProdutos;
@@ -317,10 +328,12 @@ export function CatalogoView({
         produto={selectedItem}
         now={now}
         onClose={() => setSelectedItem(null)}
+        // Serviço (reserva, orçamento) é combinado pelo WhatsApp, não pelo carrinho.
+        onAddToCart={pedidoAtivo && selectedItem && !ehServico(selectedItem.id) ? carrinho.adicionar : undefined}
       />
 
       {/* Conteúdo */}
-      <div className="px-4 pt-5 pb-16">
+      <div className={cn("px-4 pt-5", mostrarCarrinho ? "pb-28" : "pb-16")}>
         {buscaAtiva && (
           <p className="text-xs text-stone-400 mb-4">
             {itensFiltrados.length === 0
@@ -383,6 +396,7 @@ export function CatalogoView({
         )}
       </div>
       </div>
+      {mostrarCarrinho && <CartBar slug={slug} contagem={carrinho.contagem} subtotal={carrinho.subtotal} />}
     </div>
   );
 }

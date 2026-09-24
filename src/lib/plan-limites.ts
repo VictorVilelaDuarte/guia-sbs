@@ -40,13 +40,19 @@ export async function negarLimiteTags(comercioId: string, features: unknown) {
   return total >= max ? negar("tags", max) : null
 }
 
-// Conta só itens do catálogo (fora do cardápio), por tipo — a mesma regra da
-// tela ("até 3 itens por aba"). `ignorarId` = o próprio item numa edição.
+// Conta os itens da tela Produtos e serviços, por tipo — a mesma regra da tela
+// ("até 3 itens por aba"): no catálogo ou só no PDV (fora do cardápio).
+// `ignorarId` = o próprio item numa edição.
 export async function negarLimiteCatalogo(comercioId: string, features: unknown, tipo: TipoProduto, ignorarId?: string) {
   const max = limite(features, "produtos")
   if (max == null) return null
   const total = await prisma.produto.count({
-    where: { comercioId, tipo, categoriaCardapioId: null, ...(ignorarId ? { id: { not: ignorarId } } : {}) },
+    where: {
+      comercioId,
+      tipo,
+      OR: [{ noCatalogo: true }, { categoriaCardapioId: null }],
+      ...(ignorarId ? { id: { not: ignorarId } } : {}),
+    },
   })
   return total >= max ? negar("produtos", max) : null
 }

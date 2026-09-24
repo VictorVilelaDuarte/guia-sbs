@@ -20,10 +20,14 @@ const HIDDEN_PREFIXES = ["/para-comerciantes"]
 export function BottomNav() {
   const pathname = usePathname()
 
-  // O cardápio (e seu checkout) é uma experiência app-like focada, com header e
-  // tabs próprios; o nav flutuante do guia atrapalha e colide com a barra de
-  // carrinho do pedido online. Oculto em qualquer rota .../cardapio[/...].
-  if (HIDDEN_PREFIXES.some((p) => pathname.startsWith(p)) || pathname.includes("/cardapio")) {
+  // Cardápio e catálogo (com o checkout) são experiências app-like focadas, com
+  // header e tabs próprios; o nav flutuante do guia atrapalha e colide com a
+  // barra de carrinho do pedido online. Oculto em .../cardapio[/...] e .../catalogo.
+  if (
+    HIDDEN_PREFIXES.some((p) => pathname.startsWith(p)) ||
+    pathname.includes("/cardapio") ||
+    pathname.endsWith("/catalogo")
+  ) {
     return null
   }
 

@@ -81,8 +81,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Item do catálogo (fora do cardápio) conta no limite do plano Gratuito.
-  if (!parsed.data.categoriaCardapioId) {
+  // Item da tela Produtos e serviços (no catálogo ou só PDV) conta no limite do
+  // plano Gratuito; item só do cardápio, não.
+  if (parsed.data.noCatalogo || !parsed.data.categoriaCardapioId) {
     const limite = await negarLimiteCatalogo(ctx.comercioId, ctx.features, parsed.data.tipo ?? "PRODUTO")
     if (limite) return limite
   }
