@@ -49,6 +49,19 @@ const diaBase = (n: number) => {
 const emHoras = (base: Date, h: number, m = entre(0, 59)) => new Date(base.getTime() + (h * 60 + m) * 60000)
 const dec = (centavos: number) => new Prisma.Decimal(centavos).div(100) as unknown as Prisma.Decimal
 
+// Códigos da demo — determinísticos e fora do sorteio (não mudam as vendas).
+// EAN-13 fictício com prefixo brasileiro (789) e dígito verificador válido.
+let seqEan = 0
+function proximoEan(): string {
+  const base = `7891234${String(++seqEan).padStart(5, "0")}`
+  const soma = [...base].reduce((a, d, i) => a + Number(d) * (i % 2 === 0 ? 1 : 3), 0)
+  return base + ((10 - (soma % 10)) % 10)
+}
+let seqInterno = 100
+const proximoInterno = () => String(++seqInterno)
+// Custo de ~38% do preço (margem típica de restaurante), em centavos.
+const custoDe = (precoC: number) => Math.round(precoC * 0.38)
+
 // ---- catálogo fictício -------------------------------------------------------------
 
 const CARDAPIO = [
@@ -275,11 +288,21 @@ async function main() {
   )
 
   // ---- cardápio
-  const produtos: { id: string; titulo: string; precoC: number; variacoes: { id: string; nome: string; precoC: number }[] }[] = []
+  const produtos: {
+    id: string
+    titulo: string
+    precoC: number
+    codigo: string | null
+    custoC: number | null
+    variacoes: { id: string; nome: string; precoC: number; codigo: string | null; custoC: number | null }[]
+  }[] = []
   for (const [ordem, grupo] of CARDAPIO.entries()) {
     const categoria = await prisma.cardapioCategoria.create({ data: { comercioId: comercio.id, nome: grupo.categoria, ordem } })
     for (const [i, item] of grupo.itens.entries()) {
       const it = item as { titulo: string; preco: number; descricao?: string; destaque?: boolean; disponivel?: boolean; promo?: number; variacoes?: { nome: string; preco: number }[] }
+      // Bebidas industrializadas têm código de barras; tudo tem código interno e custo.
+      const temEan = grupo.categoria === "Bebidas"
+      const codigoInterno = proximoInterno()
       const criado = await prisma.produto.create({
         data: {
           comercioId: comercio.id,
@@ -292,7 +315,20 @@ async function main() {
           destaque: !!it.destaque,
           disponivel: it.disponivel !== false,
           ordem: i,
-          variacoes: it.variacoes ? { create: it.variacoes.map((v, o) => ({ nome: v.nome, preco: v.preco / 100, ordem: o })) } : undefined,
+          codigoInterno,
+          codigoBarras: temEan && !it.variacoes ? proximoEan() : null,
+          precoCusto: it.variacoes ? null : custoDe(it.preco) / 100,
+          variacoes: it.variacoes
+            ? {
+                create: it.variacoes.map((v, o) => ({
+                  nome: v.nome,
+                  preco: v.preco / 100,
+                  ordem: o,
+                  codigoBarras: temEan ? proximoEan() : null,
+                  precoCusto: custoDe(v.preco) / 100,
+                })),
+              }
+            : undefined,
         },
         include: { variacoes: true },
       })
@@ -301,7 +337,15 @@ async function main() {
           id: criado.id,
           titulo: criado.titulo,
           precoC: it.promo ?? it.preco,
-          variacoes: criado.variacoes.map((v) => ({ id: v.id, nome: v.nome, precoC: Math.round(v.preco * 100) })),
+          codigo: criado.codigoBarras ?? criado.codigoInterno,
+          custoC: criado.precoCusto != null ? Math.round(criado.precoCusto * 100) : null,
+          variacoes: criado.variacoes.map((v) => ({
+            id: v.id,
+            nome: v.nome,
+            precoC: Math.round(v.preco * 100),
+            codigo: v.codigoBarras ?? criado.codigoInterno,
+            custoC: v.precoCusto != null ? Math.round(v.precoCusto * 100) : null,
+          })),
         })
       }
     }
@@ -336,16 +380,44 @@ async function main() {
 
   // Catálogo (produtos e serviços fora do cardápio)
   const catalogo = await prisma.catalogoCategoria.create({ data: { comercioId: comercio.id, nome: "Da nossa cozinha", tipo: "PRODUTO", ordem: 0 } })
+  const itemCatalogo = (titulo: string, precoC: number, extra: Partial<Prisma.ProdutoCreateManyInput> = {}) => ({
+    comercioId: comercio.id,
+    categoriaCatalogoId: catalogo.id,
+    titulo,
+    preco: precoC / 100,
+    tipo: "PRODUTO" as const,
+    codigoBarras: proximoEan(),
+    codigoInterno: proximoInterno(),
+    precoCusto: Math.round(precoC * 0.55) / 100, // revenda: margem menor
+    marca: "Cantinho da Serra",
+    ...extra,
+  })
   await prisma.produto.createMany({
     data: [
-      { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Geleia de amora (250g)", preco: 32, tipo: "PRODUTO", destaque: true },
-      { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Café em grãos (500g)", preco: 45, tipo: "PRODUTO" },
-      { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Queijo canastra (500g)", preco: 58, tipo: "PRODUTO", destaque: true },
-      { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Doce de leite caseiro (400g)", preco: 28, tipo: "PRODUTO" },
-      { comercioId: comercio.id, categoriaCatalogoId: catalogo.id, titulo: "Cachaça artesanal (700ml)", preco: 79, tipo: "PRODUTO" },
-      { comercioId: comercio.id, titulo: "Reserva do salão para eventos", preco: 0, tipo: "SERVICO" },
-      { comercioId: comercio.id, titulo: "Café colonial para grupos (por pessoa)", preco: 89, tipo: "SERVICO" },
+      itemCatalogo("Geleia de amora (250g)", 3200, { destaque: true }),
+      itemCatalogo("Café em grãos (500g)", 4500, { marca: "Café da Mantiqueira" }),
+      itemCatalogo("Queijo canastra (500g)", 5800, { destaque: true, marca: "Queijaria Serra Alta" }),
+      itemCatalogo("Doce de leite caseiro (400g)", 2800),
+      itemCatalogo("Cachaça artesanal (700ml)", 7900, { marca: "Alambique do Baú" }),
+      // Só no balcão: não aparece na vitrine nem no cardápio online.
+      itemCatalogo("Sacola retornável", 400, { categoriaCatalogoId: null, marca: null, mostrarNaVitrine: false, precoCusto: 1.8 }),
+      { comercioId: comercio.id, titulo: "Reserva do salão para eventos", preco: 0, tipo: "SERVICO", codigoInterno: proximoInterno() },
+      { comercioId: comercio.id, titulo: "Café colonial para grupos (por pessoa)", preco: 89, tipo: "SERVICO", codigoInterno: proximoInterno() },
     ],
+  })
+  // Item fora de linha: arquivado (some do cardápio e do PDV, fica no painel).
+  const sobremesas = await prisma.cardapioCategoria.findFirst({ where: { comercioId: comercio.id, nome: "Sobremesas" }, select: { id: true } })
+  await prisma.produto.create({
+    data: {
+      comercioId: comercio.id,
+      categoriaCardapioId: sobremesas?.id ?? null,
+      titulo: "Sorvete de pinhão (saiu do cardápio)",
+      preco: 19,
+      precoCusto: 7.2,
+      codigoInterno: proximoInterno(),
+      arquivado: true,
+      ordem: 99,
+    },
   })
 
   // ---- clientes
@@ -374,7 +446,7 @@ async function main() {
     { nome: dono.name, id: dono.id },
   ]
 
-  interface ItemVenda { produtoId: string; titulo: string; variacaoNome: string | null; precoC: number; quantidade: number }
+  interface ItemVenda { produtoId: string; titulo: string; variacaoNome: string | null; precoC: number; quantidade: number; codigo: string | null; custoC: number | null }
 
   function sortearItens(qtdMax = 4): ItemVenda[] {
     const n = entre(1, qtdMax)
@@ -382,7 +454,15 @@ async function main() {
     for (let i = 0; i < n; i++) {
       const p = escolher(produtos)
       const v = p.variacoes.length > 0 ? escolher(p.variacoes) : null
-      itens.push({ produtoId: p.id, titulo: p.titulo, variacaoNome: v?.nome ?? null, precoC: v?.precoC ?? p.precoC, quantidade: entre(1, 3) })
+      itens.push({
+        produtoId: p.id,
+        titulo: p.titulo,
+        variacaoNome: v?.nome ?? null,
+        precoC: v?.precoC ?? p.precoC,
+        quantidade: entre(1, 3),
+        codigo: v?.codigo ?? p.codigo,
+        custoC: v?.custoC ?? p.custoC,
+      })
     }
     return itens
   }
@@ -471,6 +551,8 @@ async function main() {
             titulo: i.titulo,
             variacaoNome: i.variacaoNome,
             precoUnit: dec(i.precoC),
+            codigo: i.codigo,
+            custoUnit: i.custoC != null ? dec(i.custoC) : null,
             quantidade: i.quantidade,
             createdAt: opts.quando,
             rodada: passouNaCozinha ? 1 : null,
