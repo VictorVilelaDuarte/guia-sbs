@@ -41,6 +41,18 @@ Os scripts de backfill (`migrate-pagamentos-pedidos.ts`, `migrate-fechada-em.ts`
 `migrate-clientes-pedidos.ts`, `migrate-membros-dono.ts`, `migrate-flag-*.ts`) são
 idempotentes e podem ser rodados de novo sem estrago, mas hoje não têm o que fazer.
 
+## Segurança do banco (RLS)
+
+Aplicado em **2026-09-24** por `prisma/proteger-tabelas.ts`: as 34 tabelas de `public` estão com
+RLS ligado (sem políticas) e sem permissões para `anon`/`authenticated` — a API REST automática
+do Supabase não entrega nem altera nada com a anon key. Antes disso, as 33 tabelas sem RLS
+(inclusive `users`, `clientes`, `pedidos`) podiam ser lidas e alteradas por quem tivesse a anon
+key. O app não usa essa API (Prisma como `postgres`, que tem BYPASSRLS; storage pela service_role).
+
+Tabelas novas (db:push, scripts) nascem protegidas pelo event trigger `proteger_tabelas_novas`.
+Conferir a qualquer momento rodando o script de novo — ele é idempotente e imprime
+`N/N tabelas com RLS · 0 permissão(ões) restante(s)`.
+
 ## Variáveis de ambiente na Vercel (Production)
 
 Configuradas: `DATABASE_URL`, `DIRECT_URL`, `NEXT_PUBLIC_SUPABASE_URL`,
@@ -84,13 +96,14 @@ lado da loja real. Para tirar do ar sem perder os dados, basta mudar `status` pa
 Ordem para um Supabase vazio, reunindo o que está espalhado pelo `CLAUDE.md`:
 
 1. `npm run db:push`
-2. `npx tsx prisma/seed.ts` (super admin) e, se quiser, `npx tsx prisma/seed-bairros.ts`
-3. `npx tsx prisma/migrate-membros-dono.ts`
-4. `npx tsx prisma/migrate-flag-gestao-equipe.ts`
-5. `npx tsx prisma/migrate-flag-gestao-clientes.ts`
-6. `npx tsx prisma/migrate-flag-gestao-relatorios.ts`
-7. publicar o código
-8. `npx tsx prisma/migrate-clientes-pedidos.ts`, `migrate-pagamentos-pedidos.ts`,
+2. `npx tsx prisma/proteger-tabelas.ts` (RLS em todas as tabelas + gatilho para as futuras — **antes** de qualquer dado entrar)
+3. `npx tsx prisma/seed.ts` (super admin) e, se quiser, `npx tsx prisma/seed-bairros.ts`
+4. `npx tsx prisma/migrate-membros-dono.ts`
+5. `npx tsx prisma/migrate-flag-gestao-equipe.ts`
+6. `npx tsx prisma/migrate-flag-gestao-clientes.ts`
+7. `npx tsx prisma/migrate-flag-gestao-relatorios.ts`
+8. publicar o código
+9. `npx tsx prisma/migrate-clientes-pedidos.ts`, `migrate-pagamentos-pedidos.ts`,
    `migrate-fechada-em.ts` (backfills — depois de publicar, para pegar registros criados
    pelo código antigo)
 

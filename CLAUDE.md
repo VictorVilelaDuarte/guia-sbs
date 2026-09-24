@@ -33,6 +33,15 @@ de **produção** (Supabase, pooler 6543 — dev e prod compartilham), e a Verce
 hora. Estado das migrações, variáveis de ambiente, pendências conhecidas e a ordem para
 subir um ambiente novo estão em [`docs/deploy.md`](docs/deploy.md).
 
+**RLS ligado em todas as tabelas (2026-09-24):** a API REST automática do Supabase (PostgREST
+com a anon key) está fechada — RLS sem políticas + permissões de `anon`/`authenticated`
+revogadas. O app não é afetado: o Prisma conecta como `postgres` (BYPASSRLS) e o storage usa a
+service_role key. **Tabela nova nasce protegida** pelo event trigger `proteger_tabelas_novas`
+(função `interno.proteger_tabela_nova`), instalado por `prisma/proteger-tabelas.ts` —
+idempotente; rodar de novo se o trigger for removido ou num ambiente novo. **Nunca** usar a
+anon key para acessar tabelas do app nem criar políticas RLS abertas: acesso a dado é sempre
+pelas rotas do Next.js com `auth()`/`getComercioCtx()`.
+
 ## Comandos
 
 ```bash
