@@ -479,6 +479,17 @@ export function PdvApp(props: Props) {
 
   // ---- cabeçalho de cada modo
   const mostrandoGrid = aba === "comandas" && !comanda
+
+  // Voltar da comanda para o mapa/lista. Itens tocados e ainda não lançados se
+  // perdem ao sair — pergunta antes, para não sumir pedido anotado por engano.
+  function voltarAsComandas() {
+    if (pendentes.length > 0) {
+      const n = pendentes.reduce((a, p) => a + p.quantidade, 0)
+      if (!window.confirm(`Sair sem lançar ${n} item(ns) nesta comanda?`)) return
+    }
+    setComanda(null)
+    setPendentes([])
+  }
   const qtdConta = aba === "venda" ? linhas.reduce((a, l) => a + l.quantidade, 0) : linhasComanda.reduce((a, l) => a + l.quantidade, 0)
   const totalMobileC = aba === "venda" ? totaisVenda.totalC : comanda ? centavos(comanda.saldo) + pendentesC : 0
 
@@ -530,7 +541,7 @@ export function PdvApp(props: Props) {
     <Conta
       cabecalho={
         <div className="flex items-center justify-between gap-2">
-          <button type="button" onClick={() => { setComanda(null); setPendentes([]) }} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm hover:bg-stone-100" aria-label="Voltar às comandas">
+          <button type="button" onClick={voltarAsComandas} className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm hover:bg-stone-100" aria-label="Voltar às comandas">
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
@@ -716,10 +727,29 @@ export function PdvApp(props: Props) {
         </main>
       ) : (
         <main className="flex min-h-0 flex-1">
-          <section className={cn("min-h-0 flex-1", telaMobile === "conta" && "hidden lg:block")}>
-            <CatalogoPdv ref={buscaRef} itens={props.itens} onAdicionar={adicionar} onAvulso={avulso} />
+          {/* min-w-0: sem ele o item flex não encolhe abaixo do conteúdo e a faixa de
+              categorias (rolagem lateral) empurrava a tela inteira para fora no celular. */}
+          <section className={cn("flex min-h-0 min-w-0 flex-1 flex-col", telaMobile === "conta" && "hidden lg:flex")}>
+            {/* Celular com comanda aberta: volta ao mapa sem precisar abrir a conta. */}
+            {aba === "comandas" && comanda && (
+              <div className="flex items-center gap-2 border-b border-stone-200 bg-white px-2 py-1.5 lg:hidden">
+                <button
+                  type="button"
+                  onClick={voltarAsComandas}
+                  className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium hover:bg-stone-100"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Comandas
+                </button>
+                <span className="min-w-0 flex-1 truncate text-right text-sm font-semibold">
+                  {comanda.mesa ? rotuloMesa(comanda.mesa) : comanda.clienteNome}
+                </span>
+              </div>
+            )}
+            <div className="min-h-0 flex-1">
+              <CatalogoPdv ref={buscaRef} itens={props.itens} onAdicionar={adicionar} onAvulso={avulso} />
+            </div>
           </section>
-          <aside className={cn("min-h-0 w-full border-l border-stone-200 lg:block lg:w-[400px] xl:w-[440px]", telaMobile === "produtos" && "hidden")}>
+          <aside className={cn("min-h-0 w-full min-w-0 border-l border-stone-200 lg:block lg:w-[400px] xl:w-[440px]", telaMobile === "produtos" && "hidden")}>
             {aba === "venda" ? contaVenda : contaComanda}
           </aside>
         </main>

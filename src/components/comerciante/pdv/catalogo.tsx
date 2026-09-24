@@ -99,7 +99,9 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        {/* Celular: uma coluna, um produto por linha (nome ⇄ preço). Tablet e
+            desktop: grade de cartões. */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 xl:grid-cols-4">
           {visiveis.map((i) => (
             <button
               key={i.id}
@@ -107,12 +109,12 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
               disabled={!i.disponivel}
               onClick={() => tocar(i)}
               className={cn(
-                "flex min-h-[84px] flex-col justify-between rounded-xl bg-white p-3 text-left shadow-sm ring-1 ring-stone-200 transition active:scale-[0.98]",
+                "flex min-h-[56px] items-center justify-between gap-3 rounded-xl bg-white p-3 text-left shadow-sm ring-1 ring-stone-200 transition active:scale-[0.98] sm:min-h-[84px] sm:flex-col sm:items-stretch sm:gap-0",
                 i.disponivel ? "hover:ring-stone-400" : "cursor-not-allowed opacity-50",
               )}
             >
-              <span className="line-clamp-2 text-sm font-semibold leading-snug">{i.titulo}</span>
-              <span className="mt-1 text-xs tabular-nums text-stone-600">
+              <span className="line-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-snug sm:flex-none">{i.titulo}</span>
+              <span className="shrink-0 text-right text-xs tabular-nums text-stone-600 sm:mt-1 sm:text-left">
                 {!i.disponivel
                   ? "Indisponível"
                   : i.variacoes.length > 0
@@ -124,7 +126,7 @@ export const CatalogoPdv = forwardRef<HTMLInputElement, {
           <button
             type="button"
             onClick={() => setAvulso({ titulo: busca.trim(), preco: "" })}
-            className="flex min-h-[84px] flex-col items-start justify-between rounded-xl border-2 border-dashed border-stone-300 p-3 text-left text-stone-600 hover:border-stone-500"
+            className="flex min-h-[56px] items-center gap-2 rounded-xl border-2 border-dashed border-stone-300 p-3 text-left text-stone-600 hover:border-stone-500 sm:min-h-[84px] sm:flex-col sm:items-start sm:justify-between sm:gap-0"
           >
             <PackagePlus className="h-5 w-5" />
             <span className="text-sm font-medium">Item avulso</span>
